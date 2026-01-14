@@ -13,13 +13,14 @@ Project status: bootstrapping. This repo currently only contains scope documenta
 3) `README.md`
 
 ## 2) Quickstart (Verified Commands Only)
-- Install: TODO — add package manager and install command once `package.json` exists.
+- Install: `npm install`
 - Run dev: TODO — add script after initial seeder entrypoint is created.
-- Build: TODO — add build script after tooling is added.
-- Test: TODO — add test runner and scripts.
-- Lint/format: TODO — add ESLint/Prettier (likely `@cozey-tech/eslint-config`) and scripts.
-- Typecheck: TODO — add `tsc` or equivalent once `tsconfig.json` exists.
-- DB/schema/migrations: TODO — confirm ORM and add commands if applicable.
+- Build: `npm run build`
+- Test: `npm run test`
+- Lint: `npm run lint`
+- Format: `npm run format`
+- Typecheck: `npm run typecheck`
+- DB/schema/migrations: `npm run prisma:generate`
 
 ## 3) Repository Map
 - TODO — define directories once code is added (expected: `src/`, `scripts/`, `prisma/` or `db/`).
@@ -27,7 +28,8 @@ Project status: bootstrapping. This repo currently only contains scope documenta
 ## 4) Architecture & Data
 - Orchestrator job runs end-to-end: seed Shopify orders first, then seed WMS entities using those orders.
 - Seed records must be tagged and safe to re-run; staging-only guardrails are required.
-- TODO — confirm ORM and schema location (likely Prisma) and document data model mappings.
+- Prisma is selected for ORM; schema currently lives at `prisma/schema.prisma`.
+- TODO — document data model mappings once models are defined.
 
 ## 5) Engineering Conventions (Do / Don't)
 - Do follow the Cozey WMS coding conventions provided by Sam (TypeScript, clear naming, enums for string comparisons, avoid deep nesting).
@@ -49,7 +51,10 @@ Project status: bootstrapping. This repo currently only contains scope documenta
 - Expectations once tests exist: meaningful descriptions, `describe` grouping by feature, and Arrange-Act-Assert structure.
 
 ## 7) Tooling & Quality Gates
-- TODO — define lint/format/typecheck scripts and CI checks once tooling exists.
+- Lint: ESLint with `@cozey-tech/eslint-config`
+- Format: Prettier
+- Typecheck: `tsc`
+- TODO — add CI checks once workflows exist.
 - Local verification checklist should include: lint, typecheck, test, and a smoke run of the seeder in staging-safe mode.
 
 ## 8) Git Workflow (Repo-Specific)
@@ -61,6 +66,7 @@ Project status: bootstrapping. This repo currently only contains scope documenta
 - Seeder must refuse to run unless connected to approved staging DBs and staging Shopify store.
 - Never log PII or secrets. Use test emails (e.g., `@example.com`) for Shopify orders.
 - No secrets in repo; add `.env.example` when env vars are known.
+- Database access must be via `DATABASE_URL` for Prisma.
 
 ## 10) Updating This File
 - Update `AGENTS.md` whenever tooling, scripts, architecture, or conventions change.

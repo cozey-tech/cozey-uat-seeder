@@ -1,0 +1,26 @@
+{
+  "name": "cozey-uat-seeder",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Seeder for Shopify staging orders and WMS staging entities.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint \"{src,prisma}/**/*.ts\"",
+    "lint:fix": "eslint \"{src,prisma}/**/*.ts\" --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prisma:generate": "prisma generate"
+  },
+  "devDependencies": {
+    "@cozey-tech/eslint-config": "^1.0.0",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.12.0",
+    "prettier": "^3.4.2",
+    "prisma": "^6.1.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
