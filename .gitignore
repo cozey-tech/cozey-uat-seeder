@@ -1,0 +1,29 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Cursor
+.cursor/
+ai-docs/
+
+# Node / TS
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Logs
+*.log
+logs/
+
+# Package managers
+.pnpm-store/
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions

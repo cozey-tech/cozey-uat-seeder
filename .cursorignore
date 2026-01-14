@@ -1,0 +1,11 @@
+# Allow Cursor access to key folders even if gitignored
+!.cursor/
+!ai-docs/
+!node_modules/
+!logs/
+!*.log
+
+# Secrets and env files should never be read by agents
+.env
+.env.*
+!.env.example
