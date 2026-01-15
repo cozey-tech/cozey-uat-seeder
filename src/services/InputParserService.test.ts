@@ -1,8 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { readFileSync } from "fs";
 
 import { InputParserService, InputValidationError } from "./InputParserService";
-import { readJsonFile, readCsvFile } from "../utils/fileReader";
+import { readJsonFile } from "../utils/fileReader";
 
 // Mock file reader utilities
 vi.mock("../utils/fileReader", () => ({

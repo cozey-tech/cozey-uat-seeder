@@ -1,5 +1,5 @@
 import { seedConfigSchema, type SeedConfig } from "../shared/validation/seedConfigSchema";
-import { readJsonFile, readCsvFile } from "../utils/fileReader";
+import { readJsonFile } from "../utils/fileReader";
 
 export class InputValidationError extends Error {
   constructor(message: string) {

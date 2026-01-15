@@ -15,6 +15,7 @@
     "prisma:generate": "prisma generate"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/node": "^22.10.2",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
@@ -22,6 +23,7 @@
     "eslint": "^9.12.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-jest-formatting": "^3.1.0",
+    "globals": "^17.0.0",
     "prettier": "^3.4.2",
     "prisma": "^6.1.0",
     "typescript": "^5.7.2",
