@@ -92,7 +92,7 @@ export class ShopifyService {
             quantity: item.quantity,
           };
         })
-        .filter((item) => item !== null);
+        .filter((item) => item !== null && item !== undefined);
 
       const variables = {
         input: {
@@ -207,10 +207,10 @@ export class ShopifyService {
     try {
       // Get order line items
       const orderResponse = await this.client.request(queryOrder, { variables: { id: orderId } });
-      const order = orderResponse.data?.order;
-      if (!order || orderResponse.errors) {
+      if (orderResponse.errors || !orderResponse.data?.order) {
         throw new ShopifyServiceError(`Order ${orderId} not found`);
       }
+      const order = orderResponse.data.order;
 
       const lineItems = order.lineItems.edges.map((edge: { node: { id: string; quantity: number } }) => ({
         id: edge.node.id,

@@ -28,6 +28,7 @@ describe("ShopifyService", () => {
       request: vi.fn(),
     };
     vi.mocked(createAdminApiClient).mockReturnValue(mockClient as never);
+    vi.clearAllMocks();
     service = new ShopifyService();
   });
 
@@ -96,7 +97,9 @@ describe("ShopifyService", () => {
       };
 
       // Mock variant lookup returning products but no matching SKU
-      mockClient.request.mockResolvedValueOnce({
+      // The service will call findVariantIdsBySkus which returns an empty map
+      // Then createDraftOrder will throw when it can't find the variant
+      mockClient.request.mockResolvedValue({
         data: {
           products: {
             edges: [
@@ -129,6 +132,8 @@ describe("ShopifyService", () => {
         lineItems: [{ sku: "SKU-001", quantity: 1 }],
       };
 
+      // First call: variant lookup succeeds
+      // Second call: draft order creation fails with user errors
       mockClient.request
         .mockResolvedValueOnce({
           data: {
@@ -158,8 +163,9 @@ describe("ShopifyService", () => {
           extensions: undefined,
         });
 
-      await expect(service.createDraftOrder(input, "batch-123")).rejects.toThrow(ShopifyServiceError);
-      await expect(service.createDraftOrder(input, "batch-123")).rejects.toThrow("Failed to create draft order");
+      const error = await service.createDraftOrder(input, "batch-123").catch((e) => e);
+      expect(error).toBeInstanceOf(ShopifyServiceError);
+      expect(error.message).toContain("Failed to create draft order");
     });
   });
 
@@ -243,7 +249,7 @@ describe("ShopifyService", () => {
     });
 
     it("should throw error if order not found", async () => {
-      mockClient.request.mockResolvedValueOnce({
+      mockClient.request.mockResolvedValue({
         data: {
           order: null,
         },
@@ -251,8 +257,9 @@ describe("ShopifyService", () => {
         extensions: undefined,
       });
 
-      await expect(service.fulfillOrder("invalid-id")).rejects.toThrow(ShopifyServiceError);
-      await expect(service.fulfillOrder("invalid-id")).rejects.toThrow("not found");
+      const error = await service.fulfillOrder("invalid-id").catch((e) => e);
+      expect(error).toBeInstanceOf(ShopifyServiceError);
+      expect(error.message).toContain("not found");
     });
   });
 
