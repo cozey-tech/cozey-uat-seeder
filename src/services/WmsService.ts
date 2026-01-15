@@ -1,11 +1,5 @@
 import type { WmsRepository } from "../repositories/interface/WmsRepository";
 import type {
-  CreateOrderRequest,
-  CreateVariantOrderRequest,
-  CreatePrepRequest,
-  CreateShipmentRequest,
-  CreatePrepPartRequest,
-  CreatePrepPartItemRequest,
   CreatePnpPackageInfoRequest,
   CreatePnpBoxRequest,
   CreatePnpOrderBoxRequest,
