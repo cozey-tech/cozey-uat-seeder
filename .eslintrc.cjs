@@ -2,16 +2,16 @@ module.exports = {
   env: {
     es6: true,
     node: true,
-    "vitest-globals/env": true,
   },
   extends: [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended", // Uses the recommended rules from the @typescript-eslint/eslint-plugin
-    "plugin:vitest-globals/recommended", // Used for vitest tests
+    "plugin:@vitest/recommended", // Used for vitest tests
     "prettier", // Uses eslint-config-prettier to disable ESLint rules from @typescript-eslint/eslint-plugin that would conflict with prettier
   ],
   plugins: [
     "@typescript-eslint", // Enables eslint-plugin-@typescript-eslint
+    "@vitest/eslint-plugin", // Enables eslint-plugin-vitest
     "jest-formatting", // Enables eslint-plugin-jest-formatting
   ],
   parser: "@typescript-eslint/parser", // Specifies the ESLint parser
