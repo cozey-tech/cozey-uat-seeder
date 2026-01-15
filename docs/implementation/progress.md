@@ -96,34 +96,34 @@
 - [x] **Task 3.1.1**: Shopify Service Setup
   - Commit: (latest)
   - Status: ✅ COMPLETE
-  - Verified: Service initializes with GraphQL client, methods defined
+  - Verified: Service initializes with GraphQL client, methods defined, tests pass
 
 - [x] **Task 3.1.2**: Draft Order Creation Logic
   - Commit: (latest)
   - Status: ✅ COMPLETE
-  - Verified: Creates draft orders with tags and batch ID
+  - Verified: Creates draft orders with tags and batch ID, variant lookup works
 
 - [x] **Task 3.1.3**: Draft Order Completion
   - Commit: (latest)
   - Status: ✅ COMPLETE
-  - Verified: Completes draft orders, returns order ID and number
+  - Verified: Completes draft orders, returns order ID and number, tests pass
 
 - [x] **Task 3.1.4**: Query Created Orders
   - Commit: (latest)
   - Status: ✅ COMPLETE
-  - Verified: Queries orders by tag, returns structured data
+  - Verified: Queries orders by tag, returns structured data, tests pass
 
 - [x] **Task 3.1.5**: Order Fulfillment Implementation
   - Commit: (latest)
   - Status: ✅ COMPLETE
-  - Verified: Fulfills orders without payment, returns fulfillment status
+  - Verified: Fulfills orders without payment, returns fulfillment status, tests pass
 
 - [x] **Task 3.2.1**: SeedShopifyOrdersUseCase
   - Commit: (latest)
   - Status: ✅ COMPLETE
-  - Verified: Orchestrates order creation flow, processes sequentially
+  - Verified: Orchestrates order creation flow, processes sequentially, tests pass
 
 - [x] **Task 3.2.2**: SeedShopifyOrdersHandler
   - Commit: (latest)
   - Status: ✅ COMPLETE
-  - Verified: Validates request, calls use case, handles errors
+  - Verified: Validates request, calls use case, handles errors, tests pass
