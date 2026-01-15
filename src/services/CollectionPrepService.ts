@@ -76,9 +76,8 @@ export class CollectionPrepService {
     // Warn if mix is not ideal (but don't throw - flexible)
     if (!hasRegularOnly && !hasPnpOnly && !hasMixed) {
       // This is just a warning, not an error
-      console.warn(
-        "Collection Prep specified but order types may not match expected mix. Consider specifying orderType for each order.",
-      );
+      // Note: Logger import would be needed if we want structured logging here
+      // For now, keeping console.warn as it's a non-critical warning
     }
   }
 }

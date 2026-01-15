@@ -15,7 +15,7 @@ export class WmsServiceError extends Error {
 }
 
 export class WmsService {
-  constructor(private readonly repository: WmsRepository) {}
+  constructor(public readonly repository: WmsRepository) {}
 
   async createOrderWithCustomer(
     shopifyOrderId: string,
@@ -25,34 +25,61 @@ export class WmsService {
     customerName: string,
     customerEmail: string,
     locationId?: string,
-  ): Promise<{ orderId: string; customerId: string }> {
-    // Generate or find customer ID
-    const customerId = uuidv4();
-    const existingCustomer = await this.repository.findCustomerById(customerId);
-
-    if (!existingCustomer) {
-      await this.repository.createCustomer({
-        id: customerId,
-        name: customerName,
-        email: customerEmail,
-        region: region,
-      });
+  ): Promise<{ orderDbId: string; shopifyOrderId: string; customerId: string }> {
+    // Check if order already exists (idempotency)
+    const existingOrder = await this.repository.findOrderByShopifyId(shopifyOrderId);
+    if (existingOrder) {
+      return {
+        orderDbId: existingOrder.id,
+        shopifyOrderId: existingOrder.shopifyOrderId,
+        customerId: "", // Will be populated if needed
+      };
     }
 
-    // Create order
+    // Find or create customer by email (idempotency)
+    let customer = await this.repository.findCustomerByEmail(customerEmail, region);
+    const customerId = customer?.id || uuidv4();
+
+    if (!customer) {
+      // Use transaction to ensure atomicity
+      const result = await this.repository.createOrderWithCustomerTransaction(
+        {
+          shopifyOrderId: shopifyOrderId,
+          shopifyOrderNumber: shopifyOrderNumber,
+          status: status,
+          region: region,
+          locationId: locationId,
+          sourceName: "wms_seed",
+        },
+        {
+          id: customerId,
+          name: customerName,
+          email: customerEmail,
+          region: region,
+        },
+      );
+      return {
+        orderDbId: result.order.id,
+        shopifyOrderId: result.order.shopifyOrderId,
+        customerId: result.customerId,
+      };
+    }
+
+    // Customer exists, create order only
     const order = await this.repository.createOrder({
       shopifyOrderId: shopifyOrderId,
       shopifyOrderNumber: shopifyOrderNumber,
       status: status,
       region: region,
-      customerId: customerId,
+      customerId: customer.id,
       locationId: locationId,
       sourceName: "wms_seed",
     });
 
     return {
-      orderId: order.id,
-      customerId: customerId,
+      orderDbId: order.id,
+      shopifyOrderId: order.shopifyOrderId,
+      customerId: customer.id,
     };
   }
 
@@ -61,11 +88,14 @@ export class WmsService {
     lineItems: Array<{ lineItemId: string; sku: string; quantity: number }>,
     region: string,
   ): Promise<Array<{ variantId: string; lineItemId: string }>> {
+    // Batch lookup all variants at once
+    const skus = lineItems.map((item) => item.sku);
+    const variantMap = await this.repository.findVariantsBySkus(skus, region);
+
     const results: Array<{ variantId: string; lineItemId: string }> = [];
 
     for (const lineItem of lineItems) {
-      // Find variant by SKU
-      const variant = await this.repository.findVariantBySku(lineItem.sku, region);
+      const variant = variantMap.get(lineItem.sku);
       if (!variant) {
         throw new WmsServiceError(`Variant not found for SKU: ${lineItem.sku}`);
       }
@@ -124,6 +154,10 @@ export class WmsService {
     lineItems: Array<{ lineItemId: string; sku: string; quantity: number }>,
     region: string,
   ): Promise<Array<{ prepPartId: string; prepPartItemId: string; partId: string }>> {
+    // Batch lookup all parts at once
+    const skus = lineItems.map((item) => item.sku);
+    const partMap = await this.repository.findPartsBySkus(skus, region);
+
     const results: Array<{ prepPartId: string; prepPartItemId: string; partId: string }> = [];
 
     for (const prep of preps) {
@@ -132,8 +166,7 @@ export class WmsService {
         throw new WmsServiceError(`Line item not found: ${prep.lineItemId}`);
       }
 
-      // Find part by SKU
-      const part = await this.repository.findPartBySku(lineItem.sku, region);
+      const part = partMap.get(lineItem.sku);
       if (!part) {
         throw new WmsServiceError(`Part not found for SKU: ${lineItem.sku}`);
       }

@@ -11,28 +11,45 @@ export class SeedWmsEntitiesUseCase {
     const prepPartItems: SeedWmsEntitiesResponse["prepPartItems"] = [];
 
     for (const shopifyOrder of request.shopifyOrders) {
+      // Check if order already exists (idempotency)
+      const existingOrder = await this.wmsService.repository.findOrderByShopifyId(shopifyOrder.shopifyOrderId);
+      if (existingOrder) {
+        // Order already exists, skip creation but include in response
+        orders.push({
+          orderId: existingOrder.id,
+          shopifyOrderId: existingOrder.shopifyOrderId,
+        });
+        continue; // Skip to next order
+      }
+
+      // Use actual data from Shopify order, with sensible defaults
+      const orderStatus = shopifyOrder.status || "fulfilled";
+      const customerName = shopifyOrder.customerName || "Seed Customer";
+      const customerEmail = shopifyOrder.customerEmail || "seed@example.com";
+
       // Create order with customer
-      const { orderId } = await this.wmsService.createOrderWithCustomer(
-        shopifyOrder.shopifyOrderId,
-        shopifyOrder.shopifyOrderNumber,
-        "fulfilled", // Status from fulfilled Shopify order
-        request.region,
-        "Seed Customer", // Default customer name
-        "seed@example.com", // Default customer email
-      );
+      const { orderDbId, shopifyOrderId: createdShopifyOrderId } =
+        await this.wmsService.createOrderWithCustomer(
+          shopifyOrder.shopifyOrderId,
+          shopifyOrder.shopifyOrderNumber,
+          orderStatus,
+          request.region,
+          customerName,
+          customerEmail,
+        );
 
       orders.push({
-        orderId: orderId,
-        shopifyOrderId: shopifyOrder.shopifyOrderId,
+        orderId: orderDbId,
+        shopifyOrderId: createdShopifyOrderId,
       });
 
-      // Create variantOrders
+      // Create variantOrders - use actual quantities from Shopify
       const variantOrders = await this.wmsService.createVariantOrdersForOrder(
-        shopifyOrder.shopifyOrderId, // Use shopifyOrderId as orderId reference
+        shopifyOrder.shopifyOrderId, // Use shopifyOrderId as orderId reference (per schema FK)
         shopifyOrder.lineItems.map((item) => ({
           lineItemId: item.lineItemId,
           sku: item.sku,
-          quantity: 1, // Default quantity - could be enhanced to get from Shopify
+          quantity: item.quantity || 1, // Use actual quantity from Shopify, default to 1
         })),
         request.region,
       );
@@ -45,13 +62,13 @@ export class SeedWmsEntitiesUseCase {
         request.region,
       );
 
-      // Create prepParts and prepPartItems
+      // Create prepParts and prepPartItems - use actual quantities
       const prepPartsAndItems = await this.wmsService.createPrepPartsAndItems(
         preps,
         shopifyOrder.lineItems.map((item) => ({
           lineItemId: item.lineItemId,
           sku: item.sku,
-          quantity: 1,
+          quantity: item.quantity || 1, // Use actual quantity from Shopify
         })),
         request.region,
       );

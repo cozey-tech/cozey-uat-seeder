@@ -5,10 +5,14 @@ export const seedWmsEntitiesRequestSchema = z.object({
     z.object({
       shopifyOrderId: z.string(),
       shopifyOrderNumber: z.string(),
+      status: z.string().optional(), // Order status from Shopify
+      customerName: z.string().optional(), // Customer name from Shopify
+      customerEmail: z.string().email().optional(), // Customer email from Shopify
       lineItems: z.array(
         z.object({
           lineItemId: z.string(),
           sku: z.string(),
+          quantity: z.number().int().positive().optional(), // Quantity from Shopify
         }),
       ),
     }),

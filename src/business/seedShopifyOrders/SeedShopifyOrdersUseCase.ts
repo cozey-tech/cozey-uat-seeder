@@ -1,6 +1,7 @@
 import type { SeedShopifyOrdersRequest } from "../../shared/requests/SeedShopifyOrdersRequest";
 import type { SeedShopifyOrdersResponse } from "../../shared/responses/SeedShopifyOrdersResponse";
 import { ShopifyService } from "../../services/ShopifyService";
+import { Logger } from "../../utils/logger";
 
 export class SeedShopifyOrdersUseCase {
   constructor(private readonly shopifyService: ShopifyService) {}
@@ -44,8 +45,11 @@ export class SeedShopifyOrdersUseCase {
           fulfillmentStatus: fulfillmentResult.status,
         });
       } catch (error) {
-        // Log error but continue with other orders
-        console.error(`Failed to create order for customer ${orderInput.customer.email}:`, error);
+        // Log error with structured logging
+        Logger.error("Failed to create Shopify order", error, {
+          batchId: request.batchId,
+          customerEmail: orderInput.customer.email,
+        });
         throw error; // Re-throw to fail fast - can be changed to continue on error if needed
       }
     }

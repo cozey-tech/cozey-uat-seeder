@@ -23,9 +23,15 @@ describe("CollectionPrepService", () => {
       createPrepPart: vi.fn(),
       createPrepPartItem: vi.fn(),
       findPartBySku: vi.fn(),
+      findPartsBySkus: vi.fn(),
       findVariantBySku: vi.fn(),
+      findVariantsBySkus: vi.fn(),
       findCustomerById: vi.fn(),
+      findCustomerByEmail: vi.fn(),
+      findOrderByShopifyId: vi.fn(),
       createCustomer: vi.fn(),
+      createOrderWithCustomerTransaction: vi.fn(),
+      createOrderEntitiesTransaction: vi.fn(),
     };
     service = new CollectionPrepService(mockRepository);
   });

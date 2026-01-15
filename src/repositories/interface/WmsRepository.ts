@@ -122,7 +122,21 @@ export interface WmsRepository {
   createPrepPart(prepPart: CreatePrepPartRequest): Promise<unknown>;
   createPrepPartItem(prepPartItem: CreatePrepPartItemRequest): Promise<unknown>;
   findPartBySku(sku: string, region: string): Promise<{ id: string; sku: string } | null>;
+  findPartsBySkus(skus: string[], region: string): Promise<Map<string, { id: string; sku: string }>>;
   findVariantBySku(sku: string, region: string): Promise<{ id: string; sku: string } | null>;
-  findCustomerById(customerId: string): Promise<{ id: string; name: string } | null>;
+  findVariantsBySkus(skus: string[], region: string): Promise<Map<string, { id: string; sku: string }>>;
+  findCustomerById(customerId: string): Promise<{ id: string; name: string; email?: string } | null>;
+  findCustomerByEmail(email: string, region: string): Promise<{ id: string; name: string; email?: string } | null>;
   createCustomer(customer: { id: string; name: string; email?: string; region: string }): Promise<unknown>;
+  findOrderByShopifyId(shopifyOrderId: string): Promise<IOrder | null>;
+  // Transaction methods
+  createOrderWithCustomerTransaction(
+    order: CreateOrderRequest,
+    customer: { id: string; name: string; email?: string; region: string },
+  ): Promise<{ order: IOrder; customerId: string }>;
+  createOrderEntitiesTransaction(
+    order: CreateOrderRequest,
+    variantOrders: CreateVariantOrderRequest[],
+    preps: CreatePrepRequest[],
+  ): Promise<{ order: IOrder; variantOrderIds: string[]; prepIds: string[] }>;
 }

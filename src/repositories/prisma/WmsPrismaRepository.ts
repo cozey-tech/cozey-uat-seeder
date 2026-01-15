@@ -20,50 +20,71 @@ export class WmsPrismaRepository implements WmsRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async createOrder(order: CreateOrderRequest): Promise<IOrder> {
-    const created = await this.prisma.order.create({
-      data: {
-        shopifyOrderId: order.shopifyOrderId,
-        shopifyOrderNumber: order.shopifyOrderNumber,
-        status: order.status,
-        region: order.region,
-        customerId: order.customerId,
-        locationId: order.locationId,
-        sourceName: order.sourceName || "wms_seed",
-      },
-    });
+    try {
+      const created = await this.prisma.order.create({
+        data: {
+          shopifyOrderId: order.shopifyOrderId,
+          shopifyOrderNumber: order.shopifyOrderNumber,
+          status: order.status,
+          region: order.region,
+          customerId: order.customerId,
+          locationId: order.locationId,
+          sourceName: order.sourceName || "wms_seed",
+        },
+      });
 
-    return {
-      id: created.id,
-      shopifyOrderId: created.shopifyOrderId,
-      shopifyOrderNumber: created.shopifyOrderNumber,
-      status: created.status,
-      region: created.region,
-    };
+      return {
+        id: created.id,
+        shopifyOrderId: created.shopifyOrderId,
+        shopifyOrderNumber: created.shopifyOrderNumber,
+        status: created.status,
+        region: created.region,
+      };
+    } catch (error: unknown) {
+      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+        throw new Error(`Order with shopifyOrderId ${order.shopifyOrderId} already exists`);
+      }
+      throw error;
+    }
   }
 
   async createVariantOrder(variantOrder: CreateVariantOrderRequest): Promise<unknown> {
-    return await this.prisma.variantOrder.create({
-      data: {
-        orderId: variantOrder.orderId,
-        lineItemId: variantOrder.lineItemId,
-        variantId: variantOrder.variantId,
-        quantity: variantOrder.quantity,
-        region: variantOrder.region,
-      },
-    });
+    try {
+      return await this.prisma.variantOrder.create({
+        data: {
+          orderId: variantOrder.orderId,
+          lineItemId: variantOrder.lineItemId,
+          variantId: variantOrder.variantId,
+          quantity: variantOrder.quantity,
+          region: variantOrder.region,
+        },
+      });
+    } catch (error: unknown) {
+      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+        throw new Error(`VariantOrder with lineItemId ${variantOrder.lineItemId} already exists`);
+      }
+      throw error;
+    }
   }
 
   async createPrep(prep: CreatePrepRequest): Promise<unknown> {
-    return await this.prisma.prep.create({
-      data: {
-        orderId: prep.orderId,
-        prep: prep.prep,
-        collectionPrepId: prep.collectionPrepId,
-        region: prep.region,
-        variantId: prep.variantId,
-        lineItemId: prep.lineItemId,
-      },
-    });
+    try {
+      return await this.prisma.prep.create({
+        data: {
+          orderId: prep.orderId,
+          prep: prep.prep,
+          collectionPrepId: prep.collectionPrepId,
+          region: prep.region,
+          variantId: prep.variantId,
+          lineItemId: prep.lineItemId,
+        },
+      });
+    } catch (error: unknown) {
+      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+        throw new Error(`Prep with id ${prep.prep} and region ${prep.region} already exists`);
+      }
+      throw error;
+    }
   }
 
   async createCollectionPrep(collectionPrep: CreateCollectionPrepRequest): Promise<ICollectionPrep> {
@@ -89,21 +110,28 @@ export class WmsPrismaRepository implements WmsRepository {
   }
 
   async createShipment(shipment: CreateShipmentRequest): Promise<IShipment> {
-    const created = await this.prisma.shipment.create({
-      data: {
-        collectionPrepId: shipment.collectionPrepId,
-        orderId: shipment.orderId,
-        region: shipment.region,
-        status: shipment.status,
-      },
-    });
+    try {
+      const created = await this.prisma.shipment.create({
+        data: {
+          collectionPrepId: shipment.collectionPrepId,
+          orderId: shipment.orderId,
+          region: shipment.region,
+          status: shipment.status,
+        },
+      });
 
-    return {
-      id: created.id,
-      collectionPrepId: created.collectionPrepId,
-      orderId: created.orderId,
-      status: created.status,
-    };
+      return {
+        id: created.id,
+        collectionPrepId: created.collectionPrepId,
+        orderId: created.orderId,
+        status: created.status,
+      };
+    } catch (error: unknown) {
+      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+        throw new Error(`Shipment for order ${shipment.orderId} and collectionPrep ${shipment.collectionPrepId} already exists`);
+      }
+      throw error;
+    }
   }
 
   async createPnpPackageInfo(packageInfo: CreatePnpPackageInfoRequest): Promise<unknown> {
@@ -180,6 +208,44 @@ export class WmsPrismaRepository implements WmsRepository {
     return variant;
   }
 
+  async findVariantsBySkus(skus: string[], region: string): Promise<Map<string, { id: string; sku: string }>> {
+    const variants = await this.prisma.variant.findMany({
+      where: {
+        sku: { in: skus },
+        region: region,
+      },
+      select: {
+        id: true,
+        sku: true,
+      },
+    });
+
+    const variantMap = new Map<string, { id: string; sku: string }>();
+    for (const variant of variants) {
+      variantMap.set(variant.sku, variant);
+    }
+    return variantMap;
+  }
+
+  async findPartsBySkus(skus: string[], region: string): Promise<Map<string, { id: string; sku: string }>> {
+    const parts = await this.prisma.part.findMany({
+      where: {
+        sku: { in: skus },
+        region: region,
+      },
+      select: {
+        id: true,
+        sku: true,
+      },
+    });
+
+    const partMap = new Map<string, { id: string; sku: string }>();
+    for (const part of parts) {
+      partMap.set(part.sku, part);
+    }
+    return partMap;
+  }
+
   async createPrepPart(prepPart: CreatePrepPartRequest): Promise<unknown> {
     return await this.prisma.prepPart.create({
       data: {
@@ -200,7 +266,7 @@ export class WmsPrismaRepository implements WmsRepository {
     });
   }
 
-  async findCustomerById(customerId: string): Promise<{ id: string; name: string } | null> {
+  async findCustomerById(customerId: string): Promise<{ id: string; name: string; email?: string } | null> {
     const customer = await this.prisma.customer.findUnique({
       where: {
         id: customerId,
@@ -208,10 +274,60 @@ export class WmsPrismaRepository implements WmsRepository {
       select: {
         id: true,
         name: true,
+        email: true,
       },
     });
 
-    return customer;
+    if (!customer) {
+      return null;
+    }
+
+    return {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email ?? undefined,
+    };
+  }
+
+  async findCustomerByEmail(email: string, region: string): Promise<{ id: string; name: string; email?: string } | null> {
+    const customer = await this.prisma.customer.findFirst({
+      where: {
+        email: email,
+        region: region,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+
+    if (!customer) {
+      return null;
+    }
+
+    return {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email ?? undefined,
+    };
+  }
+
+  async findOrderByShopifyId(shopifyOrderId: string): Promise<IOrder | null> {
+    const order = await this.prisma.order.findUnique({
+      where: {
+        shopifyOrderId: shopifyOrderId,
+      },
+      select: {
+        id: true,
+        shopifyOrderId: true,
+        shopifyOrderNumber: true,
+        status: true,
+        region: true,
+      },
+    });
+
+    return order;
   }
 
   async createCustomer(customer: {
@@ -220,13 +336,132 @@ export class WmsPrismaRepository implements WmsRepository {
     email?: string;
     region: string;
   }): Promise<unknown> {
-    return await this.prisma.customer.create({
-      data: {
-        id: customer.id,
-        name: customer.name,
-        email: customer.email,
-        region: customer.region,
-      },
+    try {
+      return await this.prisma.customer.create({
+        data: {
+          id: customer.id,
+          name: customer.name,
+          email: customer.email,
+          region: customer.region,
+        },
+      });
+    } catch (error: unknown) {
+      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+        throw new Error(`Customer with id ${customer.id} or email ${customer.email} already exists`);
+      }
+      throw error;
+    }
+  }
+
+  async createOrderWithCustomerTransaction(
+    order: CreateOrderRequest,
+    customer: { id: string; name: string; email?: string; region: string },
+  ): Promise<{ order: IOrder; customerId: string }> {
+    return await this.prisma.$transaction(async (tx) => {
+      // Upsert customer (create if not exists, update if exists)
+      const customerRecord = await tx.customer.upsert({
+        where: {
+          id: customer.id,
+        },
+        update: {
+          name: customer.name,
+          email: customer.email,
+        },
+        create: {
+          id: customer.id,
+          name: customer.name,
+          email: customer.email,
+          region: customer.region,
+        },
+      });
+
+      // Create order
+      const orderRecord = await tx.order.create({
+        data: {
+          shopifyOrderId: order.shopifyOrderId,
+          shopifyOrderNumber: order.shopifyOrderNumber,
+          status: order.status,
+          region: order.region,
+          customerId: customerRecord.id,
+          locationId: order.locationId,
+          sourceName: order.sourceName || "wms_seed",
+        },
+      });
+
+      return {
+        order: {
+          id: orderRecord.id,
+          shopifyOrderId: orderRecord.shopifyOrderId,
+          shopifyOrderNumber: orderRecord.shopifyOrderNumber,
+          status: orderRecord.status,
+          region: orderRecord.region,
+        },
+        customerId: customerRecord.id,
+      };
+    });
+  }
+
+  async createOrderEntitiesTransaction(
+    order: CreateOrderRequest,
+    variantOrders: CreateVariantOrderRequest[],
+    preps: CreatePrepRequest[],
+  ): Promise<{ order: IOrder; variantOrderIds: string[]; prepIds: string[] }> {
+    return await this.prisma.$transaction(async (tx) => {
+      // Create order
+      const orderRecord = await tx.order.create({
+        data: {
+          shopifyOrderId: order.shopifyOrderId,
+          shopifyOrderNumber: order.shopifyOrderNumber,
+          status: order.status,
+          region: order.region,
+          customerId: order.customerId,
+          locationId: order.locationId,
+          sourceName: order.sourceName || "wms_seed",
+        },
+      });
+
+      // Create variantOrders
+      const variantOrderIds: string[] = [];
+      for (const variantOrder of variantOrders) {
+        const created = await tx.variantOrder.create({
+          data: {
+            orderId: variantOrder.orderId,
+            lineItemId: variantOrder.lineItemId,
+            variantId: variantOrder.variantId,
+            quantity: variantOrder.quantity,
+            region: variantOrder.region,
+          },
+        });
+        variantOrderIds.push(created.lineItemId);
+      }
+
+      // Create preps
+      const prepIds: string[] = [];
+      for (const prep of preps) {
+        const created = await tx.prep.create({
+          data: {
+            orderId: prep.orderId,
+            prep: prep.prep,
+            collectionPrepId: prep.collectionPrepId,
+            region: prep.region,
+            variantId: prep.variantId,
+            lineItemId: prep.lineItemId,
+          },
+        });
+        prepIds.push(created.prep);
+      }
+
+      return {
+        order: {
+          id: orderRecord.id,
+          shopifyOrderId: orderRecord.shopifyOrderId,
+          shopifyOrderNumber: orderRecord.shopifyOrderNumber,
+          status: orderRecord.status,
+          region: orderRecord.region,
+        },
+        variantOrderIds,
+        prepIds,
+      };
     });
   }
 }
