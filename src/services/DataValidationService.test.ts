@@ -1,0 +1,206 @@
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { PrismaClient } from "@prisma/client";
+
+import { DataValidationService, DataValidationError } from "./DataValidationService";
+import type { SeedConfig } from "../shared/types/SeedConfig";
+import { PickType } from "../shared/enums/PickType";
+
+describe("DataValidationService", () => {
+  let mockPrisma: {
+    part: {
+      findMany: ReturnType<typeof vi.fn>;
+    };
+  };
+  let service: DataValidationService;
+
+  beforeEach(() => {
+    mockPrisma = {
+      part: {
+        findMany: vi.fn(),
+      },
+    };
+    service = new DataValidationService(mockPrisma as unknown as PrismaClient);
+  });
+
+  describe("validateSeedConfig", () => {
+    it("should pass validation for valid config with existing SKUs", async () => {
+      const config: SeedConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test Customer",
+              email: "test@example.com",
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 1,
+                pickType: PickType.Regular,
+              },
+            ],
+          },
+        ],
+      };
+
+      mockPrisma.part.findMany.mockResolvedValue([
+        { sku: "SKU-001" },
+      ]);
+
+      await expect(service.validateSeedConfig(config)).resolves.not.toThrow();
+    });
+
+    it("should throw DataValidationError for missing SKUs", async () => {
+      const config: SeedConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test Customer",
+              email: "test@example.com",
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 1,
+                pickType: PickType.Regular,
+              },
+              {
+                sku: "SKU-MISSING",
+                quantity: 1,
+                pickType: PickType.Regular,
+              },
+            ],
+          },
+        ],
+      };
+
+      mockPrisma.part.findMany.mockResolvedValue([
+        { sku: "SKU-001" },
+      ]);
+
+      await expect(service.validateSeedConfig(config)).rejects.toThrow(DataValidationError);
+      await expect(service.validateSeedConfig(config)).rejects.toThrow("Missing SKUs in WMS");
+    });
+
+    it("should throw DataValidationError for invalid customer data", async () => {
+      const config: SeedConfig = {
+        orders: [
+          {
+            customer: {
+              name: "", // Empty name
+              email: "test@example.com",
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 1,
+                pickType: PickType.Regular,
+              },
+            ],
+          },
+        ],
+      };
+
+      mockPrisma.part.findMany.mockResolvedValue([
+        { sku: "SKU-001" },
+      ]);
+
+      await expect(service.validateSeedConfig(config)).rejects.toThrow(DataValidationError);
+      await expect(service.validateSeedConfig(config)).rejects.toThrow("Customer name is required");
+    });
+
+    it("should throw DataValidationError for invalid quantities", async () => {
+      const config: SeedConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test Customer",
+              email: "test@example.com",
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 0, // Invalid quantity
+                pickType: PickType.Regular,
+              },
+            ],
+          },
+        ],
+      };
+
+      mockPrisma.part.findMany.mockResolvedValue([
+        { sku: "SKU-001" },
+      ]);
+
+      await expect(service.validateSeedConfig(config)).rejects.toThrow(DataValidationError);
+      await expect(service.validateSeedConfig(config)).rejects.toThrow("Quantity must be positive");
+    });
+
+    it("should throw DataValidationError for PnP items without pnpConfig", async () => {
+      const config: SeedConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test Customer",
+              email: "test@example.com",
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 1,
+                pickType: PickType.PickAndPack,
+              },
+            ],
+          },
+        ],
+      };
+
+      mockPrisma.part.findMany.mockResolvedValue([
+        { sku: "SKU-001" },
+      ]);
+
+      await expect(service.validateSeedConfig(config)).rejects.toThrow(DataValidationError);
+      await expect(service.validateSeedConfig(config)).rejects.toThrow("pnpConfig is missing");
+    });
+
+    it("should validate PnP config when PnP items are present", async () => {
+      const config: SeedConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test Customer",
+              email: "test@example.com",
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 1,
+                pickType: PickType.PickAndPack,
+              },
+            ],
+          },
+        ],
+        pnpConfig: {
+          packageInfo: [
+            {
+              identifier: "PKG-001",
+              dimensions: { length: 10, width: 8, height: 6 },
+              weight: 1.5,
+            },
+          ],
+          boxes: [
+            {
+              identifier: "BOX-001",
+              dimensions: { length: 12, width: 10, height: 8 },
+            },
+          ],
+        },
+      };
+
+      mockPrisma.part.findMany.mockResolvedValue([
+        { sku: "SKU-001" },
+      ]);
+
+      await expect(service.validateSeedConfig(config)).resolves.not.toThrow();
+    });
+  });
+});
