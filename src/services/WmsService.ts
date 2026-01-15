@@ -14,9 +14,37 @@ export class WmsServiceError extends Error {
   }
 }
 
+/**
+ * Service for creating WMS entities (orders, customers, preps, etc.)
+ *
+ * Handles:
+ * - Order and customer creation (with transactions)
+ * - Variant order creation
+ * - Prep and prep part creation
+ * - PnP entity creation
+ * - Shipment creation
+ *
+ * All operations are idempotent - checks for existing records before creating.
+ */
 export class WmsService {
   constructor(public readonly repository: WmsRepository) {}
 
+  /**
+   * Creates a WMS order and associated customer
+   *
+   * Idempotent: If order already exists (by shopifyOrderId), returns existing order.
+   * If customer doesn't exist (by email + region), creates new customer.
+   *
+   * @param shopifyOrderId - Shopify order ID (unique identifier)
+   * @param shopifyOrderNumber - Shopify order number (display number)
+   * @param status - Order status (e.g., "fulfilled")
+   * @param region - Region code (e.g., "CA")
+   * @param customerName - Customer name
+   * @param customerEmail - Customer email (used for idempotency lookup)
+   * @param locationId - Optional location ID
+   * @returns Order database ID, Shopify order ID, and customer ID
+   * @throws WmsServiceError if database operation fails
+   */
   async createOrderWithCustomer(
     shopifyOrderId: string,
     shopifyOrderNumber: string,

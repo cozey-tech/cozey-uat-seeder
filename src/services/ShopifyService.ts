@@ -46,9 +46,21 @@ export class ShopifyServiceError extends Error {
   }
 }
 
+/**
+ * Service for interacting with Shopify Admin GraphQL API
+ *
+ * Handles:
+ * - Draft order creation and completion
+ * - Order fulfillment
+ * - Order querying by tags
+ * - Variant lookup by SKU
+ */
 export class ShopifyService {
   private readonly client: ReturnType<typeof createAdminApiClient>;
 
+  /**
+   * Initializes Shopify Admin API client with credentials from environment variables
+   */
   constructor() {
     const config = getEnvConfig();
     this.client = createAdminApiClient({
@@ -58,6 +70,14 @@ export class ShopifyService {
     });
   }
 
+  /**
+   * Creates a draft order in Shopify
+   *
+   * @param input - Customer and line items for the draft order
+   * @param batchId - Unique batch ID for tagging (format: wms_seed_<batchId>)
+   * @returns Draft order ID
+   * @throws ShopifyServiceError if variant lookup fails or API returns errors
+   */
   async createDraftOrder(input: DraftOrderInput, batchId: string): Promise<DraftOrderResult> {
     // First, we need to find variant IDs by SKU
     // For now, we'll use a simplified approach - in production, you'd query products by SKU

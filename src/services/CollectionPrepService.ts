@@ -11,9 +11,23 @@ export class CollectionPrepValidationError extends Error {
   }
 }
 
+/**
+ * Service for creating and validating collection prep entities
+ *
+ * Handles:
+ * - Collection prep header creation
+ * - Order mix validation (regular-only, PnP-only, mixed)
+ */
 export class CollectionPrepService {
   constructor(private readonly wmsRepository: WmsRepository) {}
 
+  /**
+   * Creates a collection prep header in the WMS database
+   *
+   * @param request - Collection prep configuration (ID, region, carrier, location, prep date, boxes)
+   * @returns Created collection prep entity
+   * @throws WmsServiceError if database operation fails
+   */
   async createCollectionPrep(
     request: CreateCollectionPrepRequest,
   ): Promise<ICollectionPrep> {
@@ -21,6 +35,18 @@ export class CollectionPrepService {
     return collectionPrep;
   }
 
+  /**
+   * Validates that order types match their declared types
+   *
+   * Ensures:
+   * - "regular-only" orders don't contain PnP items
+   * - "pnp-only" orders don't contain regular items
+   * - "mixed" orders contain both types
+   *
+   * @param config - Seed configuration to validate
+   * @param _orderIds - Order IDs (currently unused, reserved for future use)
+   * @throws CollectionPrepValidationError if order mix validation fails
+   */
   validateOrderMix(config: SeedConfig, _orderIds: string[]): void {
     if (!config.collectionPrep) {
       return; // No validation needed if collectionPrep not specified
