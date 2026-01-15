@@ -1,8 +1,1387 @@
+// ============================================================================
+// Prisma Schema: prisma-generate
+// ============================================================================
+// Source: cozey-tech/prisma-generate/prisma/schema.prisma
+// Last Updated: 2025-01-05
+// Purpose: Primary application schema for RCA investigations
+// ============================================================================
+// NOTE: This is a reference copy. Actual database column names may differ
+// from Prisma model field names due to @map annotations. Always use
+// schema discovery (get_table_schema) to get actual DB column names.
+// ============================================================================
+
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "typedSql"]
+  binaryTargets   = ["native", "linux-arm64-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // directUrl not required for seeding operations
+}
+
+// =========================================
+// Models
+// =========================================
+
+model users {
+  id                          String                    @id @default(uuid()) @db.Uuid
+  email                       String                    @db.VarChar
+  cozeyId                     Int                       @default(autoincrement())
+  authId                      String                    @unique @map("auth_id") @db.VarChar
+  name                        String                    @db.VarChar
+  updatedAt                   DateTime                  @updatedAt @map("updated_at") @db.Timestamp(6)
+  createdAt                   DateTime                  @default(now()) @map("created_at") @db.Timestamp(6)
+  lastName                    String?                   @map("last_name") @db.VarChar
+  region                      String                    @default("CA") @db.VarChar
+  inventoryHistory            inventoryHistory[]
+  purchaseOrder               purchaseOrder[]
+  manualDeliveryOverrides     manualDeliveryOverrides[]
+  inboundTask                 inboundTask[]
+  inspectedReturnsPart        returnsPart[]
+  labelScannedPrepPartItems   prepPartItem[]            @relation("labelScannedByUser")
+  pnpPackingCompliances       pnpPackingCompliance[]
+}
+
+model location {
+  id                    String               @db.VarChar
+  name                  String               @db.VarChar
+  provinces             String[]
+  allowDynamicEstimates Boolean              @default(false) @map("allow_dynamic_estimates")
+  allowPrepCreation     Boolean              @default(false) @map("allow_prep_creation")
+  region                String               @default("CA") @db.VarChar
+  priorityLocations     String[]             @map("priority_locations") @db.VarChar
+  orders                order[]
+  collectionPrep        collectionPrep[]
+  inventory             inventory[]
+  inventoryHistory      inventoryHistory[]
+  prep                  prep[]               @relation(name: "prepLocation")
+  prepsLocked           prep[]               @relation(name: "prepLocationLock")
+  purchaseOrder         purchaseOrder[]
+  purchaseOrderPart     purchaseOrderPart[]
+  carrierZoneRates      carrierZoneRate[]
+  deliveryMethod        deliveryMethod[]
+  printerInformation    printerInformation[]
+
+  @@id([id, region])
+}
+
+model manualDeliveryOverrides {
+  id                String   @id @db.Uuid
+  sku               String   @db.VarChar
+  startDeliveryDate DateTime @db.Timestamp(6)
+  endDeliveryDate   DateTime @db.Timestamp(6)
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now()) @db.Timestamp(6)
+  partId            String   @map("part_id") @db.Uuid
+  userId            String   @map("user_id") @db.VarChar
+  region            String   @db.VarChar
+  part              part     @relation(fields: [partId], references: [id])
+  user              users    @relation(fields: [userId], references: [authId])
+}
+
+model prep {
+  orderId                       String                   @map("order_id") @db.VarChar
+  prep                          String                   @db.VarChar
+  carrier                       String?                  @db.VarChar
+  promises                      String?                  @db.VarChar
+  startPromise                  DateTime?                @db.Timestamp(6)
+  endPromise                    DateTime?                @db.Timestamp(6)
+  latestInitialEstimatedDate    DateTime?                @db.Timestamp(6)
+  latestEstimatedDate           DateTime?                @db.Timestamp(6)
+  latestStockDate               DateTime?                @db.Timestamp(6)
+  stockDateEstimate             DateTime?                @map("stock_date_estimate") @db.Date
+  shipDateEstimate              DateTime?                @map("ship_date_estimate") @db.Date
+  deliveryDateEstimate          DateTime?                @map("delivery_date_estimate") @db.Date
+  estimateRunAt                 DateTime?                @map("estimate_run_at") @db.Timestamptz(6)
+  estimateBatchId               String?                  @map("estimate_batch_id") @db.VarChar
+  tempLocationIdNewEstimate     String?                  @map("temp_location_id_new_estimate") @db.VarChar
+  prepIdDependency              String?                  @map("prep_id_dependency") @db.VarChar
+  lastUpdatedEstimate           DateTime?                @db.Timestamp(6)
+  notes                         String?                  @db.VarChar
+  addedNotes                    String?                  @db.VarChar
+  notesDate                     DateTime?                @db.Timestamp(6)
+  updatedAt                     DateTime                 @updatedAt @db.Timestamp(6)
+  createdAt                     DateTime                 @default(now()) @db.Timestamp(6)
+  collectionPrepId              String?                  @db.VarChar
+  oldCollectionPrepId           String?                  @db.VarChar
+  inStock                       Boolean                  @default(false)
+  locationId                    String?                  @map("location_id") @db.VarChar
+  locationLock                  String?                  @db.VarChar
+  fulfillmentStatus             String?                  @default("Open") @db.VarChar
+  fulfillmentDate               DateTime?                @db.Timestamp(6)
+  boxesQuantity                 Int                      @default(0)
+  updatedBoxesQuantity          Int                      @default(0)
+  lineItemId                    String?                  @unique @db.VarChar
+  refundStatus                  String?                  @db.VarChar
+  variantId                     String                   @map("variant_id") @db.Uuid
+  region                        String                   @default("CA") @db.VarChar
+  dependsOnPrepId               String?                  @map("depends_on_prep") @db.VarChar
+  customerETAEndPromise         DateTime?                @db.Timestamp(6)
+  customerETAStartPromise       DateTime?                @db.Timestamp(6)
+  customerETAPromiseUpdatedAt   DateTime?                @db.Timestamp(6)
+  customerETAPromiseUpdateCount Int                      @default(0)
+  fulfillmentId                 String?                  @map("fulfillment_id") @db.VarChar
+  fulfillmentType               String?                  @map("fulfillment_type") @db.VarChar
+  type                          PrepType                 @default(STANDARD) @map("type")
+  etaStatus                     EtaStatus?               @map("eta_status")
+  tierId                        String?                  @map("tier_id") @db.Uuid
+  displayEtaStartDate           DateTime?                @map("display_eta_start_date") @db.Date
+  displayEtaEndDate             DateTime?                @map("display_eta_end_date") @db.Date
+  etaStatusUpdatedAt            DateTime?                @map("eta_status_updated_at") @db.Timestamp(6)
+  tierUpdatedAt                 DateTime?                @map("tier_updated_at") @db.Timestamp(6)
+  displayEtaUpdatedAt           DateTime?                @map("display_eta_updated_at") @db.Timestamp(6)
+  collectionPrep                collectionPrep?          @relation(name: "currentCollectionPrep", fields: [collectionPrepId, region], references: [id, region])
+  oldCollectionPrep             collectionPrep?          @relation(name: "oldCollectionPrep", fields: [oldCollectionPrepId, region], references: [id, region])
+  variantOrder                  variantOrder?            @relation(fields: [lineItemId], references: [lineItemId], onDelete: Cascade, onUpdate: NoAction)
+  location                      location?                @relation(name: "prepLocation", fields: [locationId, region], references: [id, region], onDelete: Cascade)
+  locationLocked                location?                @relation(name: "prepLocationLock", fields: [locationLock, region], references: [id, region], onDelete: Cascade)
+  order                         order                    @relation(fields: [orderId], references: [shopifyOrderId], map: "prep_orderId_fkey", onDelete: Cascade, onUpdate: NoAction)
+  variant                       variant                  @relation(fields: [variantId], references: [id])
+  customerEtaTier               customerEtaTier?         @relation(fields: [tierId], references: [id])
+  dependsOnPrep                 prep?                    @relation(name: "PrepDependency", fields: [dependsOnPrepId, region], references: [prep, region], onDelete: Cascade, onUpdate: NoAction)
+  dependentPreps                prep[]                   @relation(name: "PrepDependency")
+  prepDependency                prep?                    @relation(name: "prep_dependency", fields: [prepIdDependency, region], references: [prep, region], onDelete: NoAction, onUpdate: NoAction)
+  prepDependents                prep[]                   @relation(name: "prep_dependency")
+  prepPart                      prepPart[]
+  inventoryPoPartHistory        inventoryPoPartHistory[]
+  returnsPart                   returnsPart[]
+  wasOnHold                     Boolean                  @default(false)
+  trackingNumber                String?                  @map("tracking_number") @db.VarChar
+
+  @@id([prep, region])
+  @@index([region, fulfillmentStatus, collectionPrepId, locationId, locationLock, notes, notesDate, prep, variantId, orderId], name: "idx_prep_dynamic_estimates_unified")
+  @@index([orderId, region], name: "idx_prep_orderid_region")
+  @@index([variantId, region], name: "idx_prep_variantid_region")
+  @@index([shipDateEstimate], name: "idx_prep_ship_date_estimate")
+  @@index([startPromise, endPromise], name: "idx_prep_promise_range")
+  @@index([collectionPrepId, region], name: "idx_prep_collectionprepid_region")
+}
+
+model prepPart {
+  prepId                     String         @db.VarChar
+  stockDate                  DateTime?      @db.Timestamp(6)
+  initialEstimatedDate       DateTime?      @db.Timestamp(6)
+  estimatedDate              DateTime?      @db.Timestamp(6)
+  stockDateEstimate          DateTime?      @map("stock_date_estimate") @db.Date
+  shipDateEstimate           DateTime?      @map("ship_date_estimate") @db.Date
+  deliveryDateEstimate       DateTime?      @map("delivery_date_estimate") @db.Date
+  tempInventoryIdNewEstimate String?        @map("temp_inventory_id_new_estimate") @db.Uuid
+  consumedPo                 String?        @map("consumed_po") @db.VarChar
+  poFulfilled                String?        @db.VarChar
+  inStock                    Boolean        @default(false)
+  quantity                   Int
+  updatedAt                  DateTime       @updatedAt @db.Timestamp(6)
+  createdAt                  DateTime       @default(now()) @db.Timestamp(6)
+  temporaryInventoryId       String?        @db.VarChar
+  prepBoxes                  Int            @default(0)
+  id                         String         @id @default(uuid()) @db.Uuid
+  partId                     String         @map("part_id") @db.Uuid
+  inventoryId                String?        @map("inventory_id") @db.Uuid
+  region                     String         @default("CA") @db.VarChar
+  barScanFulfillingPos       String[]       @default([]) @map("barscan_fulfilling_pos") @db.VarChar
+  inventory                  inventory?     @relation(fields: [inventoryId], references: [id])
+  part                       part           @relation(fields: [partId], references: [id])
+  prep                       prep           @relation(fields: [prepId, region], references: [prep, region], onDelete: Cascade, onUpdate: NoAction)
+  consumedPurchaseOrder      purchaseOrder? @relation("ConsumedPO", fields: [consumedPo], references: [po])
+
+  orderReportParts orderReportParts[]
+  prepPartItem     prepPartItem[]
+
+  @@unique([prepId, partId, region])
+  @@index([prepId, region], name: "idx_preppart_prepid_region")
+  @@index([partId, region], name: "idx_preppart_partid_region")
+}
+
+model colors {
+  id          String        @db.VarChar
+  name        String        @db.VarChar
+  initials    String?       @db.VarChar
+  updatedAt   DateTime      @updatedAt @db.Timestamp(6)
+  createdAt   DateTime      @default(now()) @db.Timestamp(6)
+  region      String        @default("CA") @db.VarChar
+  colorCode   String?       @map("color_code") @db.VarChar
+  modelColors modelColors[]
+  part        part[]
+  variant     variant[]
+
+  @@id([id, region])
+}
+
+model purchaseOrder {
+  po                     String                   @unique @db.VarChar
+  locationId             String                   @map("location_id") @db.VarChar
+  eta                    DateTime                 @db.Timestamp(6)
+  status                 String                   @db.VarChar
+  notes                  String?                  @db.VarChar
+  userId                 String                   @db.Uuid
+  updatedAt              DateTime                 @updatedAt @db.Timestamp(6)
+  createdAt              DateTime                 @default(now()) @db.Timestamp(6)
+  id                     String                   @id @default(uuid()) @db.Uuid
+  broker                 String?                  @db.VarChar
+  container              String?                  @db.VarChar
+  drayage                String?                  @db.VarChar
+  eManifest              Boolean                  @default(false) @map("e_manifest")
+  etaPort                DateTime?                @map("eta_port") @db.Timestamp(6)
+  freightStatus          String?                  @map("freight_status") @db.VarChar
+  lfdEmpty               DateTime?                @map("lfd_empty") @db.Timestamp(6)
+  lfdPort                DateTime?                @map("lfd_port") @db.Timestamp(6)
+  prepull                Boolean                  @default(false)
+  schedule               String?                  @db.VarChar
+  swatches               String?                  @db.VarChar
+  customs                Boolean                  @default(false)
+  puNumber               Boolean                  @default(false)
+  aws                    Boolean                  @default(false)
+  etdCozey               DateTime?                @map("etd_cozey") @db.Timestamp(6)
+  ataCozey               DateTime?                @map("ata_cozey") @db.Timestamp(6)
+  shipSchedule           DateTime?                @map("ship_schedule") @db.Timestamp(6)
+  emptyReturn            DateTime?                @map("empty_return") @db.Timestamp(6)
+  shippingLine           String?                  @db.VarChar
+  etaLocked              Boolean                  @default(false) @map("eta_locked")
+  region                 String                   @default("CA") @db.VarChar
+  dutiesCost             Decimal                  @default(0.0) @db.Decimal(12, 4)
+  extrasCost             Decimal                  @default(0.0) @db.Decimal(12, 4)
+  freightCost            Decimal                  @default(0.0) @db.Decimal(12, 4)
+  lastMileCost           Decimal                  @default(0.0) @db.Decimal(12, 4)
+  materialCostDate       DateTime?                @db.Timestamp(6)
+  dutiesCostDate         DateTime?                @db.Timestamp(6)
+  extrasCostDate         DateTime?                @db.Timestamp(6)
+  freightCostDate        DateTime?                @db.Timestamp(6)
+  lastMileCostDate       DateTime?                @db.Timestamp(6)
+  inTransitStartDate     DateTime?                @db.Timestamp(6)
+  fobFxRate              Decimal                  @default(0.0) @db.Decimal(12, 4)
+  totalPoFobCost         Decimal                  @default(0.0) @db.Decimal(12, 4)
+  totalCost              Decimal                  @default(0.0) @db.Decimal(12, 4)
+  origin                 String?                  @db.VarChar
+  shippingDocsReceived   Boolean                  @default(false)
+  poValidation           DateTime?                @db.Timestamp(6)
+  isfFiledByCustoms      DateTime?                @db.Timestamp(6)
+  dutiesApproved         DateTime?                @db.Timestamp(6)
+  apptDeliveryDateTime   DateTime?                @db.Timestamp(6)
+  pickupApptDateTime     DateTime?                @db.Timestamp(6)
+  actualDeliveryDateTime DateTime?                @map("actual_delivery_date_time") @db.Timestamp(6)
+  actualDepartureEndTime DateTime?                @map("actual_departure_end_time") @db.Timestamp(6)
+  directOrPrepull        DirectOrPrepullPoStatus?
+
+  location             location              @relation(fields: [locationId, region], references: [id, region])
+  user                 users                 @relation(fields: [userId], references: [id])
+  purchaseOrderCountry purchaseOrderCountry? @relation(fields: [origin], references: [id])
+
+  purchaseOrderPart  purchaseOrderPart[]
+  poTransfer         poTransfer?
+  inboundTask        inboundTask[]
+  consumingPrepParts prepPart[] @relation("ConsumedPO")
+
+  @@index([status, region, locationId], name: "idx_purchase_order_status_region_location")
+}
+
+model customer {
+  name          String         @db.VarChar
+  email         String?        @db.VarChar
+  phone         String?        @db.VarChar
+  updatedAt     DateTime       @updatedAt @db.Timestamp(6)
+  createdAt     DateTime       @default(now()) @db.Timestamp(6)
+  id            String         @unique
+  address       String?        @db.VarChar
+  city          String?        @db.VarChar
+  postal        String?        @db.VarChar
+  province      String?        @db.VarChar
+  region        String         @default("CA") @db.VarChar
+  order         order[]
+  wishlistItems wishlistItem[]
+}
+
+model wishlistItem {
+  id         String   @id @default(uuid()) @db.VarChar
+  configName String   @map("config_name") @db.VarChar
+  variantId  String   @map("variant_id") @db.VarChar
+  customerId String   @map("customer_id") @db.VarChar
+  region     String   @default("CA") @db.VarChar
+  customer   customer @relation(fields: [customerId], references: [id])
+
+  @@map("wishlist_item")
+}
+
+model order {
+  id                     String                   @id @default(uuid()) @db.Uuid
+  shopifyOrderNumber     String                   @db.VarChar
+  updatedAt              DateTime                 @updatedAt @db.Timestamp(6)
+  createdAt              DateTime                 @default(now()) @db.Timestamp(6)
+  status                 String                   @db.VarChar
+  locationId             String?                  @map("location_id") @db.VarChar
+  province               String?                  @db.VarChar
+  provinceCode           String?                  @db.VarChar
+  city                   String?                  @db.VarChar
+  address                String?                  @db.VarChar
+  postalCode             String?                  @db.VarChar
+  fulfillmentDate        DateTime?                @db.Timestamp(6)
+  shopifyCreatedAt       DateTime?                @db.Timestamp(6)
+  shopifyOrderId         String                   @unique @db.VarChar
+  customerId             String?
+  totalLineItems         Int?                     @map("total_line_items")
+  orderRisk              String                   @default("none") @map("order_risk") @db.VarChar
+  sourceName             String?                  @map("source_name") @db.VarChar
+  region                 String                   @default("CA") @db.VarChar
+  customer               customer?                @relation(fields: [customerId], references: [id])
+  shippingName           String?                  @db.VarChar
+  deliveryMethodCode     DeliveryMethodCode       @default(STANDARD) @map("delivery_method_code")
+  location               location?                @relation(fields: [locationId, region], references: [id, region], onDelete: Cascade)
+  preps                  prep[]
+  variantOrder           variantOrder[]
+  inventoryPoPartHistory inventoryPoPartHistory[]
+  shipments              shipment[]
+  orderReportResponse    orderReportResponse[]
+  returnsWms             returnsWms[]
+  pnpOrderBoxes           pnpOrderBox[]
+
+  @@unique([shopifyOrderNumber, region])
+  @@index([customerId], name: "idx_order_customerid")
+}
+
+model variantOrder {
+  orderId             String
+  quantity            Int
+  updatedAt           DateTime  @updatedAt @db.Timestamp(6)
+  createdAt           DateTime  @default(now()) @db.Timestamp(6)
+  shopifyCreatedAt    DateTime? @db.Timestamp(6)
+  fulfillableQuantity Int       @default(0)
+  lineItemId          String    @id @default(cuid()) @db.VarChar
+  variantId           String    @map("variant_id") @db.Uuid
+  region              String    @default("CA") @db.VarChar
+  prep                prep?
+  order               order     @relation(fields: [orderId], references: [shopifyOrderId])
+  variant             variant   @relation(fields: [variantId], references: [id])
+}
+
+model quality {
+  id      String    @db.VarChar
+  name    String    @db.VarChar
+  suffix  String    @db.VarChar
+  region  String    @default("CA") @db.VarChar
+  part    part[]
+  variant variant[]
+
+  @@id([id, region])
+}
+
+model variant {
+  sku          String              @db.VarChar
+  description  String              @db.VarChar
+  shopifyIds   String[]            @map("shopify_ids")
+  imageUrl     String?             @map("image_url") @db.VarChar
+  colorId      String              @map("color_id") @db.VarChar
+  modelName    String              @map("model_name") @db.VarChar
+  updatedAt    DateTime            @updatedAt @map("update_at") @db.Timestamp(6)
+  createdAt    DateTime            @default(now()) @db.Timestamp(6)
+  category     String?             @map("category") @db.VarChar
+  subCategory  String?             @map("sub_category") @db.VarChar
+  isKit        Boolean             @default(false) @map("is_kit")
+  id           String              @id @default(uuid()) @db.Uuid
+  disabled     Boolean             @default(false)
+  qualityId    String?             @map("quality_id") @db.VarChar
+  region       String              @default("CA") @db.VarChar
+  shipHold     Boolean?            @default(false) @map("ship_hold")
+  prep         prep[]
+  color        colors              @relation(fields: [colorId, region], references: [id, region], map: "variant_colorId_fkey")
+  model        model               @relation(fields: [modelName, region], references: [id, region], map: "variant_modelName_fkey")
+  quality      quality?            @relation(fields: [qualityId, region], references: [id, region])
+  dependencies variantDependency[] @relation("variant_to_dependency")
+  dependents   variantDependency[] @relation("dependency_to_variant")
+  variantOrder variantOrder[]
+  variantPart  variantPart[]
+
+  @@unique([sku, region])
+}
+
+model variantDependency {
+  id                 String  @id @default(uuid()) @db.Uuid
+  variantId          String  @map("variant_id") @db.Uuid
+  dependsOnVariantId String  @map("depends_on_variant_id") @db.Uuid
+  variant            variant @relation("variant_to_dependency", fields: [variantId], references: [id], onDelete: Cascade)
+  dependsOnVariant   variant @relation("dependency_to_variant", fields: [dependsOnVariantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, dependsOnVariantId])
+  @@index([dependsOnVariantId])
+  @@index([variantId])
+  @@map("variant_dependency")
+}
+
+model model {
+  id                         String                       @db.VarChar
+  name                       String                       @db.VarChar
+  region                     String                       @default("CA") @db.VarChar
+  categoriesAndSubCategories categoriesAndSubCategories[]
+  modelColors                modelColors[]
+  part                       part[]
+  variant                    variant[]
+
+  @@id([id, region])
+}
+
+model part {
+  sku                     String                    @db.VarChar
+  barcodeInteger          Int                       @default(autoincrement())
+  hasPrintedBarcode       Boolean                   @default(true) @map("has_printed_barcode")
+  description             String                    @db.VarChar
+  colorId                 String                    @map("color_id") @db.VarChar
+  order                   Int
+  updatedAt               DateTime                  @updatedAt @db.Timestamp(6)
+  createdAt               DateTime                  @default(now()) @db.Timestamp(6)
+  modelName               String                    @map("model_name") @db.VarChar
+  allowPrep               Boolean                   @default(false)
+  isAccessory             Boolean                   @default(false)
+  commonName              String?                   @db.VarChar
+  category                String?                   @db.VarChar
+  subCategory             String?                   @db.VarChar
+  id                      String                    @id @default(uuid()) @db.Uuid
+  disableCnz              Boolean                   @default(false) @map("disable_cnz")
+  disabled                Boolean                   @default(false)
+  qualityId               String?                   @map("quality_id") @db.VarChar
+  region                  String                    @default("CA") @db.VarChar
+  weight                  Decimal                   @default(0.0) @db.Decimal(12, 4)
+  height                  Decimal                   @default(0.0) @db.Decimal(12, 4)
+  width                   Decimal                   @default(0.0) @db.Decimal(12, 4)
+  length                  Decimal                   @default(0.0) @db.Decimal(12, 4)
+  weightUnit              WeightUnit                @default(LB) @map("weight_unit")
+  dimensionsUnit          DimensionUnit             @default(IN) @map("dimensions_unit")
+  // TODO: remove fobCostCAD when https://github.com/cozey-tech/po-service/pull/42 is merged (keep USD)
+  fobCostCAD              Decimal?                  @db.Decimal(12, 4)
+  fobCostUSD              Decimal                   @default(0.0) @db.Decimal(12, 4)
+  pickType                String                    @default("Regular") @db.VarChar
+  priorityLevel           String?
+  inventory               inventory[]
+  inventoryHistory        inventoryHistory[]
+  color                   colors                    @relation(fields: [colorId, region], references: [id, region])
+  model                   model                     @relation(fields: [modelName, region], references: [id, region])
+  quality                 quality?                  @relation(fields: [qualityId, region], references: [id, region])
+  prepPart                prepPart[]
+  purchaseOrderPart       purchaseOrderPart[]
+  variantPart             variantPart[]
+  manualDeliveryOverrides manualDeliveryOverrides[]
+
+  orderReportParts  orderReportParts[]
+  returnsPart       returnsPart[]
+  returnsPartAddOns returnsPartAddOns[]
+
+  @@unique([sku, qualityId, region])
+}
+
+model variantPart {
+  quantity  Decimal  @db.Decimal(3, 1)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  id        String   @id(map: "variantPart_pkey") @default(uuid()) @db.Uuid
+  partId    String   @map("part_id") @db.Uuid
+  variantId String   @map("variant_id") @db.Uuid
+  region    String   @default("CA") @db.VarChar
+  part      part     @relation(fields: [partId], references: [id], onDelete: Cascade, map: "variantPart_part_id_fkey")
+  variant   variant  @relation(fields: [variantId], references: [id], onDelete: Cascade, map: "variantPart_variant_id_fkey")
+
+  @@unique([partId, variantId, region], map: "variantPart_part_id_variantSku_variant_id_key")
+  @@map("variant_part")
+}
+
+model purchaseOrderPart {
+  locationId             String                   @map("location_id") @db.VarChar
+  expectedQuantity       Int                      @map("expected_quantity")
+  updatedAt              DateTime                 @updatedAt @db.Timestamp(6)
+  createdAt              DateTime                 @default(now()) @db.Timestamp(6)
+  po_id                  String                   @db.Uuid
+  actualQuantity         Int?                     @map("actual_quantity")
+  notes                  String?                  @db.VarChar
+  id                     String                   @id @default(uuid()) @db.Uuid
+  partId                 String                   @map("part_id") @db.Uuid
+  inventoryId            String                   @map("inventory_id") @db.Uuid
+  region                 String                   @default("CA") @db.VarChar
+  fobCostPerUnit         Decimal                  @default(0.0) @db.Decimal(12, 4)
+  totalFobCost           Decimal                  @default(0.0) @db.Decimal(12, 4)
+  perUnitCost            Decimal                  @default(0.0) @db.Decimal(12, 4)
+  inventory              inventory                @relation(fields: [inventoryId], references: [id])
+  location               location                 @relation(fields: [locationId, region], references: [id, region])
+  part                   part                     @relation(fields: [partId], references: [id])
+  po                     purchaseOrder            @relation(fields: [po_id], references: [id], onDelete: Cascade)
+  prepPartItem           prepPartItem[]
+  inventoryPoPartHistory inventoryPoPartHistory[]
+
+  @@unique([partId, po_id, locationId, region])
+  @@index([partId, locationId, region], name: "idx_purchase_order_part_part_location_region")
+}
+
+model inventory {
+  locationId                       String                             @map("location_id") @db.VarChar
+  onHand                           Int
+  tempOnHand                       Int?                               @default(0)
+  receiving                        Int?                               @default(0)
+  openOrders                       Int
+  openOrdersHandler                Int                                @default(0)
+  onHandCommitted                  Int                                @default(0) @map("on_hand_committed")
+  partId                           String                             @map("part_id") @db.Uuid
+  id                               String                             @id @default(uuid()) @db.Uuid
+  disableCnz                       Boolean                            @default(false) @map("disable_cnz")
+  region                           String                             @default("CA") @db.VarChar
+  location                         location                           @relation(fields: [locationId, region], references: [id, region])
+  part                             part                               @relation(fields: [partId], references: [id])
+  inventoryHistory                 inventoryHistory[]
+  prepPart                         prepPart[]
+  purchaseOrderPart                purchaseOrderPart[]
+  inventoryAccountingValuesHistory inventoryAccountingValuesHistory[]
+  inventoryPoPartHistory           inventoryPoPartHistory[]
+  warehouseLocationInventory       warehouseLocationInventory[]
+  inboundTask                      inboundTask[]
+
+  @@unique([locationId, partId, region])
+  @@index([partId, region], name: "idx_inventory_partid_region")
+}
+
+model collectionPrep {
+  id          String      @db.VarChar
+  notes       String?     @db.VarChar
+  updatedAt   DateTime    @updatedAt @db.Timestamp(6)
+  createdAt   DateTime    @default(now()) @db.Timestamp(6)
+  boxes       Int
+  carrier     String      @db.VarChar
+  locationId  String      @map("location_id") @db.VarChar
+  prepDate    DateTime    @db.Timestamp(6)
+  isSaving    Boolean     @default(false) @map("is_saving")
+  scanStatus  String?     @db.VarChar
+  region      String      @default("CA") @db.VarChar
+  location    location    @relation(fields: [locationId, region], references: [id, region])
+  prep        prep[]      @relation(name: "currentCollectionPrep")
+  oldPreps    prep[]      @relation(name: "oldCollectionPrep")
+  shipments   shipment[]
+  poTransfer  poTransfer?
+  published   Boolean     @default(true)
+  publishedAt DateTime?   @default(now()) @db.Timestamp(6)
+  pnpOrderBoxes pnpOrderBox[]
+
+  @@id([id, region])
+}
+
+model carriers {
+  id          String   @db.VarChar
+  name        String   @unique @db.VarChar
+  postalCodes String[] @db.VarChar
+  updatedAt   DateTime @updatedAt @db.Timestamp(6)
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+  region      String   @default("CA") @db.VarChar
+
+  @@id([id, region])
+}
+
+model returns {
+  id             String           @id @db.VarChar
+  status         String           @db.VarChar
+  orderId        String           @db.VarChar
+  updatedAt      DateTime         @updatedAt @db.Timestamp(6)
+  createdAt      DateTime         @default(now()) @db.Timestamp(6)
+  region         String           @default("CA") @db.VarChar
+  returnVariants returnVariants[]
+}
+
+model returnVariants {
+  id         String   @id @db.VarChar
+  quantity   Int
+  lineItemId String   @map("line_item_id") @db.VarChar
+  returnId   String   @map("return_id") @db.VarChar
+  updatedAt  DateTime @updatedAt @db.Timestamp(6)
+  createdAt  DateTime @default(now()) @db.Timestamp(6)
+  region     String   @default("CA") @db.VarChar
+  returns    returns  @relation(fields: [returnId], references: [id])
+}
+
+model modelColors {
+  id      String @id @db.Uuid
+  modelId String @map("model_id") @db.VarChar
+  colorId String @map("color_id") @db.VarChar
+  region  String @default("CA") @map("region") @db.VarChar
+  color   colors @relation(fields: [colorId, region], references: [id, region])
+  model   model  @relation(fields: [modelId, region], references: [id, region])
+}
+
+model inventoryHistory {
+  id                 String    @id @unique @db.VarChar
+  inventoryId        String    @map("inventory_id") @db.Uuid
+  locationId         String    @map("location_id") @db.VarChar
+  quantity           Int
+  updatedAt          DateTime  @updatedAt @db.Timestamp(6)
+  createdAt          DateTime  @default(now()) @db.Timestamp(6)
+  notes              String?   @db.VarChar
+  partId             String    @map("part_id") @db.Uuid
+  userId             String?   @db.VarChar
+  bop                Int?
+  eop                Int?
+  region             String    @default("CA") @db.VarChar
+  orderNumber        String?   @map("order_number") @db.VarChar
+  poNumber           String?   @map("po_number") @db.VarChar
+  prepId             String?   @map("prep_id") @db.VarChar
+  collectionPrepId   String?   @map("collection_prep_id") @db.VarChar
+  source             String    @default("change") @db.VarChar
+  reasonCode         String?   @map("reason_code") @db.VarChar
+  whlSource          String?   @db.VarChar
+  whlDestination     String?   @db.VarChar
+  bopAvailable       Int?      @map("bop_available")
+  bopCommitted       Int?      @map("bop_committed")
+  eopAvailable       Int?      @map("eop_available")
+  eopCommitted       Int?      @map("eop_committed")
+  bopReceiving       Int?      @default(0)
+  eopReceiving       Int?      @default(0)
+  eopChanged         Boolean?  @map("eop_changed")
+  committedReference Int       @default(0) @map("committed_reference")
+  inventory          inventory @relation(fields: [inventoryId], references: [id])
+  location           location  @relation(fields: [locationId, region], references: [id, region])
+  part               part      @relation(fields: [partId], references: [id])
+  user               users?    @relation(fields: [userId], references: [authId])
+
+  @@map("inventory_history")
+}
+
+model categoriesAndSubCategories {
+  category      String   @db.VarChar
+  modelId       String   @map("model_id") @db.VarChar
+  subCategories String[] @map("sub_categories") @db.VarChar
+  id            String   @db.VarChar
+  showOn        String   @default("both") @map("show_on") @db.VarChar
+  region        String   @default("CA") @db.VarChar
+  model         model    @relation(fields: [modelId, region], references: [id, region])
+
+  @@id([id, region])
+  @@map("categories_and_sub_categories")
+}
+
+model reasonCodeDropdown {
+  id          String  @id @unique @db.VarChar
+  description String  @db.VarChar
+  hasNotes    Boolean @map("has_notes")
+  region      String  @default("CA") @db.VarChar
+}
+
+model allocationRules {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar
+  description  String   @db.VarChar
+  skus         String[] @db.VarChar
+  locationFrom String[] @map("location_from") @db.VarChar
+  locationTo   String   @map("location_to") @db.VarChar
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+  region       String   @default("CA") @db.VarChar
+
+  @@map("allocation_rules")
+}
+
+model inventoryAccountingValuesHistory {
+  id                String    @id @default(uuid()) @db.Uuid
+  inventoryId       String    @db.Uuid
+  quantityInTransit Int
+  quantityOnHand    Int
+  avgCpuInTransit   Decimal   @db.Decimal(12, 2)
+  avgCpuOnHand      Decimal   @db.Decimal(12, 2)
+  totalInTransit    Decimal   @db.Decimal(12, 2)
+  totalOnHand       Decimal   @db.Decimal(12, 2)
+  updatedAt         DateTime  @updatedAt @db.Timestamp(6)
+  createdAt         DateTime  @default(now()) @db.Timestamp(6)
+  costCreatedAt     DateTime? @db.Timestamp(6)
+  inventory         inventory @relation(fields: [inventoryId], references: [id])
+
+  @@index([inventoryId, costCreatedAt]) // for optimized filtering
+}
+
+model inventoryPoPartHistory {
+  id                  String    @id @default(uuid()) @db.Uuid
+  inventoryId         String    @db.Uuid
+  purchaseOrderPartId String?   @db.Uuid
+  orderId             String?   @db.Uuid
+  prepId              String?
+  inventoryHistoryId  String?
+  quantityOnHand      Int
+  quantityInTransit   Int
+  perUnitCost         Decimal   @db.Decimal(12, 4)
+  reasonCode          String?   @db.VarChar
+  inboundingDate      DateTime? @db.Timestamp(6)
+  inboundingCreatedAt DateTime? @db.Timestamp(6)
+  quantityUsed        Int       @default(0)
+  costCreatedAt       DateTime? @db.Timestamp(6)
+  updatedAt           DateTime  @updatedAt @db.Timestamp(6)
+  createdAt           DateTime  @default(now()) @db.Timestamp(6)
+  region              String    @default("CA") @db.VarChar
+
+  inventory         inventory          @relation(fields: [inventoryId], references: [id])
+  purchaseOrderPart purchaseOrderPart? @relation(fields: [purchaseOrderPartId], references: [id])
+  order             order?             @relation(fields: [orderId], references: [id])
+  prep              prep?              @relation(fields: [prepId, region], references: [prep, region])
+
+  @@index([purchaseOrderPartId, inventoryId, costCreatedAt]) // for optimized filtering
+}
+
+model featureFlags {
+  featureName String   @id @unique @db.VarChar
+  description String   @db.VarChar
+  value       Boolean  @default(false) @db.Boolean
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+}
+
+model shipment {
+  id               String   @id @default(uuid()) @db.Uuid
+  collectionPrepId String   @db.VarChar
+  orderId          String   @db.VarChar
+  labelStatus      String   @default("Not Labeled") @db.VarChar
+  region           String   @default("CA") @db.VarChar
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+  status           ShipmentStatus   @default(ACTIVE)
+
+  collectionPrep collectionPrep @relation(fields: [collectionPrepId, region], references: [id, region])
+  order          order          @relation(fields: [orderId], references: [shopifyOrderId])
+
+  @@unique([collectionPrepId, orderId])
+  @@index([orderId], name: "idx_shipment_orderid")
+}
+
+model purchaseOrderCountry {
+  id            String          @id @unique @db.VarChar
+  name          String          @db.VarChar
+  purchaseOrder purchaseOrder[]
+}
+
+model returnsWms {
+  id                   String         @id @default(uuid()) @db.Uuid
+  returnId             String?        @db.VarChar // this id it's related to shopify returnId.
+  returnBarcodeInteger Int            @default(autoincrement())
+  orderId              String         @db.VarChar
+  trackingNumber       String         @db.VarChar
+  status               ReturnStatus   @default(PENDING)
+  locationId           String         @db.VarChar
+  region               String         @db.VarChar
+  reportResponseId     String?        @db.Uuid
+  carrier              String?        @db.VarChar
+  agentName            String?        @db.VarChar
+  labelUrl             String?        @db.VarChar
+  returnAction         ReturnAction   @default(RETURN)
+  refundAmount         Decimal?       @db.Decimal(12, 4)
+  refundChangeNote     String?        @db.Text
+  order                order          @relation(fields: [orderId], references: [shopifyOrderId])
+  createdAt            DateTime       @default(now()) @db.Timestamp(6)
+  updatedAt            DateTime       @updatedAt()
+  returnsPart          returnsPart[]
+  returnsMedia         returnsMedia[]
+}
+
+model returnsTime {
+  id           String           @id @default(uuid()) @db.Uuid
+  returnPartId String           @db.Uuid // this id is related to WMS returns
+  status       ReturnPartStatus
+  notes        String?          @db.VarChar
+  createdAt    DateTime         @default(now()) @db.Timestamp(6)
+  updatedAt    DateTime         @updatedAt()
+  returnWms    returnsPart      @relation(fields: [returnPartId], references: [id]) // Database relation with the returnsWMS Table
+}
+
+model returnsPart {
+  id                   String           @id @default(uuid()) @db.Uuid
+  partId               String           @db.Uuid
+  returnWmsId          String           @db.Uuid
+  status               ReturnPartStatus
+  outcome              ReturnsOutcome?
+  inspectedByUserId    String?          @db.Uuid
+  quantity             Int              @default(1)
+  createdAt            DateTime         @default(now()) @db.Timestamp(6)
+  part                 part             @relation(fields: [partId], references: [id])
+  returnWms            returnsWms       @relation(fields: [returnWmsId], references: [id])
+  updatedAt            DateTime         @updatedAt()
+  shopifyFulfillmentId String?          @db.VarChar
+  isModule             Boolean          @default(false)
+  notes                String?          @db.VarChar
+  parentPrepId         String?          @db.VarChar
+  receivedDate         DateTime?        @db.Timestamp(6)
+  region               String           @db.VarChar // Cannot use RegionCode enum now as it's a composite key relation with prep which has a region field as String
+
+  returnsPartAddOns returnsPartAddOns[]
+  returnsTime       returnsTime[]
+  prep              prep?               @relation(fields: [parentPrepId, region], references: [prep, region])
+  inspectedByUser   users?              @relation(fields: [inspectedByUserId], references: [id], onDelete: Restrict)
+}
+
+model returnsPartAddOns {
+  id            String @id @default(uuid()) @db.Uuid
+  returnsPartId String @db.Uuid
+  partId        String @db.Uuid
+  quantity      Int    @default(0)
+
+  createdAt  DateTime    @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime    @updatedAt()
+  returnPart returnsPart @relation(fields: [returnsPartId], references: [id])
+  part       part        @relation(fields: [partId], references: [id])
+}
+
+model poTransfer {
+  id               String         @id @default(uuid()) @db.Uuid
+  collectionPrepId String         @unique @db.VarChar
+  eta              DateTime       @db.Timestamp(6)
+  po               String?        @unique @db.VarChar
+  outboundStatus   String?        @db.VarChar
+  inboundStatus    String?        @db.VarChar
+  origin           String         @db.VarChar
+  destination      String         @db.VarChar
+  notes            String?        @db.VarChar
+  region           String         @default("CA") @db.VarChar
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt        DateTime       @default(now()) @map("updated_at") @db.Timestamp(6)
+  collectionPrep   collectionPrep @relation(fields: [collectionPrepId, region], references: [id, region])
+  purchaseOrder    purchaseOrder? @relation(fields: [po], references: [po])
+
+  @@unique([collectionPrepId, region])
+}
+
+model reportFlow {
+  id              String  @id @default(uuid()) @db.Uuid
+  name            String
+  startQuestionId String? @unique @db.Uuid
+
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+
+  startQuestion       reportQuestion?                 @relation(fields: [startQuestionId], references: [id])
+  questionsConditions reportQuestionOptionCondition[]
+}
+
+model reportQuestion {
+  id                        String                  @id @default(uuid()) @db.Uuid
+  title                     String
+  type                      OrderReportQuestionType
+  isRequired                Boolean                 @default(true)
+  hasAdditionalInput        Boolean                 @default(false)
+  isAdditionalInputRequired Boolean                 @default(false)
+
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+
+  reportFlow    reportFlow?
+  options       reportQuestionOption[]
+  conditions    reportQuestionOptionCondition[] @relation("questionConditions")
+  nextQuestions reportQuestionOptionCondition[] @relation("nextQuestions")
+}
+
+model reportQuestionOption {
+  id         String @id @default(uuid()) @db.Uuid
+  questionId String @db.Uuid
+  label      String @db.VarChar
+
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+
+  reportQuestion reportQuestion?                @relation(fields: [questionId], references: [id])
+  condition      reportQuestionOptionCondition?
+
+  @@unique([questionId, label])
+}
+
+model reportQuestionOptionCondition {
+  id           String @id @default(uuid()) @db.Uuid
+  reportFlowId String @db.Uuid
+  questionId   String @db.Uuid
+
+  optionId       String                @unique @db.Uuid
+  nextQuestionId String?               @db.Uuid
+  errorType      OrderReportErrorType?
+  additionalText String?               @db.Text
+
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+
+  reportFlow   reportFlow           @relation(fields: [reportFlowId], references: [id])
+  option       reportQuestionOption @relation(fields: [optionId], references: [id])
+  question     reportQuestion       @relation(name: "questionConditions", fields: [questionId], references: [id])
+  nextQuestion reportQuestion?      @relation(name: "nextQuestions", fields: [nextQuestionId], references: [id])
+}
+
+model orderReportResponse {
+  id                 String               @id @default(uuid()) @db.Uuid
+  flowName           String               @db.VarChar
+  orderId            String?              @db.Uuid
+  shopifyOrderNumber String?              @db.VarChar
+  additionalDetails  String?              @db.Text
+  errorType          OrderReportErrorType
+  createdAt          DateTime             @default(now()) @db.Timestamp(6)
+  updatedAt          DateTime             @updatedAt @db.Timestamp(6)
+  zdTicketNumber     String?              @db.VarChar
+  order              order?               @relation(fields: [orderId], references: [id])
+  isDeleted          Boolean              @default(false)
+  submittedBy        String?              @default("") @db.VarChar
+
+  answers          reportQuestionAnswer[]
+  orderReportParts orderReportParts[]
+
+  // Partial unique index via migration on shopifyOrderNumber, zdTicketNumber, flowName and isDeleted = false 
+}
+
+model reportQuestionAnswer {
+  id               String                  @id @default(uuid()) @db.Uuid
+  reportResponseId String                  @db.Uuid
+  questionLabel    String                  @db.VarChar
+  questionType     OrderReportQuestionType
+  answer           String?                 @db.VarChar
+  photos           String[]                @default([]) @db.VarChar
+  additionalInput  String?                 @db.Text
+  createdAt        DateTime                @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime                @updatedAt @db.Timestamp(6)
+
+  reportResponse orderReportResponse @relation(fields: [reportResponseId], references: [id], onDelete: Cascade)
+}
+
+model orderReportParts {
+  id                 String    @id @default(uuid()) @db.Uuid
+  reportResponseId   String    @db.Uuid
+  partId             String    @db.Uuid
+  quantity           Int
+  createdAt          DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt          DateTime  @updatedAt @db.Timestamp(6)
+  prepPartId         String?   @db.Uuid
+  validatedDC        String?   @db.VarChar
+  validatedErrorType String?   @db.VarChar
+  validatedComments  String?   @db.VarChar
+  validatedBy        String?   @db.VarChar
+  validatedAt        DateTime? @db.Timestamp(6)
+
+  reportResponse orderReportResponse @relation(fields: [reportResponseId], references: [id], onDelete: Cascade)
+  part           part                @relation(fields: [partId], references: [id])
+  prepPart       prepPart?           @relation(fields: [prepPartId], references: [id], onDelete: SetNull)
+}
+
+model carrierZoneRate {
+  id                          String   @id @default(uuid()) @db.Uuid
+  locationId                  String   @map("location_id") @db.VarChar
+  region                      String   @default("CA") @db.VarChar
+  carrierName                 String   @map("carrier_name") @db.VarChar
+  zone                        String   @db.VarChar
+  postalCodeStart             String   @map("postal_code_start") @db.VarChar
+  postalCodeEnd               String   @map("postal_code_end") @db.VarChar
+  baseRate                    Decimal  @map("base_rate") @db.Decimal(12, 2)
+  additionalPackageRate       Decimal? @map("additional_package_rate") @db.Decimal(12, 2)
+  heavyWeightPackageSurcharge Decimal? @default(0.0) @map("heavy_weight_package_surcharge") @db.Decimal(12, 2)
+
+  location location @relation(fields: [locationId, region], references: [id, region], onDelete: Cascade)
+
+  @@unique([locationId, region, carrierName, zone, postalCodeStart, postalCodeEnd])
+  @@map("carrier_zone_rate")
+}
+
+model deliveryMethod {
+  code                          DeliveryMethodCode
+  locationId                    String             @map("location_id") @db.VarChar
+  region                        String             @default("CA") @db.VarChar
+  postalCodes                   String[]           @default([]) @map("postal_codes") @db.VarChar
+  rate                          Decimal            @db.Decimal(12, 2)
+  postalCodeRule                MatchRule          @default(NONE) @map("postal_code_rule")
+  dependsOnStock                Boolean            @default(false) @map("depends_on_stock")
+  supersedeRank                 Int                @default(0) @map("supersede_rank")
+  rateAdjustmentPercent         Decimal            @default(0.0) @map("rate_adjustment_percent") @db.Decimal(12, 2)
+  fallbackRateAdjustmentPercent Decimal?           @map("fallback_rate_adjustment_percent") @db.Decimal(12, 2)
+  carriers                      String[]           @default([]) @db.VarChar
+  carrierRule                   MatchRule          @default(NONE) @map("carrier_rule")
+  ratingRule                    RatingRule         @default(DEFAULT) @map("rating_rule")
+  fallbackRatingRule            RatingRule?        @map("fallback_rating_rule")
+
+  location location @relation(fields: [locationId, region], references: [id, region], onDelete: Cascade)
+
+  @@id([code, locationId, region])
+  @@map("delivery_method")
+}
+
+model returnsMedia {
+  id               String      @id @default(uuid()) @db.Uuid
+  returnWmsId      String      @db.Uuid
+  mediaSource      MediaSource @default(SANITY)
+  issueDescription String?
+  mediaKey         String[]    @default([])
+  createdAt        DateTime    @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime    @updatedAt @db.Timestamp(6)
+
+  returnWms returnsWms @relation(fields: [returnWmsId], references: [id])
+}
+
+model prepPartItem {
+  id                      String                         @id @default(uuid()) @db.Uuid
+  prepPartId              String                         @db.Uuid
+  trackingNumber          String?                        @db.VarChar
+  carrierName             String?                        @db.VarChar
+  fulfillingPO            String?                        @db.VarChar
+  costPoPartId            String?                        @db.Uuid
+  pnpOrderBoxId           String?                        @map("pnp_order_box_id") @db.Uuid
+  region                  RegionCode?
+  createdAt               DateTime                       @default(now()) @db.Timestamp(6)
+  outboundStatus          PrepPartItemOutboundStatus?    @map("outbound_status")
+  labelScanMethod         ScanMethod?                    @map("label_scan_method")
+  labelScannedByUserId    String?                        @map("label_scanned_by_user_id") @db.Uuid
+  labelScannedAt          DateTime?                      @map("label_scanned_at") @db.Timestamp(6)
+  labelGeneratedAt        DateTime?                      @map("label_generated_at") @db.Timestamp(6)
+
+  prepPart                prepPart                       @relation(fields: [prepPartId], references: [id], onDelete: Cascade)
+  costPoPart              purchaseOrderPart?             @relation(fields: [costPoPartId], references: [id], onDelete: SetNull)
+  labelScannedByUser      users?                         @relation("labelScannedByUser", fields: [labelScannedByUserId], references: [id], onDelete: Restrict)
+  pnpOrderBox             pnpOrderBox?                   @relation(fields: [pnpOrderBoxId], references: [id], onDelete: SetNull)
+  pnpPackingCompliance    pnpPackingCompliance?          @relation("prepPartItemPackingCompliance")
+
+  @@index([prepPartId], name: "idx_preppartitem_preppartid")
+  @@index([trackingNumber], name: "idx_preppartitem_trackingnumber")
+}
+
+model pnpPackingCompliance {
+  id                String       @id @default(uuid()) @db.Uuid
+  prepPartItemId    String       @unique @map("prep_part_item_id") @db.Uuid
+  packedByUserId    String       @map("packed_by_user_id") @db.Uuid
+  packingScanMethod ScanMethod   @map("packing_scan_method")
+  pnpOrderBoxId     String       @map("pnp_order_box_id") @db.Uuid
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  prepPartItem  prepPartItem @relation("prepPartItemPackingCompliance", fields: [prepPartItemId], references: [id], onDelete: Cascade)
+  packedByUser  users        @relation(fields: [packedByUserId], references: [id])
+  pnpOrderBox   pnpOrderBox  @relation("pnpOrderBoxPackingCompliances", fields: [pnpOrderBoxId], references: [id], onDelete: Cascade)
+
+  @@map("pnp_packing_compliance")
+}
+
+model pnpPackageInfo {
+  id         String        @id @default(uuid()) @db.Uuid
+  identifier String        @db.VarChar
+  length     Decimal       @db.Decimal(10, 4) // Store the numeric value (e.g., 12.0000)
+  lengthUnit DimensionUnit @default(IN) @map("length_unit") // Store the unit (IN or CM)
+  width      Decimal       @db.Decimal(10, 4) // Store the numeric value (e.g., 8.5000)
+  widthUnit  DimensionUnit @default(IN) @map("width_unit") // Store the unit (IN or CM)
+  height     Decimal       @db.Decimal(10, 4) // Store the numeric value (e.g., 6.2500)
+  heightUnit DimensionUnit @default(IN) @map("height_unit") // Store the unit (IN or CM)
+  weight     Decimal       @db.Decimal(10, 4) // Store the numeric value (e.g., 2.7500)
+  weightUnit WeightUnit    @default(LB) @map("weight_unit") // Store the unit (LB or KG)
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@map("pnp_package_info")
+}
+
+// =========================================
+// Enums
+// =========================================
+
+enum PrepPartItemOutboundStatus {
+  PICKED
+  PENDING_PACKING
+  PACKED
+  LABEL_QUEUED
+  LABEL_GENERATED
+  LABEL_PRINTED
+  LABEL_VERIFIED
+  LABEL_FAILED
+}
+
+enum ScanMethod {
+  SCANNER
+  MANUAL
+}
+
+enum DeliveryMethodCode {
+  STANDARD
+  SCHEDULED
+  REMOTE_LOCATION
+}
+
+enum MatchRule {
+  NONE
+  INCLUSIVE
+  EXCLUSIVE
+}
+
+enum RatingRule {
+  DEFAULT
+  ORDER
+  CARRIER
+}
+
+enum DirectOrPrepullPoStatus {
+  Direct
+  Prepull
+}
+
+enum WeightUnit {
+  KG
+  LB
+}
+
+enum DimensionUnit {
+  CM
+  IN
+}
+
+enum OrderReportQuestionType {
+  SIMPLE_RADIO
+  COMPLEX_RADIO
+  TEXT_INPUT
+  TEXT_AREA
+  FILE_UPLOAD
+}
+
+enum OrderReportErrorType {
+  CARRIER
+  CUSTOMER_HAPPINESS
+  CUSTOMER_PREFERENCE
+  QUALITY_ASSURANCE
+  WAREHOUSE
+  OTHER
+}
+
+model warehouseLocation {
+  id                         String                       @id @default(uuid()) @db.Uuid
+  region                     String                       @db.VarChar
+  whlBarcodeString           String                       @db.VarChar
+  whlBarcodeInteger          Int                          @default(autoincrement())
+  whlDimensionsUnit          DimensionUnit                @default(IN)
+  whlWeightUnit              WeightUnit                   @default(LB)
+  locationId                 String                       @map("location_id") @db.VarChar
+  whlZone                    String                       @db.VarChar
+  whlAisle                   String                       @db.VarChar
+  whlBay                     Int                          @default(0)
+  whlSlot                    Int                          @default(0)
+  whlLevel                   String                       @default("A")
+  whlPosition                Int                          @default(1)
+  whlPriorityLevel           String?
+  whlLength                  Decimal                      @default(0.0) @db.Decimal(12, 4)
+  whlWidth                   Decimal                      @default(0.0) @db.Decimal(12, 4)
+  whlWeight                  Decimal                      @default(0.0) @db.Decimal(12, 4)
+  whlHeight                  Decimal                      @default(0.0) @db.Decimal(12, 4)
+  whlStatus                  String?                      @db.VarChar
+  whlModelLock               String?                      @db.VarChar
+  whlColorLock               String?                      @db.VarChar
+  whlSkuLock                 String?                      @db.VarChar
+  whlIsPhysical              Boolean                      @default(true)
+  whlType                    WarehouseLocationType        @default(NOT_PICKABLE)
+  whlPickType                String?                      @db.VarChar
+  whlParentId                String?                      @db.VarChar
+  createdAt                  DateTime                     @default(now()) @db.Timestamp(6)
+  updatedAt                  DateTime                     @updatedAt @db.Timestamp(6)
+  warehouseLocationInventory warehouseLocationInventory[]
+  inboundTask                inboundTask[]
+
+  @@unique([whlBarcodeString, locationId])
+}
+
+model warehouseLocationInventory {
+  id                  String            @id @default(uuid()) @db.Uuid
+  inventoryQuantity   Int               @default(0)
+  warehouseLocationId String            @db.Uuid
+  inventoryId         String?           @db.Uuid
+  createdAt           DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt           DateTime          @updatedAt @db.Timestamp(6)
+  warehouseLocation   warehouseLocation @relation(fields: [warehouseLocationId], references: [id])
+  inventory           inventory?        @relation(fields: [inventoryId], references: [id])
+
+  @@unique([warehouseLocationId, inventoryId])
+}
+
+model whlManualOverrides {
+  id             String        @id @db.Uuid
+  partId         String        @map("part_id") @db.Uuid
+  inventoryId    String        @db.Uuid
+  length         Decimal       @default(0.0) @db.Decimal(12, 4)
+  width          Decimal       @default(0.0) @db.Decimal(12, 4)
+  height         Decimal       @default(0.0) @db.Decimal(12, 4)
+  whlCapacity    Int
+  dimensionsUnit DimensionUnit @default(IN)
+  region         String        @db.VarChar
+  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime      @default(now()) @db.Timestamp(6)
+
+  @@unique([inventoryId, length, width, height])
+}
+
+model inboundTask {
+  id                   String            @id @default(uuid()) @db.Uuid
+  lpn                  String?           @db.VarChar
+  locationId           String            @db.VarChar
+  assignedUserId       String?           @db.Uuid
+  previousWhLocation   String?           @db.VarChar
+  currentWhLocation    String?           @db.VarChar
+  poNumber             String?           @db.VarChar
+  assignedWhLocationId String?           @db.Uuid
+  parentWhlTaskId      String?           @db.Uuid
+  inventoryId          String            @db.Uuid
+  quantity             Int               @default(0)
+  status               InboundTaskStatus
+  type                 String            @db.VarChar
+  createdAt            DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt            DateTime          @updatedAt @db.Timestamp(6)
+
+  assignedUser  users?         @relation(fields: [assignedUserId], references: [id])
+  purchaseOrder purchaseOrder? @relation(fields: [poNumber], references: [po])
+
+  assignedWhLocation warehouseLocation? @relation(fields: [assignedWhLocationId], references: [id])
+  inventory          inventory          @relation(fields: [inventoryId], references: [id])
+}
+
+model whlTaskHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  whlTaskId String   @db.Uuid
+  eventType String   @db.VarChar
+  eventKey  String   @db.VarChar
+  metadata  String?  @db.Text
+  region    String   @db.VarChar
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+}
+
+model printerInformation {
+  id           String   @id @default(uuid()) @db.Uuid
+  locationId   String   @db.VarChar
+  printerName  String   @db.VarChar
+  printerModel String   @db.VarChar
+  labelType    String   @db.VarChar
+  notes        String?  @db.VarChar
+  ipAddress    String?  @db.VarChar
+  createdAt    DateTime @default(now()) @db.Timestamp(6)
+  region       String   @default("CA") @db.VarChar
+
+  location location @relation(fields: [locationId, region], references: [id, region], onDelete: Cascade)
+
+  @@unique([locationId, printerName])
+}
+
+model pnpBox {
+  id         String        @id @default(uuid()) @db.Uuid
+  identifier String        @db.VarChar
+  length     Decimal       @db.Decimal(10, 4) // Store the numeric value (e.g., 12.0000)
+  lengthUnit DimensionUnit @default(IN) @map("length_unit") // Store the unit (IN or CM)
+  width      Decimal       @db.Decimal(10, 4) // Store the numeric value (e.g., 8.5000)
+  widthUnit  DimensionUnit @default(IN) @map("width_unit") // Store the unit (IN or CM)
+  height     Decimal       @db.Decimal(10, 4) // Store the numeric value (e.g., 6.2500)
+  heightUnit DimensionUnit @default(IN) @map("height_unit") // Store the unit (IN or CM)
+  region     RegionCode    @default(CA)
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt  DateTime      @updatedAt @map("updated_at") @db.Timestamp(6)
+  pnpOrderBox pnpOrderBox[]
+
+  @@map("pnp_box")
+}
+
+model pnpOrderBox {
+  id               String         @id @default(uuid()) @db.Uuid
+  collectionPrepId String        @db.VarChar
+  orderId          String        @db.VarChar
+  lpn              String        @unique @db.VarChar
+  status           PnpBoxStatus  
+  weight           Decimal?      @db.Decimal(10, 4)
+  weightUnit       WeightUnit?   @default(LB) @map("weight_unit")
+  pnpBoxId         String        @map("pnp_box_id") @db.Uuid
+  region           String        @db.VarChar // Cannot use RegionCode enum now as it's a composite key relation with prep which has a region field as String
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  collectionPrep           collectionPrep    @relation(fields: [collectionPrepId, region], references: [id, region])
+  order                    order             @relation(fields: [orderId], references: [shopifyOrderId])
+  pnpBox                   pnpBox            @relation(fields: [pnpBoxId], references: [id])
+  prepPartItem             prepPartItem[]
+  pnpPackingCompliances    pnpPackingCompliance[]   @relation("pnpOrderBoxPackingCompliances")
+
+  @@map("pnp_order_box")
+}
+
+enum ReturnPartStatus {
+  IN_TRANSIT
+  ARRIVED
+  INSPECTION_STARTED
+  INSPECTION_PASS
+  PUTAWAY
+  INSPECTION_FAILED
+  INSPECTION_ABANDONED
+  ESCALATION
+  ESCALATION_CH
+  ESCALATION_INTERNAL
+  CANCELLED
+  LOST
+  COMPLETED
+}
+
+enum ReturnStatus {
+  PENDING
+  RECEIVED
+  INSPECTED
+  INSPECTION_STARTED
+  CANCELLED
+  COMPLETED
+  READY_TO_REFUND
+}
+
+enum ReturnAction {
+  RETURN
+  EXCHANGE
+}
+
+enum MediaSource {
+  CLOUDFRONT
+  SANITY
+}
+
+enum ReturnsOutcome {
+  NEW
+  REFURB
+  DONATION
+  DESTRUCTION
+  ESCALATION_CH
+  ESCALATION_INTERNAL
+}
+
+enum RegionCode {
+  CA
+  US
+}
+
+enum WarehouseLocationType {
+  PICKABLE
+  EQUIPMENT
+  STAGING_AREA
+  RESERVE
+  NOT_PICKABLE
+}
+
+enum InboundTaskStatus {
+  AVAILABLE
+  ASSIGNED
+  COMPLETE
+  PENDING
+}
+
+enum PrepType {
+  STANDARD
+  SWATCH
+}
+
+model customerEtaTier {
+  id                 String @id @default(uuid()) @db.Uuid
+  tier               Int    @unique
+  gapBdStart         Int    @map("gap_bd_start")
+  gapBdEnd           Int    @map("gap_bd_end")
+  promiseBufferStart Int    @map("promise_buffer_start")
+  promiseBufferEnd   Int    @map("promise_buffer_end")
+
+  preps prep[]
+
+  @@index([gapBdStart, gapBdEnd])
+}
+
+enum EtaStatus {
+  ahead
+  on_time
+  delayed
+  on_hold
+  updated
+  not_available
+}
+
+enum ShipmentStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum PnpBoxStatus {
+  OPEN
+  CLOSED
 }
