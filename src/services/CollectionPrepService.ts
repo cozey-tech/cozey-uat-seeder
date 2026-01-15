@@ -21,7 +21,7 @@ export class CollectionPrepService {
     return collectionPrep;
   }
 
-  validateOrderMix(config: SeedConfig, orderIds: string[]): void {
+  validateOrderMix(config: SeedConfig, _orderIds: string[]): void {
     if (!config.collectionPrep) {
       return; // No validation needed if collectionPrep not specified
     }
