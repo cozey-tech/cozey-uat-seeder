@@ -52,10 +52,11 @@ export default [
       "lines-between-class-members": ["error", "always", { exceptAfterSingleLine: true }],
     },
   },
-  // Vitest config
+  // Vitest config - extends TypeScript config
   {
     files: ["**/*.test.ts", "**/*.spec.ts"],
     plugins: {
+      "@typescript-eslint": tseslint,
       vitest: vitestPlugin,
       "jest-formatting": jestFormatting,
     },
@@ -72,6 +73,22 @@ export default [
       },
     },
     rules: {
+      // Include TypeScript rules from the main config
+      ...tseslint.configs.recommended.rules,
+      "@typescript-eslint/camelcase": "off",
+      "@typescript-eslint/no-var-requires": "off",
+      "@typescript-eslint/explicit-member-accessibility": "off",
+      "@typescript-eslint/consistent-type-assertions": "error",
+      "@typescript-eslint/explicit-module-boundary-types": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { ignoreRestSiblings: true, argsIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/prefer-interface": "off",
+      // Allow implicit return types in tests for readability
+      "@typescript-eslint/explicit-function-return-type": "off",
+      "lines-between-class-members": ["error", "always", { exceptAfterSingleLine: true }],
+      // Vitest-specific rules
       ...vitestPlugin.configs.recommended.rules,
       "jest-formatting/padding-around-describe-blocks": "error",
       "jest-formatting/padding-around-test-blocks": "error",

@@ -1,6 +1,6 @@
 # Implementation Progress Ledger
 
-**Plan**: `/Users/sammorrison/.cursor/plans/shopify_wms_staging_seeder_772f07ce.plan.md`  
+**Plan**: See main plan document in repository (if available)  
 **Branch**: `feat/implement-seeder-phase1`  
 **Last Updated**: 2026-01-15
 
