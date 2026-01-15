@@ -60,6 +60,12 @@ export default [
       "jest-formatting": jestFormatting,
     },
     languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: 2021,
+        sourceType: "module",
+        impliedStrict: true,
+      },
       globals: {
         ...globals.node,
         ...vitestPlugin.environments.env.globals,
