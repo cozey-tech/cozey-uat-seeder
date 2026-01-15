@@ -42,10 +42,25 @@
 
 ## Phase 2: Staging Safety & Configuration
 
-- [ ] **Task 2.1.1**: Environment Variable Validation
-- [ ] **Task 2.1.2**: Staging Guardrail Checks
-- [ ] **Task 2.1.3**: Input File Parser
-- [ ] **Task 2.1.4**: Data Validation Service
+- [x] **Task 2.1.1**: Environment Variable Validation
+  - Commit: `f8763ee`
+  - Status: ✅ COMPLETE
+  - Verified: Zod schema validates env vars, tests pass
+
+- [x] **Task 2.1.2**: Staging Guardrail Checks
+  - Commit: `e1502d8`
+  - Status: ✅ COMPLETE
+  - Verified: Guardrails validate staging patterns, tests pass
+
+- [x] **Task 2.1.3**: Input File Parser
+  - Commit: (latest)
+  - Status: ✅ COMPLETE
+  - Verified: Parses JSON files, validates with Zod, tests pass
+
+- [x] **Task 2.1.4**: Data Validation Service
+  - Commit: (latest)
+  - Status: ✅ COMPLETE
+  - Verified: Validates SKUs, customer data, quantities, PnP config, tests pass
 
 ## Known Blockers
 

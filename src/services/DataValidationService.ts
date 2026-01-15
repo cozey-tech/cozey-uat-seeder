@@ -119,7 +119,7 @@ export class DataValidationService {
     // Check if we have the required mix (if orderType is specified)
     const orderTypes = config.orders
       .map((order) => order.orderType)
-      .filter((type): type is string => type !== undefined);
+      .filter((type): type is "regular-only" | "pnp-only" | "mixed" => type !== undefined);
 
     if (orderTypes.length === 0) {
       // No orderType specified, skip validation
