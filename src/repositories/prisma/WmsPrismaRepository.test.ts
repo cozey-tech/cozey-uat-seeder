@@ -4,10 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import { WmsPrismaRepository } from "./WmsPrismaRepository";
 import type {
   CreateOrderRequest,
-  CreateVariantOrderRequest,
-  CreatePrepRequest,
   CreateCollectionPrepRequest,
-  CreateShipmentRequest,
 } from "../interface/WmsRepository";
 
 describe("WmsPrismaRepository", () => {
