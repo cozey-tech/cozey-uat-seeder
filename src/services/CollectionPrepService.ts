@@ -1,0 +1,84 @@
+import type { WmsRepository, CreateCollectionPrepRequest, ICollectionPrep } from "../repositories/interface/WmsRepository";
+import type { SeedConfig } from "../shared/types/SeedConfig";
+import { OrderType } from "../shared/enums/OrderType";
+import { PickType } from "../shared/enums/PickType";
+
+export class CollectionPrepValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CollectionPrepValidationError";
+    Object.setPrototypeOf(this, CollectionPrepValidationError.prototype);
+  }
+}
+
+export class CollectionPrepService {
+  constructor(private readonly wmsRepository: WmsRepository) {}
+
+  async createCollectionPrep(
+    request: CreateCollectionPrepRequest,
+  ): Promise<ICollectionPrep> {
+    const collectionPrep = await this.wmsRepository.createCollectionPrep(request);
+    return collectionPrep;
+  }
+
+  validateOrderMix(config: SeedConfig, orderIds: string[]): void {
+    if (!config.collectionPrep) {
+      return; // No validation needed if collectionPrep not specified
+    }
+
+    // Collect order types from config
+    const orderTypes = config.orders
+      .map((order) => order.orderType)
+      .filter((type): type is "regular-only" | "pnp-only" | "mixed" => type !== undefined);
+
+    if (orderTypes.length === 0) {
+      // No orderType specified, skip validation
+      return;
+    }
+
+    // Verify we have the expected mix
+    const hasRegularOnly = orderTypes.includes(OrderType.RegularOnly);
+    const hasPnpOnly = orderTypes.includes(OrderType.PnpOnly);
+    const hasMixed = orderTypes.includes(OrderType.Mixed);
+
+    // Validate that orders match their declared types
+    for (let i = 0; i < config.orders.length; i++) {
+      const order = config.orders[i];
+      if (order.orderType) {
+        const actualPickTypes = new Set(
+          order.lineItems.map((item) => item.pickType),
+        );
+
+        if (order.orderType === OrderType.RegularOnly) {
+          const hasPnpItems = actualPickTypes.has(PickType.PickAndPack);
+          if (hasPnpItems) {
+            throw new CollectionPrepValidationError(
+              `Order ${i + 1} is declared as 'regular-only' but contains Pick and Pack items`,
+            );
+          }
+        } else if (order.orderType === OrderType.PnpOnly) {
+          const hasRegularItems = actualPickTypes.has(PickType.Regular);
+          if (hasRegularItems) {
+            throw new CollectionPrepValidationError(
+              `Order ${i + 1} is declared as 'pnp-only' but contains Regular items`,
+            );
+          }
+        } else if (order.orderType === OrderType.Mixed) {
+          if (actualPickTypes.size < 2) {
+            throw new CollectionPrepValidationError(
+              `Order ${i + 1} is declared as 'mixed' but does not contain both Regular and Pick and Pack items`,
+            );
+          }
+        }
+      }
+    }
+
+    // Warn if mix is not ideal (but don't throw - flexible)
+    if (!hasRegularOnly && !hasPnpOnly && !hasMixed) {
+      // This is just a warning, not an error
+      console.warn(
+        "Collection Prep specified but order types may not match expected mix. Consider specifying orderType for each order.",
+      );
+    }
+  }
+}
