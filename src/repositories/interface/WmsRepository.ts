@@ -74,6 +74,18 @@ export type CreatePnpOrderBoxRequest = {
   region: string;
 };
 
+export type CreatePrepPartRequest = {
+  prepId: string;
+  partId: string;
+  quantity: number;
+  region: string;
+};
+
+export type CreatePrepPartItemRequest = {
+  prepPartId: string;
+  region?: "CA" | "US";
+};
+
 export interface IOrder {
   id: string;
   shopifyOrderId: string;
@@ -107,7 +119,10 @@ export interface WmsRepository {
   createPnpPackageInfo(packageInfo: CreatePnpPackageInfoRequest): Promise<unknown>;
   createPnpBox(box: CreatePnpBoxRequest): Promise<unknown>;
   createPnpOrderBox(orderBox: CreatePnpOrderBoxRequest): Promise<unknown>;
+  createPrepPart(prepPart: CreatePrepPartRequest): Promise<unknown>;
+  createPrepPartItem(prepPartItem: CreatePrepPartItemRequest): Promise<unknown>;
   findPartBySku(sku: string, region: string): Promise<{ id: string; sku: string } | null>;
+  findVariantBySku(sku: string, region: string): Promise<{ id: string; sku: string } | null>;
   findCustomerById(customerId: string): Promise<{ id: string; name: string } | null>;
   createCustomer(customer: { id: string; name: string; email?: string; region: string }): Promise<unknown>;
 }

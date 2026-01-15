@@ -20,7 +20,10 @@ describe("CollectionPrepService", () => {
       createPnpPackageInfo: vi.fn(),
       createPnpBox: vi.fn(),
       createPnpOrderBox: vi.fn(),
+      createPrepPart: vi.fn(),
+      createPrepPartItem: vi.fn(),
       findPartBySku: vi.fn(),
+      findVariantBySku: vi.fn(),
       findCustomerById: vi.fn(),
       createCustomer: vi.fn(),
     };
