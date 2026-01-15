@@ -73,3 +73,20 @@
 - ⚠️ ESLint: Config needs migration to v9 format (non-blocking)
 - ✅ Tests: All tests pass (44 tests, 9 test files)
 - ✅ Prisma: Schema copied and client generated
+
+## Phase 5: Collection Prep Creation
+
+- [x] **Task 5.1.1**: CollectionPrepService
+  - Commit: (latest)
+  - Status: ✅ COMPLETE
+  - Verified: Service creates collection prep, validates order mix, tests pass
+
+- [x] **Task 5.2.1**: CreateCollectionPrepUseCase
+  - Commit: (latest)
+  - Status: ✅ COMPLETE
+  - Verified: Use case creates collection prep, returns ID and region, tests pass
+
+- [x] **Task 5.2.2**: CreateCollectionPrepHandler
+  - Commit: (latest)
+  - Status: ✅ COMPLETE
+  - Verified: Handler validates request, calls use case, tests pass
