@@ -2,6 +2,7 @@ import type { WmsRepository, CreateCollectionPrepRequest, ICollectionPrep } from
 import type { SeedConfig } from "../shared/types/SeedConfig";
 import { OrderType } from "../shared/enums/OrderType";
 import { PickType } from "../shared/enums/PickType";
+import { Logger } from "../utils/logger";
 
 export class CollectionPrepValidationError extends Error {
   constructor(message: string) {
@@ -19,7 +20,11 @@ export class CollectionPrepValidationError extends Error {
  * - Order mix validation (regular-only, PnP-only, mixed)
  */
 export class CollectionPrepService {
-  constructor(private readonly wmsRepository: WmsRepository) {}
+  private readonly dryRun: boolean;
+
+  constructor(private readonly wmsRepository: WmsRepository, dryRun: boolean = false) {
+    this.dryRun = dryRun;
+  }
 
   /**
    * Creates a collection prep header in the WMS database
@@ -31,6 +36,26 @@ export class CollectionPrepService {
   async createCollectionPrep(
     request: CreateCollectionPrepRequest,
   ): Promise<ICollectionPrep> {
+    if (this.dryRun) {
+      const mockCollectionPrep: ICollectionPrep = {
+        id: request.id,
+        region: request.region,
+        carrier: request.carrier,
+        locationId: request.locationId,
+        prepDate: request.prepDate,
+        boxes: request.boxes,
+      };
+      Logger.info("DRY RUN: Would create collection prep", {
+        collectionPrepId: request.id,
+        region: request.region,
+        carrier: request.carrier,
+        locationId: request.locationId,
+        prepDate: request.prepDate,
+        boxes: request.boxes,
+      });
+      return mockCollectionPrep;
+    }
+
     const collectionPrep = await this.wmsRepository.createCollectionPrep(request);
     return collectionPrep;
   }

@@ -130,7 +130,7 @@ describe("SeedShopifyOrdersUseCase", () => {
     expect(mockShopifyService.fulfillOrder).toHaveBeenCalledTimes(2);
   });
 
-  it("should throw error if order query fails to find created order", async () => {
+  it("should construct line items from input if order query returns empty (dry-run scenario)", async () => {
     const request: SeedShopifyOrdersRequest = {
       batchId: "batch-123",
       orders: [
@@ -158,8 +158,16 @@ describe("SeedShopifyOrdersUseCase", () => {
       status: "SUCCESS",
     });
 
-    vi.mocked(mockShopifyService.queryOrdersByTag).mockResolvedValue([]); // Order not found
+    vi.mocked(mockShopifyService.queryOrdersByTag).mockResolvedValue([]); // Empty (e.g., dry-run mode)
 
-    await expect(useCase.execute(request)).rejects.toThrow("Failed to query created order");
+    const result = await useCase.execute(request);
+
+    // Should construct line items from input when query returns empty
+    expect(result.shopifyOrders).toHaveLength(1);
+    expect(result.shopifyOrders[0].shopifyOrderId).toBe("gid://shopify/Order/456");
+    expect(result.shopifyOrders[0].lineItems).toHaveLength(1);
+    expect(result.shopifyOrders[0].lineItems[0].sku).toBe("SKU-001");
+    // Line item ID should be a mock ID (gid://shopify/LineItem/...)
+    expect(result.shopifyOrders[0].lineItems[0].lineItemId).toMatch(/^gid:\/\/shopify\/LineItem\//);
   });
 });
