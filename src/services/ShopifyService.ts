@@ -1,5 +1,7 @@
 import { createAdminApiClient } from "@shopify/admin-api-client";
+import { v4 as uuidv4 } from "uuid";
 import { getEnvConfig } from "../config/env";
+import { Logger } from "../utils/logger";
 
 export interface DraftOrderInput {
   customer: {
@@ -57,11 +59,14 @@ export class ShopifyServiceError extends Error {
  */
 export class ShopifyService {
   private readonly client: ReturnType<typeof createAdminApiClient>;
+  private readonly dryRun: boolean;
 
   /**
    * Initializes Shopify Admin API client with credentials from environment variables
+   * @param dryRun - If true, skip actual API calls and return mock data
    */
-  constructor() {
+  constructor(dryRun: boolean = false) {
+    this.dryRun = dryRun;
     const config = getEnvConfig();
     this.client = createAdminApiClient({
       storeDomain: config.SHOPIFY_STORE_DOMAIN,
@@ -79,6 +84,16 @@ export class ShopifyService {
    * @throws ShopifyServiceError if variant lookup fails or API returns errors
    */
   async createDraftOrder(input: DraftOrderInput, batchId: string): Promise<DraftOrderResult> {
+    if (this.dryRun) {
+      const draftOrderId = `gid://shopify/DraftOrder/${uuidv4()}`;
+      Logger.info("DRY RUN: Would create draft order", {
+        customerEmail: input.customer.email,
+        batchId,
+        draftOrderId,
+      });
+      return { draftOrderId };
+    }
+
     // First, we need to find variant IDs by SKU
     // For now, we'll use a simplified approach - in production, you'd query products by SKU
     const mutation = `
@@ -156,6 +171,18 @@ export class ShopifyService {
   }
 
   async completeDraftOrder(draftOrderId: string): Promise<OrderResult> {
+    if (this.dryRun) {
+      // Generate a mock order number (e.g., #1001, #1002, etc.)
+      const orderNumber = `#${Math.floor(Math.random() * 9000) + 1000}`;
+      const orderId = `gid://shopify/Order/${uuidv4()}`;
+      Logger.info("DRY RUN: Would complete draft order", {
+        draftOrderId,
+        orderId,
+        orderNumber,
+      });
+      return { orderId, orderNumber };
+    }
+
     const mutation = `
       mutation draftOrderComplete($id: ID!) {
         draftOrderComplete(id: $id) {
@@ -207,6 +234,15 @@ export class ShopifyService {
   }
 
   async fulfillOrder(orderId: string): Promise<FulfillmentResult> {
+    if (this.dryRun) {
+      const fulfillmentId = `gid://shopify/Fulfillment/${uuidv4()}`;
+      Logger.info("DRY RUN: Would fulfill order", {
+        orderId,
+        fulfillmentId,
+      });
+      return { fulfillmentId, status: "SUCCESS" };
+    }
+
     // First, get the order's line items
     const queryOrder = `
       query getOrder($id: ID!) {
@@ -293,6 +329,14 @@ export class ShopifyService {
   }
 
   async queryOrdersByTag(tag: string): Promise<OrderQueryResult[]> {
+    if (this.dryRun) {
+      // In dry-run, return empty array - the use case will construct mock data
+      // This is called after order creation, so we return empty and let the use case
+      // construct the response from the input data
+      Logger.info("DRY RUN: Would query orders by tag", { tag });
+      return [];
+    }
+
     const query = `
       query getOrdersByTag($query: String!) {
         orders(first: 250, query: $query) {
@@ -339,6 +383,16 @@ export class ShopifyService {
 
   // Helper method to find variant IDs by SKU
   async findVariantIdsBySkus(skus: string[]): Promise<Map<string, string>> {
+    if (this.dryRun) {
+      // Return mock variant IDs for each SKU
+      const variantMap = new Map<string, string>();
+      for (const sku of skus) {
+        variantMap.set(sku, `gid://shopify/ProductVariant/${uuidv4()}`);
+      }
+      Logger.info("DRY RUN: Would find variant IDs by SKUs", { skus: skus.length });
+      return variantMap;
+    }
+
     const query = `
       query getProductsBySkus($query: String!) {
         products(first: 250, query: $query) {

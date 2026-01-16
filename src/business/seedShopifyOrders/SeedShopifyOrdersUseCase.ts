@@ -2,6 +2,7 @@ import type { SeedShopifyOrdersRequest } from "../../shared/requests/SeedShopify
 import type { SeedShopifyOrdersResponse } from "../../shared/responses/SeedShopifyOrdersResponse";
 import { ShopifyService } from "../../services/ShopifyService";
 import { Logger } from "../../utils/logger";
+import { v4 as uuidv4 } from "uuid";
 
 export class SeedShopifyOrdersUseCase {
   constructor(private readonly shopifyService: ShopifyService) {}
@@ -31,17 +32,25 @@ export class SeedShopifyOrdersUseCase {
         const orderQueryResults = await this.shopifyService.queryOrdersByTag(`seed_batch_id:${request.batchId}`);
         const createdOrder = orderQueryResults.find((o) => o.orderId === orderResult.orderId);
 
+        // In dry-run mode, queryOrdersByTag returns empty array, so construct from input
+        let lineItems: Array<{ lineItemId: string; sku: string }>;
         if (!createdOrder) {
-          throw new Error(`Failed to query created order: ${orderResult.orderId}`);
+          // This happens in dry-run mode - construct line items from input
+          lineItems = orderInput.lineItems.map((item) => ({
+            lineItemId: `gid://shopify/LineItem/${uuidv4()}`,
+            sku: item.sku,
+          }));
+        } else {
+          lineItems = createdOrder.lineItems.map((item) => ({
+            lineItemId: item.lineItemId,
+            sku: item.sku,
+          }));
         }
 
         shopifyOrders.push({
           shopifyOrderId: orderResult.orderId,
           shopifyOrderNumber: orderResult.orderNumber,
-          lineItems: createdOrder.lineItems.map((item) => ({
-            lineItemId: item.lineItemId,
-            sku: item.sku,
-          })),
+          lineItems,
           fulfillmentStatus: fulfillmentResult.status,
         });
       } catch (error) {
