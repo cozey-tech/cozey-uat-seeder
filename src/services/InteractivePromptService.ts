@@ -9,7 +9,7 @@ export interface OrderTemplate {
   lineItems: Array<{
     sku: string;
     quantity: number;
-    pickType: "Regular" | "Pick and Pack";
+    pickType: "Regular" | "Pick and Pack"; // Informational only - variant's pickType from database will be used when building orders
   }>;
 }
 

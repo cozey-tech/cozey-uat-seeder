@@ -106,15 +106,18 @@ function loadOrderTemplates(): OrderTemplate[] {
 
 /**
  * Filter templates to only include those with valid SKUs for the given variants
+ * Note: pickType in templates is informational only - the variant's pickType from the database will always be used
  */
 function filterValidTemplates(
   templates: OrderTemplate[],
-  variants: Array<{ sku: string }>,
+  variants: Array<{ sku: string; pickType: "Regular" | "Pick and Pack" }>,
 ): OrderTemplate[] {
+  // Create a set of valid SKUs for quick lookup
   const validSkus = new Set(variants.map((v) => v.sku));
   
   const validTemplates = templates.filter((template) => {
     // Check if all SKUs in template exist in available variants
+    // Note: We don't validate pickType here - the variant's pickType from database will be used when building orders
     return template.lineItems.every((item) => validSkus.has(item.sku));
   });
 
