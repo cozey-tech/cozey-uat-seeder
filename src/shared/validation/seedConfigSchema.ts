@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const seedConfigSchema = z.object({
+  region: z.enum(["CA", "US"]).optional(), // Region for all orders (required if collectionPrep is not present)
   collectionPrep: z
     .object({
       carrier: z.string(),

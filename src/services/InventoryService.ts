@@ -185,9 +185,12 @@ export class InventoryService {
     });
 
     // Create map of SKU to quantity from order line items
-    const variantQuantities = new Map(
-      order.lineItems.map((item) => [item.sku, item.quantity])
-    );
+    // Sum quantities for duplicate SKUs (same SKU can appear in multiple line items)
+    const variantQuantities = new Map<string, number>();
+    for (const item of order.lineItems) {
+      const existingQuantity = variantQuantities.get(item.sku) || 0;
+      variantQuantities.set(item.sku, existingQuantity + item.quantity);
+    }
 
     // Check availability with order quantities
     const checkResult = await this.checkInventoryAvailability(

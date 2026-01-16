@@ -193,10 +193,12 @@ async function main(): Promise<void> {
           const compositionSkus = composition.lineItems.map((item) => item.sku);
           const compositionVariants = variants.filter((v) => compositionSkus.includes(v.sku));
           
-          // Create map of SKU to quantity
-          const variantQuantities = new Map(
-            composition.lineItems.map((item) => [item.sku, item.quantity])
-          );
+          // Create map of SKU to quantity (sum quantities for duplicate SKUs)
+          const variantQuantities = new Map<string, number>();
+          for (const item of composition.lineItems) {
+            const existingQuantity = variantQuantities.get(item.sku) || 0;
+            variantQuantities.set(item.sku, existingQuantity + item.quantity);
+          }
 
           const inventoryCheck = await inventoryService.checkInventoryAvailability(
             compositionVariants,

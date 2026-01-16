@@ -124,6 +124,8 @@ export class OrderCompositionBuilder {
   /**
    * Validate order composition
    * Ensures at least one item and all quantities are valid
+   * Note: Duplicate SKUs are allowed (same product can appear multiple times with different pickTypes)
+   * The inventory service will sum quantities for duplicate SKUs
    */
   validateComposition(composition: OrderComposition): void {
     if (composition.lineItems.length === 0) {

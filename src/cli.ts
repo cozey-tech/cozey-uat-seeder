@@ -177,7 +177,7 @@ async function main(): Promise<void> {
 
     // Step 2: Seed WMS entities
     console.log("🗄️  Step 2: Seeding WMS entities...");
-    const region = config.collectionPrep?.region || "CA";
+    const region = config.region || config.collectionPrep?.region || "CA";
     let collectionPrepId: string | undefined;
 
     // Create collection prep first if configured (needed for linking)

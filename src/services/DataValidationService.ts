@@ -63,7 +63,7 @@ export class DataValidationService {
     const parts = await this.prisma.part.findMany({
       where: {
         sku: { in: Array.from(allSkus) },
-        region: config.collectionPrep?.region || "CA", // Use region from collectionPrep or default
+        region: config.region || config.collectionPrep?.region || "CA", // Use region from config, collectionPrep, or default
       },
       select: {
         sku: true,

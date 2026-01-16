@@ -97,6 +97,7 @@ export class ConfigGeneratorService {
     }
 
     return {
+      region: options.region as "CA" | "US",
       orders,
       collectionPrep,
     };

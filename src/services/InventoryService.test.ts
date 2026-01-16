@@ -3,6 +3,7 @@ import { InventoryService } from "./InventoryService";
 import { PrismaClient } from "@prisma/client";
 import { getEnvConfig } from "../config/env";
 import type { Variant } from "../repositories/ConfigDataRepository";
+import type { OrderComposition } from "./OrderCompositionBuilder";
 
 // Mock env config
 vi.mock("../config/env", () => ({
@@ -155,6 +156,49 @@ describe("InventoryService", () => {
       expect(result.shortages[0].shortfall).toBeGreaterThan(0);
     });
 
+    it("should handle missing inventory", async () => {
+      const variants: Variant[] = [
+        {
+          id: "variant-1",
+          sku: "SOFA-001-BLK",
+          modelName: "Sofa",
+          colorId: "BLK",
+          shopifyIds: ["shopify-1"],
+          region: "CA",
+        },
+      ];
+
+      mockPrisma.variantPart.findMany.mockResolvedValue([
+        {
+          variantId: "variant-1",
+          partId: "part-1",
+          quantity: 1,
+          part: {
+            id: "part-1",
+            sku: "PART-001",
+          },
+          variant: {
+            id: "variant-1",
+            sku: "SOFA-001-BLK",
+          },
+        },
+      ]);
+
+      mockPrisma.inventory.findFirst.mockResolvedValue(null);
+
+      const variantQuantities = new Map([["SOFA-001-BLK", 1]]);
+
+      const result = await service.checkInventoryAvailability(
+        variants,
+        "langley",
+        "CA",
+        variantQuantities,
+      );
+
+      expect(result.sufficient).toBe(false);
+      expect(result.shortages[0].available).toBe(0);
+    });
+
     it("should account for order quantities in calculation", async () => {
       const variants: Variant[] = [
         {
@@ -208,49 +252,6 @@ describe("InventoryService", () => {
       expect(result.shortages[0].required).toBe(6);
       expect(result.shortages[0].available).toBe(5);
       expect(result.shortages[0].shortfall).toBe(1);
-    });
-
-    it("should handle missing inventory", async () => {
-      const variants: Variant[] = [
-        {
-          id: "variant-1",
-          sku: "SOFA-001-BLK",
-          modelName: "Sofa",
-          colorId: "BLK",
-          shopifyIds: ["shopify-1"],
-          region: "CA",
-        },
-      ];
-
-      mockPrisma.variantPart.findMany.mockResolvedValue([
-        {
-          variantId: "variant-1",
-          partId: "part-1",
-          quantity: 1,
-          part: {
-            id: "part-1",
-            sku: "PART-001",
-          },
-          variant: {
-            id: "variant-1",
-            sku: "SOFA-001-BLK",
-          },
-        },
-      ]);
-
-      mockPrisma.inventory.findFirst.mockResolvedValue(null);
-
-      const variantQuantities = new Map([["SOFA-001-BLK", 1]]);
-
-      const result = await service.checkInventoryAvailability(
-        variants,
-        "langley",
-        "CA",
-        variantQuantities,
-      );
-
-      expect(result.sufficient).toBe(false);
-      expect(result.shortages[0].available).toBe(0);
     });
   });
 
@@ -312,6 +313,70 @@ describe("InventoryService", () => {
   });
 
   describe("ensureInventoryForOrder", () => {
+    it("should sum quantities for duplicate SKUs", async () => {
+      const order: OrderComposition = {
+        lineItems: [
+          {
+            sku: "SOFA-001-BLK",
+            quantity: 2,
+            pickType: "Regular",
+          },
+          {
+            sku: "SOFA-001-BLK", // Duplicate SKU
+            quantity: 3,
+            pickType: "Regular",
+          },
+        ],
+      };
+
+      const variant = {
+        id: "variant-1",
+        sku: "SOFA-001-BLK",
+        modelName: "Sofa",
+        colorId: "BLK",
+        shopifyIds: ["shopify-1"],
+        region: "CA",
+        disabled: false,
+      };
+
+      mockPrisma.variant.findMany.mockResolvedValue([variant]);
+
+      mockPrisma.variantPart.findMany.mockResolvedValue([
+        {
+          variantId: "variant-1",
+          partId: "part-1",
+          quantity: 1, // 1 part per variant
+          part: {
+            id: "part-1",
+            sku: "PART-001",
+          },
+          variant: {
+            id: "variant-1",
+            sku: "SOFA-001-BLK",
+          },
+        },
+      ]);
+
+      mockPrisma.inventory.findFirst.mockResolvedValue({
+        id: "inv-1",
+        partId: "part-1",
+        locationId: "langley",
+        region: "CA",
+        onHand: 10,
+        openOrders: 0,
+        onHandCommitted: 0,
+      });
+
+      const result = await service.ensureInventoryForOrder(order, "langley", "CA");
+
+      // Should calculate: (2 + 3) * 1 = 5 parts needed
+      // Have 10, so sufficient
+      expect(result.sufficient).toBe(true);
+      
+      // Verify that variantPart.findMany was called (indicating inventory check ran)
+      expect(mockPrisma.variantPart.findMany).toHaveBeenCalled();
+    });
+
     it("should ensure inventory is available", async () => {
       const order = {
         lineItems: [

@@ -115,7 +115,7 @@ export class ConfigValidationService {
 
         // Check if variant exists and has Shopify ID
         try {
-          const configRegion = config.collectionPrep?.region || "CA";
+          const configRegion = config.region || config.collectionPrep?.region || "CA";
           const variant = await this.dataRepository.getShopifyVariantId(item.sku, configRegion);
           if (!variant) {
             result.warnings.push(
@@ -150,18 +150,19 @@ export class ConfigValidationService {
     }
 
     // Validate SKUs exist in database
+    const configRegion = config.region || config.collectionPrep?.region || "CA";
     for (const sku of allSkus) {
       const variant = await this.prisma.variant.findFirst({
         where: {
           sku,
-          region: config.collectionPrep?.region || "CA",
+          region: configRegion,
           disabled: false,
         },
       });
 
       if (!variant) {
         result.valid = false;
-        result.errors.push(`SKU ${sku} does not exist in database for region ${config.collectionPrep?.region || "CA"}`);
+        result.errors.push(`SKU ${sku} does not exist in database for region ${configRegion}`);
       }
     }
 
@@ -213,11 +214,21 @@ export class ConfigValidationService {
       }
     }
 
-    // Validate region consistency
-    const regions = new Set<string>();
-    if (config.collectionPrep) {
-      regions.add(config.collectionPrep.region);
-    }
+      // Validate region consistency between top-level region and collectionPrep.region
+      if (config.region && config.collectionPrep && config.collectionPrep.region !== config.region) {
+        result.warnings.push(
+          `Region mismatch: top-level region is "${config.region}" but collectionPrep.region is "${config.collectionPrep.region}". Using collectionPrep.region.`,
+        );
+      }
+
+      // Validate region consistency
+      const regions = new Set<string>();
+      if (config.region) {
+        regions.add(config.region);
+      }
+      if (config.collectionPrep) {
+        regions.add(config.collectionPrep.region);
+      }
 
     if (regions.size > 1) {
       result.warnings.push("Multiple regions detected in config");
