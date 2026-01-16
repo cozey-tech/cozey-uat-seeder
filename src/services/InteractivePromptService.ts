@@ -185,7 +185,8 @@ export class InteractivePromptService {
           }
           return true;
         },
-      } as unknown as Parameters<typeof inquirer.prompt>[0][0],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
     ]);
 
     return variants.filter((v) => variantIds.includes(v.id));
