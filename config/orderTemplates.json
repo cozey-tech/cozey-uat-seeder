@@ -6,7 +6,7 @@
       "description": "Two sofas of the same model",
       "lineItems": [
         {
-          "sku": "COZ-SOF-CHA-001-BLK",
+          "sku": "1+2+1049-0-0-800",
           "quantity": 2,
           "pickType": "Regular"
         }
@@ -18,7 +18,7 @@
       "description": "Single sofa order",
       "lineItems": [
         {
-          "sku": "COZ-SOF-CHA-001-BLK",
+          "sku": "1+2+1049-0-0-800",
           "quantity": 1,
           "pickType": "Regular"
         }
@@ -27,16 +27,16 @@
     {
       "id": "mixed-order",
       "name": "Mixed Order",
-      "description": "1 Sofa + 2 Chairs (Regular + Pick and Pack)",
+      "description": "1 Regular Sofa + 1 Pick and Pack item (Regular + Pick and Pack)",
       "lineItems": [
         {
-          "sku": "COZ-SOF-CHA-001-BLK",
+          "sku": "1+2+1049-0-0-800",
           "quantity": 1,
           "pickType": "Regular"
         },
         {
-          "sku": "COZ-CHA-ACC-001-WHT",
-          "quantity": 2,
+          "sku": "1+2+1001-0-0-700",
+          "quantity": 1,
           "pickType": "Pick and Pack"
         }
       ]
@@ -47,12 +47,7 @@
       "description": "Order with only Pick and Pack items",
       "lineItems": [
         {
-          "sku": "COZ-CHA-ACC-001-WHT",
-          "quantity": 3,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "COZ-ACC-PIL-001-GRY",
+          "sku": "1+2+1001-0-0-700",
           "quantity": 2,
           "pickType": "Pick and Pack"
         }
@@ -64,12 +59,12 @@
       "description": "Order with only regular fulfillment items",
       "lineItems": [
         {
-          "sku": "COZ-SOF-CHA-001-BLK",
+          "sku": "1+2+1049-0-0-800",
           "quantity": 1,
           "pickType": "Regular"
         },
         {
-          "sku": "COZ-SOF-CHA-002-WHT",
+          "sku": "1+2+1049-0-0-900",
           "quantity": 1,
           "pickType": "Regular"
         }
@@ -81,17 +76,12 @@
       "description": "Multiple items of different types",
       "lineItems": [
         {
-          "sku": "COZ-SOF-CHA-001-BLK",
+          "sku": "1+2+1049-0-0-800",
           "quantity": 2,
           "pickType": "Regular"
         },
         {
-          "sku": "COZ-CHA-ACC-001-WHT",
-          "quantity": 4,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "COZ-ACC-PIL-001-GRY",
+          "sku": "1+2+1001-0-0-700",
           "quantity": 2,
           "pickType": "Pick and Pack"
         }
@@ -99,16 +89,16 @@
     },
     {
       "id": "sofa-chair-combo",
-      "name": "Sofa + Chair Combo",
-      "description": "1 Sofa and 1 Chair",
+      "name": "Sofa Combo",
+      "description": "1 Regular Sofa + 1 Pick and Pack item",
       "lineItems": [
         {
-          "sku": "COZ-SOF-CHA-001-BLK",
+          "sku": "1+2+1049-0-0-800",
           "quantity": 1,
           "pickType": "Regular"
         },
         {
-          "sku": "COZ-CHA-ACC-001-WHT",
+          "sku": "1+2+1001-0-0-700",
           "quantity": 1,
           "pickType": "Pick and Pack"
         }
@@ -116,16 +106,16 @@
     },
     {
       "id": "accessories-only",
-      "name": "Accessories Only",
-      "description": "Multiple accessory items (Pick and Pack)",
+      "name": "Pick and Pack Only (Multiple)",
+      "description": "Multiple Pick and Pack items",
       "lineItems": [
         {
-          "sku": "COZ-ACC-PIL-001-GRY",
+          "sku": "1+2+1001-0-0-700",
           "quantity": 2,
           "pickType": "Pick and Pack"
         },
         {
-          "sku": "COZ-ACC-THR-001-BLK",
+          "sku": "1+2+1001-0-0-701",
           "quantity": 1,
           "pickType": "Pick and Pack"
         }
