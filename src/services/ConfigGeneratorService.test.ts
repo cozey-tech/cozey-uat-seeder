@@ -177,6 +177,67 @@ describe("ConfigGeneratorService", () => {
       expect(result.collectionPrep?.carrier).toBe("CANPAR");
       expect(result.collectionPrep?.locationId).toBe("langley");
     });
+
+    it("should throw error if orders have different locationIds", async () => {
+      const customer1: Customer = {
+        id: "customer-1",
+        name: "Test Customer 1",
+        email: "test1@example.com",
+        region: "CA",
+        locationId: "langley",
+      };
+
+      const customer2: Customer = {
+        id: "customer-2",
+        name: "Test Customer 2",
+        email: "test2@example.com",
+        region: "CA",
+        locationId: "windsor",
+      };
+
+      const composition: OrderComposition = {
+        lineItems: [
+          {
+            sku: "SOFA-001-BLK",
+            quantity: 1,
+            pickType: "Regular",
+          },
+        ],
+      };
+
+      const carrier: Carrier = {
+        id: "CANPAR",
+        name: "Canpar",
+        region: "CA",
+      };
+
+      mockPrisma.location.findUnique.mockResolvedValue({
+        name: "Langley",
+      });
+
+      const options = {
+        orders: [
+          {
+            customer: customer1,
+            composition,
+            locationId: "langley",
+          },
+          {
+            customer: customer2,
+            composition,
+            locationId: "windsor",
+          },
+        ],
+        collectionPrepCount: 1,
+        carrier,
+        prepDate: new Date("2024-01-15"),
+        region: "CA",
+      };
+
+      await expect(service.generateConfig(options)).rejects.toThrow(
+        "orders have different locationIds",
+      );
+    });
   });
 
   describe("allocateOrdersToCollectionPreps", () => {

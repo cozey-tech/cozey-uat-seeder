@@ -27,11 +27,17 @@ export class InventoryService {
 
   /**
    * Check inventory availability for variants at a location
+   * 
+   * @param variants - Variants to check (with optional quantity map)
+   * @param locationId - Warehouse location ID
+   * @param region - Region code
+   * @param variantQuantities - Optional map of variant SKU to order quantity (defaults to 1 if not provided)
    */
   async checkInventoryAvailability(
     variants: Variant[],
     locationId: string,
     region: string,
+    variantQuantities?: Map<string, number>,
   ): Promise<InventoryCheckResult> {
     const shortages: InventoryCheckResult["shortages"] = [];
 
@@ -54,11 +60,13 @@ export class InventoryService {
       const variant = variants.find((v) => v.id === variantPart.variantId);
       if (!variant) continue;
 
-      // For simplicity, assume 1 variant = 1 quantity
-      // In real scenario, would need to track quantities per variant
+      // Get order quantity for this variant (default to 1 if not provided)
+      const orderQuantity = variantQuantities?.get(variant.sku) || 1;
+      
+      // Calculate required parts: variantPart.quantity * orderQuantity
       const key = variantPart.partId;
       const existing = partRequirements.get(key) || { sku: variantPart.part.sku, required: 0 };
-      existing.required += Number(variantPart.quantity) || 1;
+      existing.required += Number(variantPart.quantity) * orderQuantity;
       partRequirements.set(key, existing);
     }
 
@@ -176,8 +184,18 @@ export class InventoryService {
       },
     });
 
-    // Check availability
-    const checkResult = await this.checkInventoryAvailability(variants, locationId, region);
+    // Create map of SKU to quantity from order line items
+    const variantQuantities = new Map(
+      order.lineItems.map((item) => [item.sku, item.quantity])
+    );
+
+    // Check availability with order quantities
+    const checkResult = await this.checkInventoryAvailability(
+      variants,
+      locationId,
+      region,
+      variantQuantities,
+    );
 
     // If insufficient, modify inventory to meet requirements
     if (!checkResult.sufficient) {
@@ -186,7 +204,12 @@ export class InventoryService {
       }
 
       // Re-check after modification
-      return await this.checkInventoryAvailability(variants, locationId, region);
+      return await this.checkInventoryAvailability(
+        variants,
+        locationId,
+        region,
+        variantQuantities,
+      );
     }
 
     return checkResult;

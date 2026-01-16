@@ -115,10 +115,11 @@ export class ConfigValidationService {
 
         // Check if variant exists and has Shopify ID
         try {
-          const variant = await this.dataRepository.getShopifyVariantId(item.sku, "CA");
+          const configRegion = config.collectionPrep?.region || "CA";
+          const variant = await this.dataRepository.getShopifyVariantId(item.sku, configRegion);
           if (!variant) {
             result.warnings.push(
-              `${itemPrefix}: SKU ${item.sku} may not have a Shopify variant ID for region CA`,
+              `${itemPrefix}: SKU ${item.sku} may not have a Shopify variant ID for region ${configRegion}`,
             );
           }
         } catch {

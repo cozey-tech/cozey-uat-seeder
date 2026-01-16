@@ -61,6 +61,19 @@ export class ConfigGeneratorService {
     // Generate collection prep configuration if needed
     let collectionPrep: SeedConfig["collectionPrep"] | undefined;
     if (options.collectionPrepCount > 0) {
+      // Validate all orders have the same locationId for collection prep
+      const locationIds = new Set(options.orders.map((o) => o.locationId).filter(Boolean));
+      if (locationIds.size > 1) {
+        throw new Error(
+          `Cannot create collection prep: orders have different locationIds: ${Array.from(locationIds).join(", ")}`,
+        );
+      }
+
+      const locationId = options.orders[0]?.locationId || "";
+      if (!locationId) {
+        throw new Error("Cannot create collection prep: no locationId found in orders");
+      }
+
       // Allocate orders to collection preps (for future use)
       this.allocateOrdersToCollectionPreps(orders.length, options.collectionPrepCount);
 
@@ -68,7 +81,7 @@ export class ConfigGeneratorService {
       await this.generateCollectionPrepIds(
         options.collectionPrepCount,
         options.carrier.id,
-        options.orders[0]?.locationId || "",
+        locationId,
         options.prepDate,
         options.region,
       );
@@ -77,7 +90,7 @@ export class ConfigGeneratorService {
       // The actual allocation to multiple preps would be handled during seeding
       collectionPrep = {
         carrier: options.carrier.id,
-        locationId: options.orders[0]?.locationId || "",
+        locationId,
         region: options.region,
         prepDate: options.prepDate.toISOString(),
       };

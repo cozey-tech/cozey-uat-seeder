@@ -124,6 +124,19 @@ async function main(): Promise<void> {
       console.log(`   ✓ Found ${carriers.length} carriers`);
       console.log(`   ✓ Found ${templates.length} templates\n`);
 
+      // Validate reference data is not empty
+      if (variants.length === 0) {
+        throw new Error(`No variants found for region ${region}. Please check database.`);
+      }
+      if (customers.length === 0) {
+        throw new Error(
+          "No customers found in config/customers.json. Please add at least one customer.",
+        );
+      }
+      if (carriers.length === 0) {
+        throw new Error(`No carriers found for region ${region}. Please check database or config.`);
+      }
+
       // Prompt for number of orders
       const orderCount = await promptService.promptOrderCount();
 
@@ -153,10 +166,20 @@ async function main(): Promise<void> {
 
         // Check inventory if enabled
         if (options.modifyInventory) {
+          // Get variants for the actual SKUs in composition
+          const compositionSkus = composition.lineItems.map((item) => item.sku);
+          const compositionVariants = variants.filter((v) => compositionSkus.includes(v.sku));
+          
+          // Create map of SKU to quantity
+          const variantQuantities = new Map(
+            composition.lineItems.map((item) => [item.sku, item.quantity])
+          );
+
           const inventoryCheck = await inventoryService.checkInventoryAvailability(
-            variants.filter((v) => composition.lineItems.some((item) => item.sku === v.sku)),
+            compositionVariants,
             customer.locationId,
             region,
+            variantQuantities,
           );
 
           if (!inventoryCheck.sufficient) {
