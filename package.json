@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prisma:generate": "prisma generate",
-    "seed": "tsx src/cli.ts"
+    "seed": "tsx src/cli.ts",
+    "generate-config": "tsx src/generateConfig.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
