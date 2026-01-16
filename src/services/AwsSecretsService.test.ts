@@ -10,6 +10,13 @@ vi.mock("@aws-sdk/client-secrets-manager", () => {
   };
 });
 
+// Mock credential providers
+vi.mock("@aws-sdk/credential-providers", () => {
+  return {
+    fromIni: vi.fn(() => ({})),
+  };
+});
+
 describe("AwsSecretsService", () => {
   let mockSend: ReturnType<typeof vi.fn>;
   let service: AwsSecretsService;
@@ -20,7 +27,7 @@ describe("AwsSecretsService", () => {
     (SecretsManagerClient as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
       send: mockSend,
     }));
-    service = new AwsSecretsService("us-east-1");
+    service = new AwsSecretsService("us-east-1", undefined);
     service.clearCache();
   });
 
@@ -199,6 +206,35 @@ describe("AwsSecretsService", () => {
       await service.fetchSecret("dev/test-secret");
       // Should call AWS SDK again after cache clear
       expect(mockSend).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("profile support", () => {
+    it("should accept profile parameter in constructor", () => {
+      const serviceWithProfile = new AwsSecretsService("us-east-1", "dev");
+      expect(serviceWithProfile).toBeInstanceOf(AwsSecretsService);
+    });
+  });
+
+  describe("credential error handling", () => {
+    it("should handle expired credentials error", async () => {
+      const expiredError = new Error("The security token included in the request is expired");
+      expiredError.name = "CredentialsProviderError";
+      mockSend.mockRejectedValueOnce(expiredError);
+
+      const result = await service.fetchSecret("dev/test-secret");
+
+      expect(result).toBeNull();
+    });
+
+    it("should handle invalid credentials error", async () => {
+      const invalidError = new Error("InvalidClientTokenId");
+      invalidError.name = "InvalidClientTokenId";
+      mockSend.mockRejectedValueOnce(invalidError);
+
+      const result = await service.fetchSecret("dev/test-secret");
+
+      expect(result).toBeNull();
     });
   });
 });

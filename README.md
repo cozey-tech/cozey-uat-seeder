@@ -39,14 +39,21 @@ By default, the seeder attempts to fetch secrets from AWS Secrets Manager with a
 **Configuration options:**
 - `USE_AWS_SECRETS`: Enable/disable AWS secrets (default: `true`)
 - `AWS_REGION`: AWS region (default: `us-east-1`)
+- `AWS_PROFILE`: AWS profile name from `~/.aws/credentials` (optional, defaults to "default" profile)
 - `AWS_DATABASE_SECRET_NAME`: Custom database secret name (default: `dev/uat-database-url`)
 - `AWS_SHOPIFY_SECRET_NAME`: Custom Shopify secret name (default: `dev/shopify-access-token`)
 
 **AWS Credentials:** The seeder automatically detects AWS credentials from:
 1. Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
 2. AWS IAM role (when running in AWS)
-3. AWS credentials file (`~/.aws/credentials`)
+3. AWS credentials file (`~/.aws/credentials`) - specify profile via `AWS_PROFILE`
 4. Default credential provider chain
+
+**Multiple AWS Profiles:** If you have multiple profiles in `~/.aws/credentials`, set `AWS_PROFILE` to select which profile to use:
+```bash
+# Use the "dev" profile from ~/.aws/credentials
+AWS_PROFILE=dev npm run seed config.json
+```
 
 #### Option 2: Environment Variables (.env files)
 
@@ -267,15 +274,26 @@ If you're experiencing issues with AWS Secrets Manager:
    - Ensure your IAM role/user has `secretsmanager:GetSecretValue` permission
    - The seeder will automatically fallback to `.env` files, so this is non-fatal
 
-2. **To disable AWS secrets entirely:**
+2. **"AWS credentials error" or expired credentials:**
+   - If using temporary credentials (STS), they may have expired - refresh them
+   - If using `~/.aws/credentials`, verify the credentials are valid and not expired
+   - Check that `AWS_PROFILE` matches a valid profile in `~/.aws/credentials`
+   - For IAM roles, ensure the role session hasn't expired
+
+3. **Multiple AWS profiles:**
+   - If you have multiple profiles in `~/.aws/credentials`, set `AWS_PROFILE` to select which one to use
+   - Example: `AWS_PROFILE=dev` to use the `[dev]` profile
+   - If `AWS_PROFILE` is not set, the `[default]` profile will be used
+
+4. **To disable AWS secrets entirely:**
    - Set `USE_AWS_SECRETS=false` in your `.env` file
    - The seeder will use `.env` files only
 
-3. **Custom secret names:**
+5. **Custom secret names:**
    - Set `AWS_DATABASE_SECRET_NAME` and `AWS_SHOPIFY_SECRET_NAME` in `.env`
    - Defaults: `dev/uat-database-url` and `dev/shopify-access-token`
 
-4. **Wrong AWS region:**
+6. **Wrong AWS region:**
    - Set `AWS_REGION` in `.env` (default: `us-east-1`)
 
 ### "Missing SKUs in WMS" Error

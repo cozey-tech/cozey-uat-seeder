@@ -20,17 +20,20 @@ let isInitialized = false;
 function getAwsConfig(): {
   useAwsSecrets: boolean;
   region: string;
+  profile?: string;
   databaseSecretName: string;
   shopifySecretName: string;
 } {
   const useAwsSecrets = process.env.USE_AWS_SECRETS !== "false"; // Default to true
   const region = process.env.AWS_REGION || "us-east-1";
+  const profile = process.env.AWS_PROFILE; // Optional - if not set, uses default profile
   const databaseSecretName = process.env.AWS_DATABASE_SECRET_NAME || "dev/uat-database-url";
   const shopifySecretName = process.env.AWS_SHOPIFY_SECRET_NAME || "dev/shopify-access-token";
 
   return {
     useAwsSecrets,
     region,
+    profile,
     databaseSecretName,
     shopifySecretName,
   };
@@ -66,7 +69,7 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
   // Try to fetch from AWS if enabled
   if (awsConfig.useAwsSecrets) {
     try {
-      const awsService = new AwsSecretsService(awsConfig.region);
+      const awsService = new AwsSecretsService(awsConfig.region, awsConfig.profile);
       const secretNames = [awsConfig.databaseSecretName, awsConfig.shopifySecretName];
       awsSecrets = await awsService.fetchSecrets(secretNames);
 
