@@ -78,6 +78,10 @@ export class WmsService {
         orderDbId,
         customerId,
         customerEmail,
+        customerName,
+        status,
+        region,
+        locationId,
       });
       return { orderDbId, shopifyOrderId, customerId };
     }
@@ -152,6 +156,8 @@ export class WmsService {
           lineItemId: lineItem.lineItemId,
           variantId: variant.id,
           sku: lineItem.sku,
+          quantity: lineItem.quantity,
+          region,
         });
         results.push({
           variantId: variant.id,
@@ -197,6 +203,7 @@ export class WmsService {
           variantId: variantOrder.variantId,
           lineItemId: variantOrder.lineItemId,
           collectionPrepId,
+          region,
         });
         results.push({
           prepId: prepId,
@@ -256,6 +263,8 @@ export class WmsService {
           prepPartItemId,
           partId: part.id,
           sku: lineItem.sku,
+          quantity: lineItem.quantity,
+          region,
         });
         results.push({
           prepPartId,
@@ -304,6 +313,7 @@ export class WmsService {
         collectionPrepId,
         orderId,
         shipmentId,
+        region,
       });
       return shipmentId;
     }
@@ -324,6 +334,14 @@ export class WmsService {
       Logger.info("DRY RUN: Would create PnP package info", {
         identifier: packageInfo.identifier,
         packageInfoId,
+        length: packageInfo.length,
+        width: packageInfo.width,
+        height: packageInfo.height,
+        weight: packageInfo.weight,
+        lengthUnit: packageInfo.lengthUnit,
+        widthUnit: packageInfo.widthUnit,
+        heightUnit: packageInfo.heightUnit,
+        weightUnit: packageInfo.weightUnit,
       });
       return packageInfoId;
     }
@@ -341,6 +359,13 @@ export class WmsService {
         Logger.info("DRY RUN: Would create PnP box", {
           identifier: box.identifier,
           boxId,
+          region: box.region,
+          length: box.length,
+          width: box.width,
+          height: box.height,
+          lengthUnit: box.lengthUnit,
+          widthUnit: box.widthUnit,
+          heightUnit: box.heightUnit,
         });
         boxIds.push(boxId);
         continue;
@@ -363,7 +388,11 @@ export class WmsService {
         const orderBoxId = uuidv4();
         Logger.info("DRY RUN: Would create PnP order box", {
           orderId: orderBox.orderId,
+          pnpBoxId: orderBox.pnpBoxId,
+          collectionPrepId: orderBox.collectionPrepId,
           lpn: orderBox.lpn,
+          status: orderBox.status,
+          region: orderBox.region,
           orderBoxId: orderBoxId,
         });
         results.push({

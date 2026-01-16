@@ -90,8 +90,11 @@ export class ShopifyService {
       const draftOrderId = `gid://shopify/DraftOrder/${uuidv4()}`;
       Logger.info("DRY RUN: Would create draft order", {
         customerEmail: input.customer.email,
+        customerName: input.customer.name,
         batchId,
         draftOrderId,
+        lineItemCount: input.lineItems.length,
+        lineItems: input.lineItems.map((item) => ({ sku: item.sku, quantity: item.quantity })),
       });
       return { draftOrderId };
     }
@@ -241,6 +244,7 @@ export class ShopifyService {
       Logger.info("DRY RUN: Would fulfill order", {
         orderId,
         fulfillmentId,
+        status: "SUCCESS",
       });
       return { fulfillmentId, status: "SUCCESS" };
     }
@@ -391,7 +395,10 @@ export class ShopifyService {
       for (const sku of skus) {
         variantMap.set(sku, `gid://shopify/ProductVariant/${uuidv4()}`);
       }
-      Logger.info("DRY RUN: Would find variant IDs by SKUs", { skus: skus.length });
+      Logger.info("DRY RUN: Would find variant IDs by SKUs", {
+        skuCount: skus.length,
+        skus: skus,
+      });
       return variantMap;
     }
 

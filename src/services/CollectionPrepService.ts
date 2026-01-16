@@ -49,6 +49,8 @@ export class CollectionPrepService {
         collectionPrepId: request.id,
         region: request.region,
         carrier: request.carrier,
+        locationId: request.locationId,
+        prepDate: request.prepDate,
         boxes: request.boxes,
       });
       return mockCollectionPrep;
