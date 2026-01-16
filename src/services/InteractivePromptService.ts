@@ -103,11 +103,18 @@ export class InteractivePromptService {
 
   /**
    * Prompt for order composition choice (template vs custom)
+   * Only shows template option if templates are available
+   * If no templates available, automatically returns "custom" without prompting
    */
   async promptOrderComposition(
     _variants: Variant[],
-    _templates: OrderTemplate[],
+    templates: OrderTemplate[],
   ): Promise<"template" | "custom"> {
+    // If no templates available, automatically use custom order
+    if (templates.length === 0) {
+      return "custom";
+    }
+
     const { compositionType } = await inquirer.prompt<{ compositionType: "template" | "custom" }>([
       {
         type: "list",
@@ -125,8 +132,13 @@ export class InteractivePromptService {
 
   /**
    * Prompt for template selection
+   * Throws error if templates array is empty (should not be called in that case)
    */
   async promptTemplateSelection(templates: OrderTemplate[]): Promise<OrderTemplate> {
+    if (templates.length === 0) {
+      throw new Error("No templates available. Cannot select template.");
+    }
+
     const { templateId } = await inquirer.prompt<{ templateId: string }>([
       {
         type: "list",

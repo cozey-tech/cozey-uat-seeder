@@ -209,7 +209,7 @@ async function main(): Promise<void> {
           throw new Error(`Location not found for customer ${customer.id}`);
         }
 
-        // Select order composition method
+        // Select order composition method (automatically uses custom if no templates available)
         const compositionType = await promptService.promptOrderComposition(variants, templates);
 
         let composition;
@@ -217,6 +217,7 @@ async function main(): Promise<void> {
           const template = await promptService.promptTemplateSelection(templates);
           composition = await compositionBuilder.buildFromTemplate(template, variants);
         } else {
+          // Build custom order
           composition = await compositionBuilder.buildCustom(variants);
         }
 

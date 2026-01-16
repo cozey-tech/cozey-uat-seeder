@@ -126,12 +126,39 @@ describe("InteractivePromptService", () => {
   });
 
   describe("promptOrderComposition", () => {
-    it("should return composition type", async () => {
+    it("should return composition type when templates are available", async () => {
+      const templates: OrderTemplate[] = [
+        {
+          id: "template-1",
+          name: "Test Template",
+          description: "Test",
+          lineItems: [],
+        },
+      ];
+
       vi.mocked(inquirer.prompt).mockResolvedValue({ compositionType: "template" });
 
-      const result = await service.promptOrderComposition([], []);
+      const result = await service.promptOrderComposition([], templates);
 
       expect(result).toBe("template");
+      expect(inquirer.prompt).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            choices: expect.arrayContaining([
+              expect.objectContaining({ value: "template" }),
+              expect.objectContaining({ value: "custom" }),
+            ]),
+          }),
+        ]),
+      );
+    });
+
+    it("should automatically return custom when no templates available", async () => {
+      const result = await service.promptOrderComposition([], []);
+
+      expect(result).toBe("custom");
+      // Should not prompt when no templates available
+      expect(inquirer.prompt).not.toHaveBeenCalled();
     });
   });
 
@@ -151,6 +178,12 @@ describe("InteractivePromptService", () => {
       const result = await service.promptTemplateSelection(templates);
 
       expect(result.id).toBe("template-1");
+    });
+
+    it("should throw error if no templates available", async () => {
+      await expect(service.promptTemplateSelection([])).rejects.toThrow(
+        "No templates available",
+      );
     });
   });
 
