@@ -1,4 +1,5 @@
 import inquirer from "inquirer";
+import { search } from "@inquirer/prompts";
 import type { Customer, Variant, Carrier } from "../repositories/ConfigDataRepository";
 
 export interface OrderTemplate {
@@ -174,45 +175,23 @@ export class InteractivePromptService {
     const selectedVariants: Variant[] = [];
 
     let addMoreProducts = true;
-    let searchTerm = "";
 
     while (addMoreProducts) {
-      // Step 1: Search/filter models
-      const { searchInput } = await inquirer.prompt<{ searchInput: string }>([
-        {
-          type: "input",
-          name: "searchInput",
-          message: "Search for a product/model (press Enter to see all, or type to filter):",
-          default: searchTerm,
-          filter: (input: string): string => input.trim(),
-        },
-      ]);
-
-      searchTerm = searchInput.toLowerCase();
-
-      // Filter models based on search
-      const filteredModels = modelNames.filter((model) =>
-        model.toLowerCase().includes(searchTerm),
-      );
-
-      if (filteredModels.length === 0) {
-        console.log("❌ No models found matching your search. Please try again.");
-        continue;
-      }
-
-      // Step 2: Select a model
-      const { selectedModel } = await inquirer.prompt<{ selectedModel: string }>([
-        {
-          type: "list",
-          name: "selectedModel",
-          message: `Select a product/model${searchTerm ? ` (filtered: "${searchTerm}")` : ""}:`,
-          choices: filteredModels.map((model) => ({
+      // Step 1: Select a model with live search
+      const selectedModel = await search({
+        message: "Search and select a product/model:",
+        source: async (input) => {
+          const searchTerm = (input || "").toLowerCase().trim();
+          const filtered = modelNames.filter((model) =>
+            model.toLowerCase().includes(searchTerm),
+          );
+          return filtered.map((model) => ({
             name: model,
             value: model,
-          })),
-          pageSize: 10,
+          }));
         },
-      ]);
+        pageSize: 10,
+      });
 
       // Step 3: Get all color variants for the selected model
       const modelVariants = variantsByModel[selectedModel];
@@ -231,18 +210,20 @@ export class InteractivePromptService {
 
       const colors = Object.keys(variantsByColor).sort();
 
-      // Step 4: Select colors for this model
-      const { selectedColor } = await inquirer.prompt<{ selectedColor: string }>([
-        {
-          type: "list",
-          name: "selectedColor",
-          message: `Select a color for "${selectedModel}":`,
-          choices: colors.map((color) => ({
+      // Step 2: Select color with live search
+      const selectedColor = await search({
+        message: `Select a color for "${selectedModel}":`,
+        source: async (input) => {
+          const searchTerm = (input || "").toLowerCase().trim();
+          const filtered = colors.filter((color) =>
+            color.toLowerCase().includes(searchTerm),
+          );
+          return filtered.map((color) => ({
             name: color,
             value: color,
-          })),
+          }));
         },
-      ]);
+      });
 
       // Step 5: Get variants for selected model/color and group by configuration
       const colorVariants = variantsByColor[selectedColor];
@@ -262,46 +243,78 @@ export class InteractivePromptService {
 
       const configurations = Object.keys(variantsByConfig).sort();
 
-      // Step 6: Select configuration (if multiple exist, otherwise auto-select)
+      // Step 3: Select configuration (if multiple exist, otherwise auto-select)
       let selectedConfig: string;
       if (configurations.length === 1) {
         selectedConfig = configurations[0];
         console.log(`📦 Using configuration: ${selectedConfig === "Standard" ? "Standard (no specific configuration)" : selectedConfig}`);
       } else {
-        const { config } = await inquirer.prompt<{ config: string }>([
-          {
-            type: "list",
-            name: "config",
-            message: `Select a configuration for "${selectedModel}" - "${selectedColor}":`,
-            choices: configurations.map((cfg) => ({
+        selectedConfig = await search({
+          message: `Select a configuration for "${selectedModel}" - "${selectedColor}":`,
+          source: async (input) => {
+            const searchTerm = (input || "").toLowerCase().trim();
+            const filtered = configurations.filter((cfg) =>
+              cfg.toLowerCase().includes(searchTerm),
+            );
+            return filtered.map((cfg) => ({
               name: cfg === "Standard" ? "Standard (no specific configuration)" : cfg,
               value: cfg,
-            })),
+            }));
           },
-        ]);
-        selectedConfig = config;
+        });
       }
 
-      // Step 7: Select variants for this configuration (multi-select)
+      // Step 4: Select variants for this configuration (multi-select with live filtering)
       const configVariants = variantsByConfig[selectedConfig];
-      const { selectedVariantSkus } = await inquirer.prompt<{ selectedVariantSkus: string[] }>([
-        {
-          type: "checkbox",
-          name: "selectedVariantSkus",
-          message: `Select variants for "${selectedModel}" - "${selectedColor}"${selectedConfig !== "Standard" ? ` - "${selectedConfig}"` : ""}:`,
-          choices: configVariants.map((variant) => ({
-            name: `${variant.sku} - ${variant.description} [${variant.pickType}]`,
-            value: variant.sku,
-          })),
-          validate: (input: string[]): boolean | string => {
-            if (input.length === 0) {
-              return "Please select at least one variant";
-            }
-            return true;
+      
+      // Use searchable multi-select: users can search and select variants one by one
+      let selectedVariantSkus: string[] = [];
+      let doneSelectingVariants = false;
+
+      while (!doneSelectingVariants) {
+        // Show current selection status
+        const statusMsg = selectedVariantSkus.length > 0 
+          ? ` (${selectedVariantSkus.length} selected - select again to deselect)` 
+          : "";
+
+        const selectedSku = await search({
+          message: `Search and select variants for "${selectedModel}" - "${selectedColor}"${selectedConfig !== "Standard" ? ` - "${selectedConfig}"` : ""}${statusMsg}:`,
+          source: async (input) => {
+            const searchTerm = (input || "").toLowerCase().trim();
+            const filtered = configVariants.filter((variant) =>
+              variant.sku.toLowerCase().includes(searchTerm) ||
+              variant.description.toLowerCase().includes(searchTerm)
+            );
+            return filtered.map((variant) => ({
+              name: `${variant.sku} - ${variant.description} [${variant.pickType}]${selectedVariantSkus.includes(variant.sku) ? " ✓" : ""}`,
+              value: variant.sku,
+            }));
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
-      ]);
+        });
+
+        // Toggle selection (add if not selected, remove if already selected)
+        if (selectedVariantSkus.includes(selectedSku)) {
+          selectedVariantSkus = selectedVariantSkus.filter((sku) => sku !== selectedSku);
+          console.log(`➖ Removed: ${selectedSku} (${selectedVariantSkus.length} selected)`);
+        } else {
+          selectedVariantSkus.push(selectedSku);
+          console.log(`➕ Added: ${selectedSku} (${selectedVariantSkus.length} selected)`);
+        }
+
+        // Ask if done selecting variants
+        const { done } = await inquirer.prompt<{ done: boolean }>([
+          {
+            type: "confirm",
+            name: "done",
+            message: selectedVariantSkus.length > 0
+              ? `Done selecting variants? (${selectedVariantSkus.length} selected)`
+              : "Please select at least one variant. Continue?",
+            default: selectedVariantSkus.length > 0,
+          },
+        ]);
+
+        doneSelectingVariants = done && selectedVariantSkus.length > 0;
+      }
 
       // Add selected variants to the result
       const selected = configVariants.filter((v) => selectedVariantSkus.includes(v.sku));
@@ -322,7 +335,6 @@ export class InteractivePromptService {
       ]);
 
       addMoreProducts = addMore;
-      searchTerm = ""; // Reset search for next product
     }
 
     if (selectedVariants.length === 0) {

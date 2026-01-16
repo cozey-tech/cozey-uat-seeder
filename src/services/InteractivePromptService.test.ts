@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { InteractivePromptService, type OrderTemplate, type InventoryCheckResult } from "./InteractivePromptService";
 import type { Customer, Variant, Carrier } from "../repositories/ConfigDataRepository";
 import inquirer from "inquirer";
+import { search } from "@inquirer/prompts";
 
 // Mock inquirer
 vi.mock("inquirer", () => ({
@@ -13,6 +14,11 @@ vi.mock("inquirer", () => ({
   },
 }));
 
+// Mock @inquirer/prompts
+vi.mock("@inquirer/prompts", () => ({
+  search: vi.fn(),
+}));
+
 describe("InteractivePromptService", () => {
   let service: InteractivePromptService;
 
@@ -21,6 +27,8 @@ describe("InteractivePromptService", () => {
     vi.clearAllMocks();
     // Mock console.log to avoid cluttering test output
     vi.spyOn(console, "log").mockImplementation(() => {});
+    // Reset search mock for each test
+    vi.mocked(search).mockReset();
   });
 
   describe("promptOrderCount", () => {
@@ -181,25 +189,27 @@ describe("InteractivePromptService", () => {
         },
       ];
 
-      // Mock the new hierarchical flow:
-      // 1. Search input (empty to show all)
-      // 2. Model selection
-      // 3. Color selection (single select)
-      // 4. Configuration selection (auto if only one)
-      // 5. Variant selection (checkbox)
-      // 6. Add more products (false)
+      // Mock the new hierarchical flow with live search:
+      // 1. Model selection (search) - returns "Sofa"
+      // 2. Color selection (search) - returns "BLK"
+      // 3. Configuration selection (auto if only one, or search) - auto-selected "Standard"
+      // 4. Variant selection (search, multi-select) - select "SOFA-001-BLK"
+      // 5. Done selecting variants - true
+      // 6. Add more products - false
+      vi.mocked(search)
+        .mockResolvedValueOnce("Sofa") // Model selection
+        .mockResolvedValueOnce("BLK") // Color selection
+        .mockResolvedValueOnce("SOFA-001-BLK"); // Variant selection
       vi.mocked(inquirer.prompt)
-        .mockResolvedValueOnce({ searchInput: "" }) // Search step
-        .mockResolvedValueOnce({ selectedModel: "Sofa" }) // Model selection
-        .mockResolvedValueOnce({ selectedColor: "BLK" }) // Color selection
-        .mockResolvedValueOnce({ selectedVariantSkus: ["SOFA-001-BLK"] }) // Variant selection
+        .mockResolvedValueOnce({ done: true }) // Done selecting variants
         .mockResolvedValueOnce({ addMore: false }); // Don't add more
 
       const result = await service.promptVariantSelection(variants);
 
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("variant-1");
-      expect(inquirer.prompt).toHaveBeenCalledTimes(5);
+      expect(search).toHaveBeenCalledTimes(3); // Model, color, variant (config auto-selected)
+      expect(inquirer.prompt).toHaveBeenCalledTimes(2); // Done, addMore
     });
 
     it("should support filtering models by search term", async () => {
@@ -226,12 +236,13 @@ describe("InteractivePromptService", () => {
         },
       ];
 
-      // Search for "Sofa" to filter
+      // Search for "Sofa" to filter (live search now handles this)
+      vi.mocked(search)
+        .mockResolvedValueOnce("Sofa") // Model selection (search filters live)
+        .mockResolvedValueOnce("BLK") // Color selection
+        .mockResolvedValueOnce("SOFA-001-BLK"); // Variant selection
       vi.mocked(inquirer.prompt)
-        .mockResolvedValueOnce({ searchInput: "Sofa" }) // Search step
-        .mockResolvedValueOnce({ selectedModel: "Sofa" }) // Model selection
-        .mockResolvedValueOnce({ selectedColor: "BLK" }) // Color selection
-        .mockResolvedValueOnce({ selectedVariantSkus: ["SOFA-001-BLK"] }) // Variant selection
+        .mockResolvedValueOnce({ done: true }) // Done selecting variants
         .mockResolvedValueOnce({ addMore: false }); // Don't add more
 
       const result = await service.promptVariantSelection(variants);
@@ -265,17 +276,18 @@ describe("InteractivePromptService", () => {
       ];
 
       // First product
-      vi.mocked(inquirer.prompt)
-        .mockResolvedValueOnce({ searchInput: "" })
-        .mockResolvedValueOnce({ selectedModel: "Sofa" })
-        .mockResolvedValueOnce({ selectedColor: "BLK" })
-        .mockResolvedValueOnce({ selectedVariantSkus: ["SOFA-001-BLK"] })
-        .mockResolvedValueOnce({ addMore: true }) // Add more
+      vi.mocked(search)
+        .mockResolvedValueOnce("Sofa") // Model
+        .mockResolvedValueOnce("BLK") // Color
+        .mockResolvedValueOnce("SOFA-001-BLK") // Variant
         // Second product
-        .mockResolvedValueOnce({ searchInput: "" })
-        .mockResolvedValueOnce({ selectedModel: "Chair" })
-        .mockResolvedValueOnce({ selectedColor: "BLK" })
-        .mockResolvedValueOnce({ selectedVariantSkus: ["CHAIR-001-BLK"] })
+        .mockResolvedValueOnce("Chair") // Model
+        .mockResolvedValueOnce("BLK") // Color
+        .mockResolvedValueOnce("CHAIR-001-BLK"); // Variant
+      vi.mocked(inquirer.prompt)
+        .mockResolvedValueOnce({ done: true }) // Done selecting variants (first product)
+        .mockResolvedValueOnce({ addMore: true }) // Add more
+        .mockResolvedValueOnce({ done: true }) // Done selecting variants (second product)
         .mockResolvedValueOnce({ addMore: false }); // Done
 
       const result = await service.promptVariantSelection(variants);
