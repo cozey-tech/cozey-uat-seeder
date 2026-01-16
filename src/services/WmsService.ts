@@ -5,6 +5,7 @@ import type {
   CreatePnpOrderBoxRequest,
 } from "../repositories/interface/WmsRepository";
 import { v4 as uuidv4 } from "uuid";
+import { Logger } from "../utils/logger";
 
 export class WmsServiceError extends Error {
   constructor(message: string) {
@@ -27,7 +28,11 @@ export class WmsServiceError extends Error {
  * All operations are idempotent - checks for existing records before creating.
  */
 export class WmsService {
-  constructor(public readonly repository: WmsRepository) {}
+  private readonly dryRun: boolean;
+
+  constructor(public readonly repository: WmsRepository, dryRun: boolean = false) {
+    this.dryRun = dryRun;
+  }
 
   /**
    * Creates a WMS order and associated customer
@@ -54,7 +59,7 @@ export class WmsService {
     customerEmail: string,
     locationId?: string,
   ): Promise<{ orderDbId: string; shopifyOrderId: string; customerId: string }> {
-    // Check if order already exists (idempotency)
+    // Check if order already exists (idempotency) - still run in dry-run
     const existingOrder = await this.repository.findOrderByShopifyId(shopifyOrderId);
     if (existingOrder) {
       return {
@@ -62,6 +67,23 @@ export class WmsService {
         shopifyOrderId: existingOrder.shopifyOrderId,
         customerId: "", // Will be populated if needed
       };
+    }
+
+    if (this.dryRun) {
+      const orderDbId = uuidv4();
+      const customerId = uuidv4();
+      Logger.info("DRY RUN: Would create order with customer", {
+        shopifyOrderId,
+        shopifyOrderNumber,
+        orderDbId,
+        customerId,
+        customerEmail,
+        customerName,
+        status,
+        region,
+        locationId,
+      });
+      return { orderDbId, shopifyOrderId, customerId };
     }
 
     // Find or create customer by email (idempotency)
@@ -116,7 +138,7 @@ export class WmsService {
     lineItems: Array<{ lineItemId: string; sku: string; quantity: number }>,
     region: string,
   ): Promise<Array<{ variantId: string; lineItemId: string }>> {
-    // Batch lookup all variants at once
+    // Batch lookup all variants at once (still run in dry-run for validation)
     const skus = lineItems.map((item) => item.sku);
     const variantMap = await this.repository.findVariantsBySkus(skus, region);
 
@@ -126,6 +148,22 @@ export class WmsService {
       const variant = variantMap.get(lineItem.sku);
       if (!variant) {
         throw new WmsServiceError(`Variant not found for SKU: ${lineItem.sku}`);
+      }
+
+      if (this.dryRun) {
+        Logger.info("DRY RUN: Would create variant order", {
+          orderId,
+          lineItemId: lineItem.lineItemId,
+          variantId: variant.id,
+          sku: lineItem.sku,
+          quantity: lineItem.quantity,
+          region,
+        });
+        results.push({
+          variantId: variant.id,
+          lineItemId: lineItem.lineItemId,
+        });
+        continue;
       }
 
       // Create variantOrder
@@ -158,6 +196,23 @@ export class WmsService {
       // Generate prep ID (composite key: prep + region)
       const prepId = uuidv4();
 
+      if (this.dryRun) {
+        Logger.info("DRY RUN: Would create prep", {
+          orderId,
+          prepId,
+          variantId: variantOrder.variantId,
+          lineItemId: variantOrder.lineItemId,
+          collectionPrepId,
+          region,
+        });
+        results.push({
+          prepId: prepId,
+          variantId: variantOrder.variantId,
+          lineItemId: variantOrder.lineItemId,
+        });
+        continue;
+      }
+
       await this.repository.createPrep({
         orderId: orderId,
         prep: prepId,
@@ -182,7 +237,7 @@ export class WmsService {
     lineItems: Array<{ lineItemId: string; sku: string; quantity: number }>,
     region: string,
   ): Promise<Array<{ prepPartId: string; prepPartItemId: string; partId: string }>> {
-    // Batch lookup all parts at once
+    // Batch lookup all parts at once (still run in dry-run for validation)
     const skus = lineItems.map((item) => item.sku);
     const partMap = await this.repository.findPartsBySkus(skus, region);
 
@@ -197,6 +252,26 @@ export class WmsService {
       const part = partMap.get(lineItem.sku);
       if (!part) {
         throw new WmsServiceError(`Part not found for SKU: ${lineItem.sku}`);
+      }
+
+      if (this.dryRun) {
+        const prepPartId = uuidv4();
+        const prepPartItemId = uuidv4();
+        Logger.info("DRY RUN: Would create prep part and item", {
+          prepId: prep.prepId,
+          prepPartId,
+          prepPartItemId,
+          partId: part.id,
+          sku: lineItem.sku,
+          quantity: lineItem.quantity,
+          region,
+        });
+        results.push({
+          prepPartId,
+          prepPartItemId,
+          partId: part.id,
+        });
+        continue;
       }
 
       // Create prepPart
@@ -232,6 +307,17 @@ export class WmsService {
     orderId: string,
     region: string,
   ): Promise<string> {
+    if (this.dryRun) {
+      const shipmentId = uuidv4();
+      Logger.info("DRY RUN: Would create shipment", {
+        collectionPrepId,
+        orderId,
+        shipmentId,
+        region,
+      });
+      return shipmentId;
+    }
+
     const shipment = await this.repository.createShipment({
       collectionPrepId: collectionPrepId,
       orderId: orderId,
@@ -243,6 +329,23 @@ export class WmsService {
   }
 
   async createPnpPackageInfo(packageInfo: CreatePnpPackageInfoRequest): Promise<string> {
+    if (this.dryRun) {
+      const packageInfoId = uuidv4();
+      Logger.info("DRY RUN: Would create PnP package info", {
+        identifier: packageInfo.identifier,
+        packageInfoId,
+        length: packageInfo.length,
+        width: packageInfo.width,
+        height: packageInfo.height,
+        weight: packageInfo.weight,
+        lengthUnit: packageInfo.lengthUnit,
+        widthUnit: packageInfo.widthUnit,
+        heightUnit: packageInfo.heightUnit,
+        weightUnit: packageInfo.weightUnit,
+      });
+      return packageInfoId;
+    }
+
     const created = await this.repository.createPnpPackageInfo(packageInfo);
     return (created as { id: string }).id;
   }
@@ -251,6 +354,23 @@ export class WmsService {
     const boxIds: string[] = [];
 
     for (const box of boxes) {
+      if (this.dryRun) {
+        const boxId = uuidv4();
+        Logger.info("DRY RUN: Would create PnP box", {
+          identifier: box.identifier,
+          boxId,
+          region: box.region,
+          length: box.length,
+          width: box.width,
+          height: box.height,
+          lengthUnit: box.lengthUnit,
+          widthUnit: box.widthUnit,
+          heightUnit: box.heightUnit,
+        });
+        boxIds.push(boxId);
+        continue;
+      }
+
       const created = await this.repository.createPnpBox(box);
       boxIds.push((created as { id: string }).id);
     }
@@ -264,6 +384,24 @@ export class WmsService {
     const results: Array<{ id: string; lpn: string }> = [];
 
     for (const orderBox of orderBoxes) {
+      if (this.dryRun) {
+        const orderBoxId = uuidv4();
+        Logger.info("DRY RUN: Would create PnP order box", {
+          orderId: orderBox.orderId,
+          pnpBoxId: orderBox.pnpBoxId,
+          collectionPrepId: orderBox.collectionPrepId,
+          lpn: orderBox.lpn,
+          status: orderBox.status,
+          region: orderBox.region,
+          orderBoxId: orderBoxId,
+        });
+        results.push({
+          id: orderBoxId,
+          lpn: orderBox.lpn,
+        });
+        continue;
+      }
+
       const created = await this.repository.createPnpOrderBox(orderBox);
       results.push({
         id: (created as { id: string }).id,
