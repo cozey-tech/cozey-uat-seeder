@@ -34,6 +34,8 @@ import { DataValidationError } from "./services/DataValidationService";
 interface CliOptions {
   configFile: string;
   skipConfirmation: boolean;
+  validate: boolean;
+  dryRun: boolean;
 }
 
 /**
@@ -43,14 +45,23 @@ function parseArgs(): CliOptions {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.error("Usage: npm run seed <config-file.json> [--skip-confirmation]");
+    console.error("Usage: npm run seed <config-file.json> [--validate|--dry-run] [--skip-confirmation]");
     process.exit(1);
   }
 
   const configFile = args[0];
   const skipConfirmation = args.includes("--skip-confirmation");
+  const validate = args.includes("--validate");
+  const dryRun = args.includes("--dry-run");
 
-  return { configFile, skipConfirmation };
+  // Validate flags are mutually exclusive
+  if (validate && dryRun) {
+    console.error("Error: --validate and --dry-run cannot be used together");
+    console.error("Usage: npm run seed <config-file.json> [--validate|--dry-run] [--skip-confirmation]");
+    process.exit(1);
+  }
+
+  return { configFile, skipConfirmation, validate, dryRun };
 }
 
 /**
