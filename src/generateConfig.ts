@@ -35,6 +35,7 @@ interface CliOptions {
   output?: string;
   region?: "CA" | "US";
   modifyInventory: boolean;
+  skipSaveTemplate: boolean;
 }
 
 /**
@@ -46,6 +47,7 @@ function parseArgs(): CliOptions {
   const options: CliOptions = {
     dryRun: args.includes("--dry-run"),
     modifyInventory: args.includes("--modify-inventory"),
+    skipSaveTemplate: args.includes("--skip-save-template"),
   };
 
   // Parse --output
@@ -101,6 +103,47 @@ function loadOrderTemplates(): OrderTemplate[] {
   } catch {
     console.warn("⚠️  Could not load order templates, continuing without them");
     return [];
+  }
+}
+
+/**
+ * Save a new template to the order templates file
+ * Creates the file structure if it doesn't exist
+ */
+function saveTemplate(template: OrderTemplate): void {
+  try {
+    const configPath = join(process.cwd(), "config", "orderTemplates.json");
+    
+    // Read existing config or create new structure
+    let config: { templates: OrderTemplate[] };
+    try {
+      const fileContent = readFileSync(configPath, "utf-8");
+      config = JSON.parse(fileContent);
+      // Ensure templates array exists
+      if (!config.templates || !Array.isArray(config.templates)) {
+        config.templates = [];
+      }
+    } catch {
+      // File doesn't exist or is invalid - create new structure
+      config = { templates: [] };
+    }
+    
+    // Check if template with same ID already exists
+    const existingIndex = config.templates.findIndex((t: OrderTemplate) => t.id === template.id);
+    if (existingIndex !== -1) {
+      // Update existing template
+      config.templates[existingIndex] = template;
+      console.log(`✅ Updated existing template: ${template.name} (${template.id})`);
+    } else {
+      // Add new template
+      config.templates.push(template);
+      console.log(`✅ Saved new template: ${template.name} (${template.id})`);
+    }
+    
+    // Write back to file
+    writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+  } catch (error) {
+    throw new Error(`Failed to save template: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -187,7 +230,7 @@ async function main(): Promise<void> {
 
       // Load reference data
       console.log("📊 Loading reference data...");
-      const [variants, customers, carriers, allTemplates] = await Promise.all([
+      let [variants, customers, carriers, allTemplates] = await Promise.all([
         dataRepository.getAvailableVariants(region),
         dataRepository.getCustomers(),
         dataRepository.getCarriers(region),
@@ -195,7 +238,7 @@ async function main(): Promise<void> {
       ]);
 
       // Filter templates to only include those with valid SKUs for this region
-      const templates = filterValidTemplates(allTemplates, variants);
+      let templates = filterValidTemplates(allTemplates, variants);
 
       console.log(`   ✓ Found ${variants.length} variants`);
       console.log(`   ✓ Found ${customers.length} customers`);
@@ -246,6 +289,48 @@ async function main(): Promise<void> {
         } else {
           // Build custom order
           composition = await compositionBuilder.buildCustom(variants);
+          
+          // Offer to save custom order as template (unless skipped)
+          if (!options.skipSaveTemplate) {
+            const shouldSave = await promptService.promptConfirm(
+              "Would you like to save this order as a template for future use?",
+              false,
+            );
+            
+            if (shouldSave) {
+              console.log("\n💾 Saving order as template...");
+              const templateName = await promptService.promptTemplateName();
+              const templateDescription = await promptService.promptTemplateDescription();
+              
+              // Generate suggested ID from name
+              const suggestedId = templateName
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "");
+              
+              const templateId = await promptService.promptTemplateId(suggestedId);
+              
+              // Create template from composition
+              const newTemplate: OrderTemplate = {
+                id: templateId,
+                name: templateName,
+                description: templateDescription || `Custom order: ${templateName}`,
+                lineItems: composition.lineItems.map((item) => ({
+                  sku: item.sku,
+                  quantity: item.quantity,
+                  pickType: item.pickType, // Informational only - will use variant's pickType when used
+                })),
+              };
+              
+              saveTemplate(newTemplate);
+              
+              // Reload templates to include the new one
+              const updatedTemplates = loadOrderTemplates();
+              const validUpdatedTemplates = filterValidTemplates(updatedTemplates, variants);
+              templates = validUpdatedTemplates;
+              allTemplates = updatedTemplates;
+            }
+          }
         }
 
         // Check inventory if enabled

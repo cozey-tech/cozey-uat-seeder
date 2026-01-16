@@ -551,4 +551,84 @@ export class InteractivePromptService {
 
     return confirmed;
   }
+
+  /**
+   * Prompt for template name
+   */
+  async promptTemplateName(): Promise<string> {
+    const { name } = await inquirer.prompt<{ name: string }>([
+      {
+        type: "input",
+        name: "name",
+        message: "Enter template name:",
+        validate: (input: string): boolean | string => {
+          const trimmed = input.trim();
+          if (!trimmed) {
+            return "Template name cannot be empty";
+          }
+          if (trimmed.length > 100) {
+            return "Template name must be 100 characters or less";
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    return name;
+  }
+
+  /**
+   * Prompt for template description
+   */
+  async promptTemplateDescription(): Promise<string> {
+    const { description } = await inquirer.prompt<{ description: string }>([
+      {
+        type: "input",
+        name: "description",
+        message: "Enter template description:",
+        default: "",
+        validate: (input: string): boolean | string => {
+          if (input.length > 200) {
+            return "Template description must be 200 characters or less";
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    return description;
+  }
+
+  /**
+   * Prompt for template ID
+   */
+  async promptTemplateId(suggestedId?: string): Promise<string> {
+    const { id } = await inquirer.prompt<{ id: string }>([
+      {
+        type: "input",
+        name: "id",
+        message: "Enter template ID (used for identification, e.g., 'my-custom-order'):",
+        default: suggestedId || "",
+        validate: (input: string): boolean | string => {
+          const trimmed = input.trim();
+          if (!trimmed) {
+            return "Template ID cannot be empty";
+          }
+          // Allow alphanumeric, hyphens, and underscores
+          if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+            return "Template ID can only contain letters, numbers, underscores, and hyphens";
+          }
+          if (trimmed.length > 50) {
+            return "Template ID must be 50 characters or less";
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    return id;
+  }
 }
