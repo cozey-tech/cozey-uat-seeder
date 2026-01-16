@@ -105,25 +105,190 @@ function displaySummary(
   shopifyResult: { shopifyOrders: Array<{ shopifyOrderId: string; shopifyOrderNumber: string }> },
   wmsResult: { orders: Array<{ orderId: string }>; shipments: Array<{ shipmentId: string }> },
   collectionPrepResult?: { collectionPrepId: string; region: string },
+  isDryRun = false,
 ): void {
-  console.log("\n✅ Seeding Complete!");
+  if (isDryRun) {
+    console.log("\n🔍 DRY RUN MODE - No changes will be made");
+  } else {
+    console.log("\n✅ Seeding Complete!");
+  }
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log(`📦 Shopify Orders Created: ${shopifyResult.shopifyOrders.length}`);
+  console.log(`📦 Shopify Orders ${isDryRun ? "Would Be" : "Created"}: ${shopifyResult.shopifyOrders.length}`);
   shopifyResult.shopifyOrders.forEach((order) => {
     console.log(`   - Order #${order.shopifyOrderNumber} (ID: ${order.shopifyOrderId})`);
   });
 
-  console.log(`\n🗄️  WMS Entities Created:`);
+  console.log(`\n🗄️  WMS Entities ${isDryRun ? "Would Be" : "Created"}:`);
   console.log(`   - Orders: ${wmsResult.orders.length}`);
   console.log(`   - Shipments: ${wmsResult.shipments.length}`);
 
   if (collectionPrepResult) {
-    console.log(`\n📋 Collection Prep Created:`);
+    console.log(`\n📋 Collection Prep ${isDryRun ? "Would Be" : "Created"}:`);
     console.log(`   - ID: ${collectionPrepResult.collectionPrepId}`);
     console.log(`   - Region: ${collectionPrepResult.region}`);
   }
 
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  if (isDryRun) {
+    console.log("⚠️  DRY RUN - No actual changes were made");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+  } else {
+    console.log();
+  }
+}
+
+/**
+ * Execute dry-run mode: simulate full flow without making actual changes
+ */
+async function executeDryRun(configFilePath: string): Promise<void> {
+  console.log("🔍 DRY RUN MODE - No changes will be made");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+  // Display staging environment info (same as normal run)
+  const envInfo = displayStagingEnvironment();
+  console.log("🔒 Staging Environment Check");
+  console.log(`   Database: ${envInfo.databaseUrl}`);
+  console.log(`   Shopify: ${envInfo.shopifyDomain}`);
+  console.log(`   Status: ${envInfo.isStaging ? "✅ Staging" : "❌ Not Staging"}\n`);
+
+  // Assert staging environment (same safety as normal run)
+  try {
+    assertStagingEnvironment();
+  } catch (error) {
+    if (error instanceof StagingGuardrailError) {
+      console.error("❌ Staging Guardrail Violation:");
+      console.error(`   ${error.message}\n`);
+      console.error("This tool can only run against staging environments.");
+      process.exit(1);
+    }
+    throw error;
+  }
+
+  // Initialize services with dryRun=true
+  console.log("🔧 Initializing services (DRY RUN mode)...");
+  const prisma = new PrismaClient();
+  const wmsRepository = new WmsPrismaRepository(prisma);
+  const shopifyService = new ShopifyService(true);
+  const wmsService = new WmsService(wmsRepository, true);
+  const collectionPrepService = new CollectionPrepService(wmsRepository, true);
+  const inputParser = new InputParserService();
+  const dataValidator = new DataValidationService(prisma);
+
+  // Initialize use cases and handlers
+  const seedShopifyOrdersUseCase = new SeedShopifyOrdersUseCase(shopifyService);
+  const seedShopifyOrdersHandler = new SeedShopifyOrdersHandler(seedShopifyOrdersUseCase);
+
+  const seedWmsEntitiesUseCase = new SeedWmsEntitiesUseCase(wmsService);
+  const seedWmsEntitiesHandler = new SeedWmsEntitiesHandler(seedWmsEntitiesUseCase);
+
+  const createCollectionPrepUseCase = new CreateCollectionPrepUseCase(collectionPrepService);
+  const createCollectionPrepHandler = new CreateCollectionPrepHandler(createCollectionPrepUseCase);
+
+  // Parse and validate configuration file
+  console.log(`📄 Parsing configuration file: ${configFilePath}`);
+  let config;
+  try {
+    config = inputParser.parseInputFile(configFilePath);
+  } catch (error) {
+    if (error instanceof InputValidationError) {
+      console.error(`❌ Configuration file validation failed:\n${error.message}\n`);
+      process.exit(1);
+    }
+    throw error;
+  }
+
+  // Validate data (SKUs, customers, etc.) - read-only DB operations
+  console.log("🔍 Validating data...");
+  try {
+    await dataValidator.validateSeedConfig(config);
+  } catch (error) {
+    if (error instanceof DataValidationError) {
+      console.error(`❌ Data validation failed:\n${error.message}\n`);
+      process.exit(1);
+    }
+    throw error;
+  }
+  console.log("✅ Data validation passed\n");
+
+  // Generate batch ID for this run
+  const batchId = uuidv4();
+  console.log(`🆔 Batch ID: ${batchId}\n`);
+
+  // Step 1: Simulate Shopify seeding
+  console.log("🛒 Step 1: Would seed Shopify orders...");
+  const shopifyRequest = {
+    orders: config.orders.map((order) => ({
+      customer: order.customer,
+      lineItems: order.lineItems.map((item) => ({
+        sku: item.sku,
+        quantity: item.quantity,
+      })),
+    })),
+    batchId,
+  };
+
+  const shopifyResult = await seedShopifyOrdersHandler.execute(shopifyRequest);
+  console.log(`✅ Would create ${shopifyResult.shopifyOrders.length} Shopify order(s)\n`);
+
+  // Step 2: Simulate WMS seeding
+  console.log("🗄️  Step 2: Would seed WMS entities...");
+  const region = config.collectionPrep?.region || "CA";
+  let collectionPrepId: string | undefined;
+
+  // Create collection prep first if configured
+  if (config.collectionPrep) {
+    console.log("📋 Would create collection prep...");
+    const collectionPrepRequest = {
+      orderIds: shopifyResult.shopifyOrders.map((o) => o.shopifyOrderId),
+      carrier: config.collectionPrep.carrier,
+      locationId: config.collectionPrep.locationId,
+      region: config.collectionPrep.region,
+      prepDate: config.collectionPrep.prepDate,
+    };
+
+    const collectionPrepResult = await createCollectionPrepHandler.execute(collectionPrepRequest);
+    collectionPrepId = collectionPrepResult.collectionPrepId;
+    console.log(`✅ Would create collection prep: ${collectionPrepId}\n`);
+  }
+
+  // Seed WMS entities with Shopify order data
+  const wmsRequest = {
+    shopifyOrders: shopifyResult.shopifyOrders.map((shopifyOrder, index) => {
+      const configOrder = config.orders[index];
+      const lineItemsWithQuantity = shopifyOrder.lineItems.map((shopifyItem) => {
+        const configItem = configOrder.lineItems.find((item) => item.sku === shopifyItem.sku);
+        return {
+          lineItemId: shopifyItem.lineItemId,
+          sku: shopifyItem.sku,
+          quantity: configItem?.quantity || 1,
+        };
+      });
+
+      return {
+        shopifyOrderId: shopifyOrder.shopifyOrderId,
+        shopifyOrderNumber: shopifyOrder.shopifyOrderNumber,
+        status: "fulfilled",
+        customerName: configOrder.customer.name,
+        customerEmail: configOrder.customer.email,
+        lineItems: lineItemsWithQuantity,
+      };
+    }),
+    collectionPrepId,
+    region,
+  };
+
+  const wmsResult = await seedWmsEntitiesHandler.execute(wmsRequest);
+  console.log(`✅ Would create ${wmsResult.orders.length} WMS order(s)`);
+  console.log(`✅ Would create ${wmsResult.shipments.length} shipment(s)\n`);
+
+  // Display summary
+  const collectionPrepResult = collectionPrepId
+    ? { collectionPrepId, region: config.collectionPrep!.region }
+    : undefined;
+  displaySummary(shopifyResult, wmsResult, collectionPrepResult, true);
+
+  // Cleanup
+  await prisma.$disconnect();
 }
 
 /**
@@ -137,6 +302,12 @@ async function main(): Promise<void> {
     // Handle --validate flag (early exit, no DB/API calls)
     if (options.validate) {
       await validateConfig(options.configFile);
+      process.exit(0);
+    }
+
+    // Handle --dry-run flag
+    if (options.dryRun) {
+      await executeDryRun(options.configFile);
       process.exit(0);
     }
 
@@ -283,7 +454,7 @@ async function main(): Promise<void> {
     const collectionPrepResult = collectionPrepId
       ? { collectionPrepId, region: config.collectionPrep!.region }
       : undefined;
-    displaySummary(shopifyResult, wmsResult, collectionPrepResult);
+    displaySummary(shopifyResult, wmsResult, collectionPrepResult, false);
 
     // Cleanup
     await prisma.$disconnect();
