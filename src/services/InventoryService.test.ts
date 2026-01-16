@@ -314,7 +314,7 @@ describe("InventoryService", () => {
         onHandCommitted: 0,
       });
 
-      const result = await service.ensureInventoryForOrder(order, "langley", "CA");
+      await service.ensureInventoryForOrder(order, "langley", "CA");
 
       // Verify modification was attempted
       expect(mockPrisma.inventory.updateMany).toHaveBeenCalled();
