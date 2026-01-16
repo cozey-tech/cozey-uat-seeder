@@ -20,6 +20,7 @@ config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
 import { PrismaClient } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
+import { initializeEnvConfig } from "./config/env";
 import { assertStagingEnvironment, displayStagingEnvironment } from "./config/stagingGuardrails";
 import { InputParserService } from "./services/InputParserService";
 import { DataValidationService } from "./services/DataValidationService";
@@ -378,6 +379,7 @@ async function executeDryRun(configFilePath: string): Promise<void> {
   console.log("🔍 DRY RUN MODE - No changes will be made");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
+  // Config is already initialized in main(), so staging check can proceed
   checkStagingEnvironment();
 
   // Initialize services with dryRun=true
@@ -410,6 +412,9 @@ async function executeDryRun(configFilePath: string): Promise<void> {
  */
 async function main(): Promise<void> {
   try {
+    // Initialize environment configuration (load from AWS Secrets Manager or .env)
+    await initializeEnvConfig();
+
     // Parse CLI arguments
     const options = parseArgs();
 

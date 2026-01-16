@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { AwsSecretsService } from "../services/AwsSecretsService";
+import { Logger } from "../utils/logger";
 
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
@@ -10,26 +12,121 @@ const envSchema = z.object({
 export type EnvConfig = z.infer<typeof envSchema>;
 
 let cachedConfig: EnvConfig | null = null;
+let isInitialized = false;
 
-export function getEnvConfig(): EnvConfig {
-  if (cachedConfig) {
-    return cachedConfig;
-  }
+/**
+ * Get AWS configuration from environment variables
+ */
+function getAwsConfig(): {
+  useAwsSecrets: boolean;
+  region: string;
+  databaseSecretName: string;
+  shopifySecretName: string;
+} {
+  const useAwsSecrets = process.env.USE_AWS_SECRETS !== "false"; // Default to true
+  const region = process.env.AWS_REGION || "us-east-1";
+  const databaseSecretName = process.env.AWS_DATABASE_SECRET_NAME || "dev/uat-database-url";
+  const shopifySecretName = process.env.AWS_SHOPIFY_SECRET_NAME || "dev/shopify-access-token";
 
-  const result = envSchema.safeParse({
+  return {
+    useAwsSecrets,
+    region,
+    databaseSecretName,
+    shopifySecretName,
+  };
+}
+
+/**
+ * Load environment variables from .env files
+ */
+function loadEnvVars(): Partial<EnvConfig> {
+  return {
     DATABASE_URL: process.env.DATABASE_URL,
     SHOPIFY_STORE_DOMAIN: process.env.SHOPIFY_STORE_DOMAIN,
     SHOPIFY_ACCESS_TOKEN: process.env.SHOPIFY_ACCESS_TOKEN,
     SHOPIFY_API_VERSION: process.env.SHOPIFY_API_VERSION,
-  });
+  };
+}
+
+/**
+ * Initialize environment configuration by loading from AWS Secrets Manager and .env files
+ * This should be called once at application startup before any services are initialized
+ */
+export async function initializeEnvConfig(): Promise<EnvConfig> {
+  if (isInitialized && cachedConfig) {
+    Logger.debug("Config already initialized, using cached config");
+    return cachedConfig;
+  }
+
+  const awsConfig = getAwsConfig();
+  const envVars = loadEnvVars();
+
+  let awsSecrets: Record<string, unknown> | null = null;
+
+  // Try to fetch from AWS if enabled
+  if (awsConfig.useAwsSecrets) {
+    try {
+      const awsService = new AwsSecretsService(awsConfig.region);
+      const secretNames = [awsConfig.databaseSecretName, awsConfig.shopifySecretName];
+      awsSecrets = await awsService.fetchSecrets(secretNames);
+
+      if (awsSecrets) {
+        Logger.info("Loaded secrets from AWS Secrets Manager", {
+          secretCount: Object.keys(awsSecrets).length,
+          secrets: Object.keys(awsSecrets),
+        });
+      } else {
+        Logger.warn("AWS secrets fetch returned null, falling back to .env files");
+      }
+    } catch (error) {
+      Logger.warn("Failed to initialize AWS secrets, falling back to .env files", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  } else {
+    Logger.info("AWS secrets disabled via USE_AWS_SECRETS=false, using .env files only");
+  }
+
+  // Merge AWS secrets with .env vars (AWS secrets override .env, but .env fills in missing values)
+  const merged: Partial<EnvConfig> = {
+    ...envVars,
+    ...(awsSecrets as Partial<EnvConfig>),
+  };
+
+  // Validate the merged config
+  const result = envSchema.safeParse(merged);
 
   if (!result.success) {
     const missingVars = result.error.errors.map((err) => err.path.join(".")).join(", ");
+    const sources = awsSecrets ? "AWS Secrets Manager and .env files" : ".env files";
     throw new Error(
-      `Missing or invalid required environment variables: ${missingVars}. Please check your .env file.`,
+      `Missing or invalid required environment variables: ${missingVars}. ` +
+        `Please check your ${sources}.`,
     );
   }
 
   cachedConfig = result.data;
+  isInitialized = true;
+
+  const source = awsSecrets ? "AWS Secrets Manager (with .env fallback)" : ".env files";
+  Logger.info("Environment configuration initialized", { source });
+
+  return cachedConfig;
+}
+
+/**
+ * Get the cached environment configuration
+ * This is a synchronous function for backward compatibility
+ *
+ * @throws Error if called before initializeEnvConfig()
+ */
+export function getEnvConfig(): EnvConfig {
+  if (!isInitialized || !cachedConfig) {
+    throw new Error(
+      "Environment configuration not initialized. " +
+        "Call initializeEnvConfig() before using getEnvConfig().",
+    );
+  }
+
   return cachedConfig;
 }
