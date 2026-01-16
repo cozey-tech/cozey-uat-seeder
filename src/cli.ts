@@ -65,6 +65,40 @@ function parseArgs(): CliOptions {
 }
 
 /**
+ * Validate configuration file against schema
+ */
+async function validateConfig(configFilePath: string): Promise<void> {
+  const inputParser = new InputParserService();
+
+  try {
+    const config = inputParser.parseInputFile(configFilePath);
+
+    // Check for PnP items
+    const hasPnpItems = config.orders.some((order) =>
+      order.lineItems.some((item) => item.pickType === "Pick and Pack"),
+    );
+
+    // Display validation results
+    console.log("✅ Configuration file validation passed");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log(`   Schema: Valid`);
+    console.log(`   Orders: ${config.orders.length}`);
+    console.log(`   Collection Prep: ${config.collectionPrep ? "Configured" : "Not configured"}`);
+    if (hasPnpItems) {
+      console.log(`   PnP Config: ${config.pnpConfig ? "Present" : "Missing"}`);
+    }
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  } catch (error) {
+    if (error instanceof InputValidationError) {
+      console.error("❌ Configuration file validation failed:");
+      console.error(`   ${error.message}`);
+      process.exit(1);
+    }
+    throw error;
+  }
+}
+
+/**
  * Display summary of seeding results
  */
 function displaySummary(
@@ -99,6 +133,12 @@ async function main(): Promise<void> {
   try {
     // Parse CLI arguments
     const options = parseArgs();
+
+    // Handle --validate flag (early exit, no DB/API calls)
+    if (options.validate) {
+      await validateConfig(options.configFile);
+      process.exit(0);
+    }
 
     // Display staging environment info
     const envInfo = displayStagingEnvironment();
