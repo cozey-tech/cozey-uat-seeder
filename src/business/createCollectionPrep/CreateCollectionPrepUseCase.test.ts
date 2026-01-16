@@ -17,9 +17,6 @@ describe("CreateCollectionPrepUseCase", () => {
     } as unknown as CollectionPrepService;
 
     mockPrisma = {
-      carriers: {
-        findUnique: vi.fn(),
-      },
       location: {
         findUnique: vi.fn(),
       },
@@ -31,22 +28,14 @@ describe("CreateCollectionPrepUseCase", () => {
   it("should create collection prep and return ID and region", async () => {
     const request: CreateCollectionPrepRequest = {
       orderIds: ["order-1", "order-2", "order-3"],
-      carrier: "UPS",
+      carrier: "Fedex",
       locationId: "langley",
       region: "CA",
       prepDate: "2026-01-15T10:00:00Z",
       testTag: "Outbound_Compliance",
     };
 
-    // Mock Prisma queries
-    vi.mocked(mockPrisma.carriers.findUnique).mockResolvedValue({
-      id: "UPS",
-      name: "UPS",
-      region: "CA",
-      postalCodes: [],
-      updatedAt: new Date(),
-      createdAt: new Date(),
-    });
+    // Mock Prisma queries (carrier lookup now uses enum, no need to mock)
 
     vi.mocked(mockPrisma.location.findUnique).mockResolvedValue({
       id: "langley",
@@ -59,9 +48,9 @@ describe("CreateCollectionPrepUseCase", () => {
     });
 
     const mockCollectionPrep = {
-      id: "Outbound_Compliance-Ups-Langley-1234",
+      id: "Outbound_Compliance-Fedex-Langley-1234",
       region: "CA",
-      carrier: "UPS",
+      carrier: "Fedex",
       locationId: "langley",
       prepDate: new Date("2026-01-15"),
       boxes: 3,
@@ -71,12 +60,12 @@ describe("CreateCollectionPrepUseCase", () => {
 
     const result = await useCase.execute(request);
 
-    expect(result.collectionPrepId).toMatch(/^Outbound_Compliance-Ups-Langley-[0-9A-F]{4}$/);
+    expect(result.collectionPrepId).toMatch(/^Outbound_Compliance-Fedex-Langley-[0-9A-F]{4}$/);
     expect(result.region).toBe("CA");
     expect(mockCollectionPrepService.createCollectionPrep).toHaveBeenCalledWith(
       expect.objectContaining({
         region: "CA",
-        carrier: "UPS",
+        carrier: "Fedex",
         locationId: "langley",
         boxes: 3,
       }),
@@ -86,22 +75,14 @@ describe("CreateCollectionPrepUseCase", () => {
   it("should set boxes count to number of order IDs", async () => {
     const request: CreateCollectionPrepRequest = {
       orderIds: ["order-1", "order-2", "order-3", "order-4", "order-5"],
-      carrier: "CANPAR",
+      carrier: "Canpar",
       locationId: "langley",
       region: "CA",
       prepDate: "2026-01-15T10:00:00Z",
       testTag: "Test",
     };
 
-    // Mock Prisma queries
-    vi.mocked(mockPrisma.carriers.findUnique).mockResolvedValue({
-      id: "CANPAR",
-      name: "Canpar",
-      region: "CA",
-      postalCodes: [],
-      updatedAt: new Date(),
-      createdAt: new Date(),
-    });
+    // Mock Prisma queries (carrier lookup now uses enum, no need to mock)
 
     vi.mocked(mockPrisma.location.findUnique).mockResolvedValue({
       id: "langley",
@@ -116,7 +97,7 @@ describe("CreateCollectionPrepUseCase", () => {
     const mockCollectionPrep = {
       id: "Test-Canpar-Langley-ABCD",
       region: "CA",
-      carrier: "CANPAR",
+      carrier: "Canpar",
       locationId: "langley",
       prepDate: new Date("2026-01-15"),
       boxes: 5,

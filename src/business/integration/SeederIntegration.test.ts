@@ -46,9 +46,6 @@ describe("Seeder Integration", () => {
     } as unknown as WmsRepository;
 
     mockPrisma = {
-      carriers: {
-        findUnique: vi.fn(),
-      },
       location: {
         findUnique: vi.fn(),
       },
@@ -143,16 +140,7 @@ describe("Seeder Integration", () => {
       expect(wmsResponse.orders).toHaveLength(1);
 
       // Step 3: Create collection prep
-      // Mock Prisma queries for carrier and location
-      vi.mocked(mockPrisma.carriers.findUnique).mockResolvedValue({
-        id: "UPS",
-        name: "UPS",
-        region: "CA",
-        postalCodes: [],
-        updatedAt: new Date(),
-        createdAt: new Date(),
-      });
-
+      // Mock Prisma queries for location (carrier lookup now uses enum, no need to mock)
       vi.mocked(mockPrisma.location.findUnique).mockResolvedValue({
         id: "loc-123",
         name: "Test Location",
@@ -166,9 +154,9 @@ describe("Seeder Integration", () => {
       const collectionPrepUseCase = new CreateCollectionPrepUseCase(mockCollectionPrepService, mockPrisma);
 
       vi.mocked(mockWmsRepository.createCollectionPrep).mockResolvedValue({
-        id: "Test-Ups-TestLocation-1234",
+        id: "Test-Fedex-TestLocation-1234",
         region: "CA",
-        carrier: "UPS",
+        carrier: "Fedex",
         locationId: "loc-123",
         prepDate: new Date("2026-01-15"),
         boxes: 1,
@@ -176,14 +164,14 @@ describe("Seeder Integration", () => {
 
       const collectionPrepResponse = await collectionPrepUseCase.execute({
         orderIds: [wmsResponse.orders[0].shopifyOrderId],
-        carrier: "UPS",
+        carrier: "Fedex",
         locationId: "loc-123",
         region: "CA",
         prepDate: "2026-01-15T10:00:00Z",
         testTag: "Test",
       });
 
-      expect(collectionPrepResponse.collectionPrepId).toMatch(/^Test-Ups-TestLocation-[0-9A-F]{4}$/);
+      expect(collectionPrepResponse.collectionPrepId).toMatch(/^Test-Fedex-TestLocation-[0-9A-F]{4}$/);
     });
 
     it("should handle idempotency - skip existing orders", async () => {

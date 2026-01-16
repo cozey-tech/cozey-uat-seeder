@@ -3,6 +3,7 @@ import type { CreateCollectionPrepResponse } from "../../shared/responses/Create
 import { CollectionPrepService } from "../../services/CollectionPrepService";
 import { PrismaClient } from "@prisma/client";
 import { randomBytes } from "crypto";
+import { carriers } from "../../shared/carriers";
 
 export class CreateCollectionPrepUseCase {
   constructor(
@@ -28,21 +29,21 @@ export class CreateCollectionPrepUseCase {
     locationId: string,
     region: string,
   ): Promise<string> {
-    // Get carrier name
-    const carrier = await this.prisma.carriers.findUnique({
-      where: {
-        id_region: {
-          id: carrierId,
-          region,
-        },
-      },
-      select: {
-        name: true,
-      },
-    });
+    // Get carrier name from enum
+    const carrier = carriers.find(
+      (c) => c.code.toLowerCase() === carrierId.toLowerCase(),
+    );
 
     if (!carrier) {
-      throw new Error(`Carrier ${carrierId} not found for region ${region}`);
+      throw new Error(`Carrier ${carrierId} not found in carriers enum`);
+    }
+
+    // Check if carrier is available for the specified region
+    // Carriers with region: null are available for all regions
+    const isAvailableForRegion = carrier.region === null || carrier.region === region;
+
+    if (!isAvailableForRegion) {
+      throw new Error(`Carrier ${carrierId} is not available for region ${region}`);
     }
 
     // Get location name

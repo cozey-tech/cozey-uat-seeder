@@ -260,29 +260,41 @@ describe("ConfigDataRepository", () => {
   });
 
   describe("getCarriers", () => {
-    it("should return carriers from database", async () => {
-      const mockCarriers = [
-        {
-          id: "CANPAR",
-          name: "Canpar",
-          region: "CA",
-        },
-      ];
-
-      mockPrisma.carriers.findMany.mockResolvedValue(mockCarriers);
-
+    it("should return carriers from enum filtered by region", async () => {
       const result = await repository.getCarriers("CA");
 
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("CANPAR");
+      // Should include carriers with region: null (available for all regions)
+      // and carriers with region: "CA"
+      expect(result.length).toBeGreaterThan(0);
+      
+      // Check that Canpar (region: null) is included
+      const canpar = result.find((c) => c.id === "Canpar");
+      expect(canpar).toBeDefined();
+      expect(canpar?.name).toBe("Canpar");
+      
+      // Check that GoBoltMontreal (region: "CA") is included
+      const goBoltMontreal = result.find((c) => c.id === "GoBoltMontreal");
+      expect(goBoltMontreal).toBeDefined();
+      expect(goBoltMontreal?.name).toBe("Go Bolt Montreal");
     });
 
-    it("should return empty array if database is empty (no fallback)", async () => {
-      mockPrisma.carriers.findMany.mockResolvedValue([]);
+    it("should filter out carriers not available for the specified region", async () => {
+      const resultCA = await repository.getCarriers("CA");
+      const resultUS = await repository.getCarriers("US");
 
-      const result = await repository.getCarriers("CA");
+      // GoBoltMontreal should only be in CA results
+      const goBoltMontrealCA = resultCA.find((c) => c.id === "GoBoltMontreal");
+      const goBoltMontrealUS = resultUS.find((c) => c.id === "GoBoltMontreal");
+      
+      expect(goBoltMontrealCA).toBeDefined();
+      expect(goBoltMontrealUS).toBeUndefined();
 
-      expect(result).toHaveLength(0);
+      // GoBoltNewYorkCity should only be in US results
+      const goBoltNYCCA = resultCA.find((c) => c.id === "GoBoltNewYorkCity");
+      const goBoltNYCUS = resultUS.find((c) => c.id === "GoBoltNewYorkCity");
+      
+      expect(goBoltNYCCA).toBeUndefined();
+      expect(goBoltNYCUS).toBeDefined();
     });
   });
 
