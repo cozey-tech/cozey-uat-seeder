@@ -125,6 +125,7 @@ export class ConfigDataRepository {
 
   /**
    * Get all available variants for a region with pickType and configuration
+   * Only includes variants that have Shopify IDs (required for order creation)
    * Variants are grouped by: model > color > configuration > variant
    */
   async getAvailableVariants(region: string): Promise<Variant[]> {
@@ -132,6 +133,10 @@ export class ConfigDataRepository {
       where: {
         region,
         disabled: false,
+        // Only include variants that have Shopify IDs
+        shopifyIds: {
+          isEmpty: false,
+        },
       },
       select: {
         id: true,
@@ -252,7 +257,8 @@ export class ConfigDataRepository {
 
   /**
    * Get all carriers for a region
-   * Falls back to hardcoded list if carriers table is empty
+   * Only returns carriers that exist in the database for the specified region
+   * No fallback to hardcoded carriers to ensure data integrity
    */
   async getCarriers(region: string): Promise<Carrier[]> {
     const carriers = await this.prisma.carriers.findMany({
@@ -268,16 +274,6 @@ export class ConfigDataRepository {
         name: "asc",
       },
     });
-
-    // If no carriers in DB, return common carriers
-    if (carriers.length === 0) {
-      return [
-        { id: "CANPAR", name: "Canpar", region },
-        { id: "FEDEX", name: "FedEx", region },
-        { id: "PUROLATOR", name: "Purolator", region },
-        { id: "UPS", name: "UPS", region },
-      ];
-    }
 
     return carriers.map((c) => ({
       id: c.id,

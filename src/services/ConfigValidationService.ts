@@ -114,16 +114,21 @@ export class ConfigValidationService {
         }
 
         // Check if variant exists and has Shopify ID
+        // This should never fail if variants are properly filtered, but validate as safety check
         try {
           const configRegion = config.region || config.collectionPrep?.region || "CA";
           const variant = await this.dataRepository.getShopifyVariantId(item.sku, configRegion);
           if (!variant) {
-            result.warnings.push(
-              `${itemPrefix}: SKU ${item.sku} may not have a Shopify variant ID for region ${configRegion}`,
+            result.valid = false;
+            result.errors.push(
+              `${itemPrefix}: SKU ${item.sku} does not have a Shopify variant ID for region ${configRegion}. This variant should not have been selectable.`,
             );
           }
-        } catch {
-          result.warnings.push(`${itemPrefix}: Could not verify Shopify variant ID for ${item.sku}`);
+        } catch (error) {
+          result.valid = false;
+          result.errors.push(
+            `${itemPrefix}: Could not verify Shopify variant ID for ${item.sku}: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
     }
@@ -195,9 +200,10 @@ export class ConfigValidationService {
       });
 
       if (!carrier) {
-        // Carrier might not be in DB, just warn
-        result.warnings.push(
-          `Carrier ${config.collectionPrep.carrier} not found in database for region ${config.collectionPrep.region}`,
+        // Carrier should always exist if properly filtered, but validate as safety check
+        result.valid = false;
+        result.errors.push(
+          `Carrier ${config.collectionPrep.carrier} not found in database for region ${config.collectionPrep.region}. This carrier should not have been selectable.`,
         );
       }
 

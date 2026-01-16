@@ -106,6 +106,9 @@ describe("ConfigDataRepository", () => {
         where: {
           region: "CA",
           disabled: false,
+          shopifyIds: {
+            isEmpty: false,
+          },
         },
         select: {
           id: true,
@@ -149,6 +152,9 @@ describe("ConfigDataRepository", () => {
         expect.objectContaining({
           where: expect.objectContaining({
             disabled: false,
+            shopifyIds: {
+              isEmpty: false,
+            },
           }),
         }),
       );
@@ -271,14 +277,12 @@ describe("ConfigDataRepository", () => {
       expect(result[0].id).toBe("CANPAR");
     });
 
-    it("should return hardcoded carriers if database is empty", async () => {
+    it("should return empty array if database is empty (no fallback)", async () => {
       mockPrisma.carriers.findMany.mockResolvedValue([]);
 
       const result = await repository.getCarriers("CA");
 
-      expect(result).toHaveLength(4);
-      expect(result.map((c) => c.id)).toContain("CANPAR");
-      expect(result.map((c) => c.id)).toContain("FEDEX");
+      expect(result).toHaveLength(0);
     });
   });
 

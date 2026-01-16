@@ -243,7 +243,7 @@ describe("ConfigValidationService", () => {
       expect(result.errors.some((e) => e.includes("location"))).toBe(true);
     });
 
-    it("should warn if carrier not in database", async () => {
+    it("should error if carrier not in database", async () => {
       const config: SeedConfig = {
         orders: [
           {
@@ -282,7 +282,8 @@ describe("ConfigValidationService", () => {
 
       const result = await service.validateDatabaseAlignment(config);
 
-      expect(result.warnings.some((w) => w.includes("Carrier"))).toBe(true);
+      expect(result.valid).toBe(false);
+      expect(result.errors.some((e) => e.includes("Carrier"))).toBe(true);
     });
   });
 });
