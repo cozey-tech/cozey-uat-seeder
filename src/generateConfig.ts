@@ -12,7 +12,7 @@
 
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { writeFileSync } from "fs";
+import { writeFileSync, existsSync, accessSync, constants } from "fs";
 import { ConfigDataRepository } from "./repositories/ConfigDataRepository";
 import { InteractivePromptService } from "./services/InteractivePromptService";
 import { OrderCompositionBuilder } from "./services/OrderCompositionBuilder";
@@ -21,7 +21,7 @@ import { ConfigValidationService } from "./services/ConfigValidationService";
 import { InventoryService } from "./services/InventoryService";
 import { DataValidationService } from "./services/DataValidationService";
 import { readFileSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 import type { OrderTemplate } from "./services/InteractivePromptService";
 
 interface CliOptions {
@@ -54,6 +54,29 @@ function parseArgs(): CliOptions {
     const region = args[regionIndex + 1] as "CA" | "US";
     if (region === "CA" || region === "US") {
       options.region = region;
+    } else {
+      throw new Error(
+        `Invalid region: ${region}. Must be "CA" or "US". Use --region CA or --region US`,
+      );
+    }
+  }
+
+  // Validate --output path if provided
+  if (options.output) {
+    const parentDir = dirname(options.output);
+    if (!existsSync(parentDir)) {
+      throw new Error(
+        `Output directory does not exist: ${parentDir}. Please create it first or use a different path.`,
+      );
+    }
+
+    // Check if parent directory is writable
+    try {
+      accessSync(parentDir, constants.W_OK);
+    } catch {
+      throw new Error(
+        `Output directory is not writable: ${parentDir}. Please check permissions.`,
+      );
     }
   }
 

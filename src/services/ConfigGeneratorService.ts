@@ -129,6 +129,15 @@ export class ConfigGeneratorService {
    * ${MMDDYY}${locationFirstLastLetter}${CARRIER}${count}
    *
    * Example: 010724WRCANPAR1 (Jan 7, 2024, Windsor, Canpar, #1)
+   *
+   * Note: This method has a race condition if multiple processes generate IDs simultaneously.
+   * The IDs are generated based on existing preps at query time, so concurrent runs may
+   * generate duplicate IDs. The database unique constraint on collectionPrep.id will catch
+   * duplicates, but the seeding process will fail. For production use, consider:
+   * - Using database transactions with row-level locking
+   * - Adding retry logic with exponential backoff
+   * - Using a distributed lock (e.g., Redis) for ID generation
+   * - Generating IDs at seeding time instead of config generation time
    */
   async generateCollectionPrepIds(
     count: number,
@@ -164,6 +173,8 @@ export class ConfigGeneratorService {
     const dateStr = `${month}${day}${year}`;
 
     // Check existing collection preps to determine count
+    // Note: This query is not atomic with ID generation, creating a race condition window.
+    // For staging/UAT use, this is acceptable, but be aware of the limitation.
     const existingPreps = await this.prisma.collectionPrep.findMany({
       where: {
         region,

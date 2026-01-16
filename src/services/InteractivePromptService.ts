@@ -185,6 +185,9 @@ export class InteractivePromptService {
           }
           return true;
         },
+        // Note: Type assertion needed due to inquirer v10's strict typing for checkbox prompts.
+        // The choices array with Separator objects doesn't match the expected type signature,
+        // but works correctly at runtime. This is a known limitation of inquirer v10 types.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any,
     ]);
