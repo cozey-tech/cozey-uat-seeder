@@ -3,6 +3,7 @@ import { seedConfigSchema } from "../shared/validation/seedConfigSchema";
 import { DataValidationService } from "./DataValidationService";
 import { PrismaClient } from "@prisma/client";
 import type { ConfigDataRepository } from "../repositories/ConfigDataRepository";
+import { carriers } from "../shared/carriers";
 
 export interface ValidationResult {
   valid: boolean;
@@ -189,22 +190,29 @@ export class ConfigValidationService {
         );
       }
 
-      // Validate carrier exists (if in DB)
-      const carrier = await this.prisma.carriers.findUnique({
-        where: {
-          id_region: {
-            id: config.collectionPrep.carrier,
-            region: config.collectionPrep.region,
-          },
-        },
-      });
+      // Validate carrier exists in enum and is available for region
+      const carrierCode = config.collectionPrep.carrier;
+      const carrier = carriers.find(
+        (c) => c.code.toLowerCase() === carrierCode.toLowerCase(),
+      );
 
       if (!carrier) {
-        // Carrier should always exist if properly filtered, but validate as safety check
         result.valid = false;
         result.errors.push(
-          `Carrier ${config.collectionPrep.carrier} not found in database for region ${config.collectionPrep.region}. This carrier should not have been selectable.`,
+          `Carrier ${carrierCode} not found in carriers enum. This carrier should not have been selectable.`,
         );
+      } else {
+        // Check if carrier is available for the specified region
+        // Carriers with region: null are available for all regions
+        const isAvailableForRegion =
+          carrier.region === null || carrier.region === config.collectionPrep.region;
+
+        if (!isAvailableForRegion) {
+          result.valid = false;
+          result.errors.push(
+            `Carrier ${carrierCode} is not available for region ${config.collectionPrep.region}. This carrier should not have been selectable.`,
+          );
+        }
       }
 
       // Validate prepDate is valid

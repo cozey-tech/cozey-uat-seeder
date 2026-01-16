@@ -14,9 +14,6 @@ describe("ConfigValidationService", () => {
     location: {
       findUnique: ReturnType<typeof vi.fn>;
     };
-    carriers: {
-      findUnique: ReturnType<typeof vi.fn>;
-    };
   };
   let mockDataRepository: {
     getShopifyVariantId: ReturnType<typeof vi.fn>;
@@ -31,9 +28,6 @@ describe("ConfigValidationService", () => {
         findFirst: vi.fn(),
       },
       location: {
-        findUnique: vi.fn(),
-      },
-      carriers: {
         findUnique: vi.fn(),
       },
     };
@@ -243,7 +237,7 @@ describe("ConfigValidationService", () => {
       expect(result.errors.some((e) => e.includes("location"))).toBe(true);
     });
 
-    it("should error if carrier not in database", async () => {
+    it("should error if carrier not in enum", async () => {
       const config: SeedConfig = {
         orders: [
           {
@@ -261,7 +255,7 @@ describe("ConfigValidationService", () => {
           },
         ],
         collectionPrep: {
-          carrier: "CANPAR",
+          carrier: "INVALID_CARRIER",
           locationId: "langley",
           region: "CA",
           prepDate: new Date().toISOString(),
@@ -278,12 +272,94 @@ describe("ConfigValidationService", () => {
         name: "Langley",
       });
 
-      mockPrisma.carriers.findUnique.mockResolvedValue(null);
+      const result = await service.validateDatabaseAlignment(config);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors.some((e) => e.includes("Carrier") && e.includes("not found in carriers enum"))).toBe(true);
+    });
+
+    it("should error if carrier not available for region", async () => {
+      const config: SeedConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test",
+              email: "test@example.com",
+            },
+            lineItems: [
+              {
+                sku: "SOFA-001-BLK",
+                quantity: 1,
+                pickType: "Regular",
+              },
+            ],
+          },
+        ],
+        collectionPrep: {
+          // GoBoltMontreal is only available for CA, so using it with US should fail
+          carrier: "GoBoltMontreal",
+          locationId: "langley",
+          region: "US",
+          prepDate: new Date().toISOString(),
+        },
+      };
+
+      mockPrisma.variant.findFirst.mockResolvedValue({
+        id: "variant-1",
+        sku: "SOFA-001-BLK",
+      });
+
+      mockPrisma.location.findUnique.mockResolvedValue({
+        id: "langley",
+        name: "Langley",
+      });
 
       const result = await service.validateDatabaseAlignment(config);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes("Carrier"))).toBe(true);
+      expect(result.errors.some((e) => e.includes("Carrier") && e.includes("not available for region"))).toBe(true);
+    });
+
+    it("should validate carrier exists in enum and is available for region", async () => {
+      const config: SeedConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test",
+              email: "test@example.com",
+            },
+            lineItems: [
+              {
+                sku: "SOFA-001-BLK",
+                quantity: 1,
+                pickType: "Regular",
+              },
+            ],
+          },
+        ],
+        collectionPrep: {
+          // Canpar has region: null, so it's available for all regions
+          carrier: "Canpar",
+          locationId: "langley",
+          region: "CA",
+          prepDate: new Date().toISOString(),
+        },
+      };
+
+      mockPrisma.variant.findFirst.mockResolvedValue({
+        id: "variant-1",
+        sku: "SOFA-001-BLK",
+      });
+
+      mockPrisma.location.findUnique.mockResolvedValue({
+        id: "langley",
+        name: "Langley",
+      });
+
+      const result = await service.validateDatabaseAlignment(config);
+
+      expect(result.valid).toBe(true);
+      expect(result.errors.some((e) => e.includes("Carrier"))).toBe(false);
     });
   });
 });
