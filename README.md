@@ -26,6 +26,32 @@ npm install
 
 ### Configuration
 
+The seeder supports two methods for loading configuration:
+
+#### Option 1: AWS Secrets Manager (Recommended for AWS environments)
+
+By default, the seeder attempts to fetch secrets from AWS Secrets Manager with automatic fallback to `.env` files. This is ideal when running in AWS environments (EC2, ECS, Lambda, etc.).
+
+**AWS Secrets:**
+- `dev/uat-database-url`: Contains `DATABASE_URL`
+- `dev/shopify-access-token`: Contains `SHOPIFY_ACCESS_TOKEN`, `SHOPIFY_STORE_DOMAIN`, and optionally `SHOPIFY_API_VERSION`
+
+**Configuration options:**
+- `USE_AWS_SECRETS`: Enable/disable AWS secrets (default: `true`)
+- `AWS_REGION`: AWS region (default: `us-east-1`)
+- `AWS_DATABASE_SECRET_NAME`: Custom database secret name (default: `dev/uat-database-url`)
+- `AWS_SHOPIFY_SECRET_NAME`: Custom Shopify secret name (default: `dev/shopify-access-token`)
+
+**AWS Credentials:** The seeder automatically detects AWS credentials from:
+1. Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+2. AWS IAM role (when running in AWS)
+3. AWS credentials file (`~/.aws/credentials`)
+4. Default credential provider chain
+
+#### Option 2: Environment Variables (.env files)
+
+For local development or when AWS is unavailable, use `.env` files:
+
 1. Copy `.env.example` to `.env`:
    ```bash
    cp .env.example .env
@@ -36,6 +62,10 @@ npm install
    - `SHOPIFY_STORE_DOMAIN`: Shopify store domain (must match staging patterns)
    - `SHOPIFY_ACCESS_TOKEN`: Shopify Admin API access token
    - `SHOPIFY_API_VERSION`: API version (optional, defaults to 2024-01)
+
+**Hybrid Mode:** The seeder merges values from both sources - AWS secrets override `.env` values, but missing AWS values fallback to `.env`. This provides flexibility and resilience.
+
+**Disable AWS Secrets:** Set `USE_AWS_SECRETS=false` in your `.env` file to use environment variables only.
 
 ### Usage
 
@@ -217,11 +247,36 @@ src/
 
 ## Troubleshooting
 
+### "Environment configuration not initialized" Error
+
+This error occurs if `getEnvConfig()` is called before `initializeEnvConfig()`. This should not happen in normal usage, but if you're writing custom code, ensure you call `initializeEnvConfig()` first.
+
 ### "Staging Guardrail Violation" Error
 
 The tool detected a production environment. Check:
 - `DATABASE_URL` contains staging patterns (staging, stage, test, dev, uat)
 - `SHOPIFY_STORE_DOMAIN` contains staging patterns or ends with `.myshopify.com`
+
+### AWS Secrets Manager Issues
+
+If you're experiencing issues with AWS Secrets Manager:
+
+1. **"Failed to fetch secret from AWS" warnings:**
+   - Verify AWS credentials are configured correctly
+   - Check that the secret names match your AWS Secrets Manager secrets
+   - Ensure your IAM role/user has `secretsmanager:GetSecretValue` permission
+   - The seeder will automatically fallback to `.env` files, so this is non-fatal
+
+2. **To disable AWS secrets entirely:**
+   - Set `USE_AWS_SECRETS=false` in your `.env` file
+   - The seeder will use `.env` files only
+
+3. **Custom secret names:**
+   - Set `AWS_DATABASE_SECRET_NAME` and `AWS_SHOPIFY_SECRET_NAME` in `.env`
+   - Defaults: `dev/uat-database-url` and `dev/shopify-access-token`
+
+4. **Wrong AWS region:**
+   - Set `AWS_REGION` in `.env` (default: `us-east-1`)
 
 ### "Missing SKUs in WMS" Error
 
