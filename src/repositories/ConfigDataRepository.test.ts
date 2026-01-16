@@ -78,20 +78,22 @@ describe("ConfigDataRepository", () => {
       ];
 
       mockPrisma.variant.findMany.mockResolvedValue(mockVariants);
-      // Mock variantPart.findMany for pickType lookup (called for each variant)
-      mockPrisma.variantPart.findMany
-        .mockResolvedValueOnce([
-          {
-            variantId: "variant-1",
-            part: { pickType: "Regular" },
-          },
-        ])
-        .mockResolvedValueOnce([
-          {
-            variantId: "variant-2",
-            part: { pickType: "Regular" },
-          },
-        ]);
+      // Mock variantPart.findMany for pickType lookup (batched query for all variants)
+      // The query returns all variantParts for all variants, grouped by variantId in code
+      mockPrisma.variantPart.findMany.mockResolvedValue([
+        {
+          variantId: "variant-1",
+          partId: "part-1",
+          quantity: 1,
+          part: { pickType: "Regular" },
+        },
+        {
+          variantId: "variant-2",
+          partId: "part-2",
+          quantity: 1,
+          part: { pickType: "Regular" },
+        },
+      ]);
 
       const result = await repository.getAvailableVariants("CA");
 
@@ -121,10 +123,25 @@ describe("ConfigDataRepository", () => {
           { sku: "asc" },
         ],
       });
+      // Verify batched variantPart query was called
+      expect(mockPrisma.variantPart.findMany).toHaveBeenCalledWith({
+        where: {
+          variantId: { in: ["variant-1", "variant-2"] },
+        },
+        include: {
+          part: {
+            select: {
+              pickType: true,
+            },
+          },
+        },
+      });
     });
 
     it("should filter out disabled variants", async () => {
       mockPrisma.variant.findMany.mockResolvedValue([]);
+      // When no variants, variantPart.findMany should still be called with empty array
+      mockPrisma.variantPart.findMany.mockResolvedValue([]);
 
       await repository.getAvailableVariants("CA");
 
@@ -135,6 +152,19 @@ describe("ConfigDataRepository", () => {
           }),
         }),
       );
+      // Verify variantPart query was called (even with empty variant list)
+      expect(mockPrisma.variantPart.findMany).toHaveBeenCalledWith({
+        where: {
+          variantId: { in: [] },
+        },
+        include: {
+          part: {
+            select: {
+              pickType: true,
+            },
+          },
+        },
+      });
     });
   });
 

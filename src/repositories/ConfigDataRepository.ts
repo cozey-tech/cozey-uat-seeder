@@ -96,20 +96,9 @@ export class ConfigDataRepository {
    * If variant has multiple parts with different pickTypes, use the most common one
    * Defaults to "Regular" if no parts found
    */
-  private async getVariantPickType(variantId: string): Promise<"Regular" | "Pick and Pack"> {
-    const variantParts = await this.prisma.variantPart.findMany({
-      where: {
-        variantId,
-      },
-      include: {
-        part: {
-          select: {
-            pickType: true,
-          },
-        },
-      },
-    });
-
+  private getVariantPickTypeFromParts(
+    variantParts: Array<{ part: { pickType: string } }>,
+  ): "Regular" | "Pick and Pack" {
     if (variantParts.length === 0) {
       return "Regular"; // Default
     }
@@ -161,25 +150,47 @@ export class ConfigDataRepository {
       ],
     });
 
-    // Get pickType for each variant
-    const variantsWithPickType = await Promise.all(
-      variants.map(async (v) => {
-        const pickType = await this.getVariantPickType(v.id);
-        const configuration = this.extractConfiguration(v.description, v.modelName, v.colorId);
-        
-        return {
-          id: v.id,
-          sku: v.sku,
-          modelName: v.modelName,
-          colorId: v.colorId,
-          shopifyIds: v.shopifyIds,
-          region: v.region,
-          description: v.description,
-          pickType,
-          configuration,
-        };
-      }),
-    );
+    // Batch fetch all variantParts for all variants at once to avoid connection pool exhaustion
+    const variantIds = variants.map((v) => v.id);
+    const allVariantParts = await this.prisma.variantPart.findMany({
+      where: {
+        variantId: { in: variantIds },
+      },
+      include: {
+        part: {
+          select: {
+            pickType: true,
+          },
+        },
+      },
+    });
+
+    // Group variantParts by variantId
+    const variantPartsByVariantId = new Map<string, typeof allVariantParts>();
+    for (const vp of allVariantParts) {
+      const existing = variantPartsByVariantId.get(vp.variantId) || [];
+      existing.push(vp);
+      variantPartsByVariantId.set(vp.variantId, existing);
+    }
+
+    // Get pickType for each variant from batched data
+    const variantsWithPickType = variants.map((v) => {
+      const variantParts = variantPartsByVariantId.get(v.id) || [];
+      const pickType = this.getVariantPickTypeFromParts(variantParts);
+      const configuration = this.extractConfiguration(v.description, v.modelName, v.colorId);
+      
+      return {
+        id: v.id,
+        sku: v.sku,
+        modelName: v.modelName,
+        colorId: v.colorId,
+        shopifyIds: v.shopifyIds,
+        region: v.region,
+        description: v.description,
+        pickType,
+        configuration,
+      };
+    });
 
     return variantsWithPickType;
   }
