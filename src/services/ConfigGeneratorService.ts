@@ -10,9 +10,10 @@ export interface GenerateConfigOptions {
     locationId: string;
   }>;
   collectionPrepCount: number;
-  carrier: Carrier;
-  prepDate: Date;
+  carrier?: Carrier;
+  prepDate?: Date;
   region: string;
+  testTag?: string;
 }
 
 /**
@@ -35,6 +36,10 @@ export class ConfigGeneratorService {
       customer: {
         name: order.customer.name,
         email: order.customer.email,
+        address: order.customer.address,
+        city: order.customer.city,
+        province: order.customer.province,
+        postalCode: order.customer.postalCode,
       },
       lineItems: order.composition.lineItems.map((item) => ({
         sku: item.sku,
@@ -61,6 +66,12 @@ export class ConfigGeneratorService {
     // Generate collection prep configuration if needed
     let collectionPrep: SeedConfig["collectionPrep"] | undefined;
     if (options.collectionPrepCount > 0) {
+      if (!options.carrier || !options.prepDate) {
+        throw new Error(
+          "Carrier and prepDate are required when collectionPrepCount > 0",
+        );
+      }
+
       // Validate all orders have the same locationId for collection prep
       const locationIds = new Set(options.orders.map((o) => o.locationId).filter(Boolean));
       if (locationIds.size > 1) {
@@ -93,6 +104,7 @@ export class ConfigGeneratorService {
         locationId,
         region: options.region,
         prepDate: options.prepDate.toISOString(),
+        testTag: options.testTag,
       };
     }
 

@@ -19,7 +19,7 @@ config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
 import { PrismaClient } from "@prisma/client";
 import { writeFileSync, existsSync, accessSync, constants } from "fs";
-import { ConfigDataRepository } from "./repositories/ConfigDataRepository";
+import { ConfigDataRepository, type Carrier } from "./repositories/ConfigDataRepository";
 import { InteractivePromptService } from "./services/InteractivePromptService";
 import { OrderCompositionBuilder } from "./services/OrderCompositionBuilder";
 import { ConfigGeneratorService } from "./services/ConfigGeneratorService";
@@ -190,7 +190,12 @@ async function main(): Promise<void> {
         );
       }
       if (carriers.length === 0) {
-        throw new Error(`No carriers found for region ${region}. Please check database or config.`);
+        console.warn(
+          `⚠️  No carriers found for region ${region}. Collection prep will be skipped.`,
+        );
+        console.warn(
+          `   To enable collection prep, add carriers to the database for region ${region}.\n`,
+        );
       }
 
       // Prompt for number of orders
@@ -264,9 +269,24 @@ async function main(): Promise<void> {
       // Prompt for collection prep
       console.log("\n📋 Collection Prep Configuration");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      const collectionPrepCount = await promptService.promptCollectionPrepCount(orderCount);
-      const carrier = await promptService.promptCarrierSelection(carriers);
-      const prepDate = new Date();
+      const collectionPrepCount = await promptService.promptCollectionPrepCount(orderCount, carriers.length > 0);
+      
+      // Only require carriers if collection prep is requested
+      if (collectionPrepCount > 0 && carriers.length === 0) {
+        throw new Error(
+          `Cannot create collection prep: No carriers found for region ${region}.\n` +
+            `Please add carriers to the database or set collection prep count to 0 to skip collection prep.`,
+        );
+      }
+
+      let carrier: Carrier | undefined;
+      let prepDate: Date | undefined;
+      let testTag: string | undefined;
+      if (collectionPrepCount > 0) {
+        carrier = await promptService.promptCarrierSelection(carriers);
+        prepDate = new Date();
+        testTag = await promptService.promptTestTag();
+      }
 
       // Generate config
       console.log("\n⚙️  Generating configuration...");
@@ -276,6 +296,7 @@ async function main(): Promise<void> {
         carrier,
         prepDate,
         region,
+        testTag,
       });
 
       // Validate config

@@ -217,10 +217,11 @@ describe("ShopifyService", () => {
           data: {
             order: {
               id: "gid://shopify/Order/456",
+              fulfillments: [],
               lineItems: {
                 edges: [
-                  { node: { id: "gid://shopify/LineItem/1", quantity: 2 } },
-                  { node: { id: "gid://shopify/LineItem/2", quantity: 1 } },
+                  { node: { id: "gid://shopify/LineItem/1", quantity: 2, fulfillableQuantity: 2 } },
+                  { node: { id: "gid://shopify/LineItem/2", quantity: 1, fulfillableQuantity: 1 } },
                 ],
               },
             },
@@ -248,6 +249,32 @@ describe("ShopifyService", () => {
       expect(result.status).toBe("SUCCESS");
     });
 
+    it("should return existing fulfillment if order already fulfilled", async () => {
+      mockClient.request.mockResolvedValueOnce({
+        data: {
+          order: {
+            id: "gid://shopify/Order/456",
+            fulfillments: [
+              { id: "gid://shopify/Fulfillment/789", status: "SUCCESS" },
+            ],
+            lineItems: {
+              edges: [
+                { node: { id: "gid://shopify/LineItem/1", quantity: 2, fulfillableQuantity: 0 } },
+              ],
+            },
+          },
+        },
+        errors: undefined,
+        extensions: undefined,
+      });
+
+      const result = await service.fulfillOrder("gid://shopify/Order/456");
+
+      expect(result.fulfillmentId).toBe("gid://shopify/Fulfillment/789");
+      expect(result.status).toBe("SUCCESS");
+      expect(mockClient.request).toHaveBeenCalledTimes(1); // Should not create new fulfillment
+    });
+
     it("should throw error if order not found", async () => {
       mockClient.request.mockResolvedValue({
         data: {
@@ -260,6 +287,28 @@ describe("ShopifyService", () => {
       const error = await service.fulfillOrder("invalid-id").catch((e) => e);
       expect(error).toBeInstanceOf(ShopifyServiceError);
       expect(error.message).toContain("not found");
+    });
+
+    it("should throw error if no fulfillable line items", async () => {
+      mockClient.request.mockResolvedValueOnce({
+        data: {
+          order: {
+            id: "gid://shopify/Order/456",
+            fulfillments: [],
+            lineItems: {
+              edges: [
+                { node: { id: "gid://shopify/LineItem/1", quantity: 2, fulfillableQuantity: 0 } },
+              ],
+            },
+          },
+        },
+        errors: undefined,
+        extensions: undefined,
+      });
+
+      const error = await service.fulfillOrder("gid://shopify/Order/456").catch((e) => e);
+      expect(error).toBeInstanceOf(ShopifyServiceError);
+      expect(error.message).toContain("No fulfillable line items");
     });
   });
 

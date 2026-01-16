@@ -6,6 +6,7 @@ export const createCollectionPrepRequestSchema = z.object({
   locationId: z.string(),
   region: z.string(),
   prepDate: z.string().datetime(),
+  testTag: z.string().optional(),
 });
 
 export type CreateCollectionPrepRequest = z.infer<typeof createCollectionPrepRequestSchema>;

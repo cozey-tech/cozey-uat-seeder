@@ -7,6 +7,10 @@ export interface DraftOrderInput {
   customer: {
     name: string;
     email: string;
+    address?: string;
+    city?: string;
+    province?: string;
+    postalCode?: string;
   };
   lineItems: Array<{
     sku: string;
@@ -100,15 +104,24 @@ export class ShopifyService {
    *
    * @param input - Customer and line items for the draft order
    * @param batchId - Unique batch ID for tagging (format: wms_seed_<batchId>)
+   * @param region - Optional region code (CA or US) for determining country code in shipping address
    * @returns Draft order ID
    * @throws ShopifyServiceError if variant lookup fails or API returns errors
    */
-  async createDraftOrder(input: DraftOrderInput, batchId: string): Promise<DraftOrderResult> {
+  async createDraftOrder(input: DraftOrderInput, batchId: string, region?: string): Promise<DraftOrderResult> {
     if (this.dryRun) {
       const draftOrderId = `gid://shopify/DraftOrder/${uuidv4()}`;
       Logger.info("DRY RUN: Would create draft order", {
         customerEmail: input.customer.email,
         customerName: input.customer.name,
+        shippingAddress: input.customer.address
+          ? {
+              address: input.customer.address,
+              city: input.customer.city,
+              province: input.customer.province,
+              postalCode: input.customer.postalCode,
+            }
+          : undefined,
         batchId,
         draftOrderId,
         lineItemCount: input.lineItems.length,
@@ -152,6 +165,23 @@ export class ShopifyService {
         })
         .filter((item) => item !== null && item !== undefined);
 
+      // Build shipping address if provided
+      // Determine country code from region (CA -> "CA", US -> "US", default to "CA")
+      const countryCode = region === "US" ? "US" : "CA";
+      
+      const shippingAddress = input.customer.address &&
+        input.customer.city &&
+        input.customer.province &&
+        input.customer.postalCode
+        ? {
+            address1: input.customer.address,
+            city: input.customer.city,
+            province: input.customer.province,
+            zip: input.customer.postalCode,
+            country: countryCode,
+          }
+        : undefined;
+
       const variables = {
         input: {
           email: input.customer.email,
@@ -164,8 +194,33 @@ export class ShopifyService {
             },
           ],
           lineItems: lineItems,
+          ...(shippingAddress && { shippingAddress }),
         },
       };
+
+      // Log shipping address inclusion for debugging
+      if (shippingAddress) {
+        Logger.info("Including shipping address in draft order", {
+          customerEmail: input.customer.email,
+          customerName: input.customer.name,
+          shippingAddress: {
+            address: shippingAddress.address1,
+            city: shippingAddress.city,
+            province: shippingAddress.province,
+            postalCode: shippingAddress.zip,
+            country: shippingAddress.country,
+          },
+        });
+      } else {
+        Logger.warn("Shipping address not included in draft order - missing address fields", {
+          customerEmail: input.customer.email,
+          customerName: input.customer.name,
+          hasAddress: !!input.customer.address,
+          hasCity: !!input.customer.city,
+          hasProvince: !!input.customer.province,
+          hasPostalCode: !!input.customer.postalCode,
+        });
+      }
 
       const response = await this.client.request(mutation, { variables });
 
@@ -207,8 +262,8 @@ export class ShopifyService {
     }
 
     const mutation = `
-      mutation draftOrderComplete($id: ID!) {
-        draftOrderComplete(id: $id) {
+      mutation draftOrderComplete($id: ID!, $paymentPending: Boolean) {
+        draftOrderComplete(id: $id, paymentPending: $paymentPending) {
           draftOrder {
             id
             order {
@@ -226,6 +281,7 @@ export class ShopifyService {
 
     const variables = {
       id: draftOrderId,
+      paymentPending: false, // Mark as paid immediately so fulfillment can proceed
     };
 
     try {
@@ -267,16 +323,21 @@ export class ShopifyService {
       return { fulfillmentId, status: "SUCCESS" };
     }
 
-    // First, get the order's line items
+    // First, get the order's line items and check for existing fulfillments
     const queryOrder = `
       query getOrder($id: ID!) {
         order(id: $id) {
           id
+          fulfillments {
+            id
+            status
+          }
           lineItems(first: 250) {
             edges {
               node {
                 id
                 quantity
+                fulfillableQuantity
               }
             }
           }
@@ -285,17 +346,58 @@ export class ShopifyService {
     `;
 
     try {
-      // Get order line items
+      // Get order line items and fulfillments
       const orderResponse = await this.client.request(queryOrder, { variables: { id: orderId } });
-      if (orderResponse.errors || !orderResponse.data?.order) {
+      
+      // Check for GraphQL errors (errors can be an object with graphQLErrors array or a direct array)
+      const graphQLErrors = orderResponse.errors?.graphQLErrors || 
+                            (Array.isArray(orderResponse.errors) ? orderResponse.errors : []);
+      
+      if (graphQLErrors.length > 0) {
+        Logger.error("GraphQL errors when querying order", undefined, {
+          orderId,
+          errors: graphQLErrors,
+        });
+        throw new ShopifyServiceError(
+          `Failed to query order: ${graphQLErrors.map((e: { message: string }) => e.message).join(", ")}`,
+        );
+      }
+      
+      if (!orderResponse.data?.order) {
         throw new ShopifyServiceError(`Order ${orderId} not found`);
       }
+      
       const order = orderResponse.data.order;
 
-      const lineItems = order.lineItems.edges.map((edge: { node: { id: string; quantity: number } }) => ({
-        id: edge.node.id,
-        quantity: edge.node.quantity,
-      }));
+      // Check if order already has fulfillments (fulfillments is a plain list, not a connection)
+      const existingFulfillments = order.fulfillments || [];
+      if (existingFulfillments.length > 0) {
+        const firstFulfillment = existingFulfillments[0];
+        Logger.info("Order already has fulfillments, returning existing fulfillment", {
+          orderId,
+          fulfillmentId: firstFulfillment.id,
+          status: firstFulfillment.status,
+        });
+        return {
+          fulfillmentId: firstFulfillment.id,
+          status: firstFulfillment.status || "SUCCESS",
+        };
+      }
+
+      // Filter line items to only include fulfillable items
+      const fulfillableLineItems = order.lineItems.edges
+        .filter((edge: { node: { id: string; quantity: number; fulfillableQuantity: number } }) => {
+          const fulfillableQty = edge.node.fulfillableQuantity ?? edge.node.quantity;
+          return fulfillableQty > 0;
+        })
+        .map((edge: { node: { id: string; quantity: number; fulfillableQuantity: number } }) => ({
+          id: edge.node.id,
+          quantity: edge.node.fulfillableQuantity ?? edge.node.quantity,
+        }));
+
+      if (fulfillableLineItems.length === 0) {
+        throw new ShopifyServiceError("No fulfillable line items found in order");
+      }
 
       // Create fulfillment
       const mutation = `
@@ -316,19 +418,33 @@ export class ShopifyService {
       const variables = {
         fulfillment: {
           orderId: orderId,
-          lineItems: lineItems,
+          lineItems: fulfillableLineItems,
           notifyCustomer: false,
-          trackingInfo: {
-            number: "",
-            company: "",
-          },
         },
       };
 
       const response = await this.client.request(mutation, { variables });
 
+      // Check for GraphQL errors (errors can be an object with graphQLErrors array or a direct array)
+      const fulfillmentGraphQLErrors = response.errors?.graphQLErrors || 
+                                       (Array.isArray(response.errors) ? response.errors : []);
+      
+      if (fulfillmentGraphQLErrors.length > 0) {
+        Logger.error("GraphQL errors when creating fulfillment", undefined, {
+          orderId,
+          errors: fulfillmentGraphQLErrors,
+        });
+        throw new ShopifyServiceError(
+          `Failed to create fulfillment: ${fulfillmentGraphQLErrors.map((e: { message: string }) => e.message).join(", ")}`,
+        );
+      }
+
       if (response.data?.fulfillmentCreate?.userErrors?.length > 0) {
         const errors = response.data.fulfillmentCreate.userErrors;
+        Logger.error("User errors when creating fulfillment", undefined, {
+          orderId,
+          userErrors: errors,
+        });
         throw new ShopifyServiceError(
           `Failed to fulfill order: ${errors.map((e: { message: string }) => e.message).join(", ")}`,
           errors,
@@ -337,6 +453,12 @@ export class ShopifyService {
 
       const fulfillment = response.data?.fulfillmentCreate?.fulfillment;
       if (!fulfillment) {
+        // Log the full response for debugging
+        Logger.error("Fulfillment creation returned no data", undefined, {
+          orderId,
+          responseData: response.data,
+          responseErrors: response.errors,
+        });
         throw new ShopifyServiceError("Fulfillment creation returned no data");
       }
 

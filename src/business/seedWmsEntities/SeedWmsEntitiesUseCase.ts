@@ -23,7 +23,8 @@ export class SeedWmsEntitiesUseCase {
       }
 
       // Use actual data from Shopify order, with sensible defaults
-      const orderStatus = shopifyOrder.status || "fulfilled";
+      // Orders are paid but not fulfilled during seeding
+      const orderStatus = shopifyOrder.status || "paid";
       const customerName = shopifyOrder.customerName || "Seed Customer";
       const customerEmail = shopifyOrder.customerEmail || "seed@example.com";
 

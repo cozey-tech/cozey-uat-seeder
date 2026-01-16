@@ -123,6 +123,7 @@ export interface WmsRepository {
   createPrepPartItem(prepPartItem: CreatePrepPartItemRequest): Promise<unknown>;
   findPartBySku(sku: string, region: string): Promise<{ id: string; sku: string } | null>;
   findPartsBySkus(skus: string[], region: string): Promise<Map<string, { id: string; sku: string }>>;
+  findPartsByVariantIds(variantIds: string[], region: string): Promise<Map<string, Array<{ id: string; sku: string; quantity: number }>>>;
   findVariantBySku(sku: string, region: string): Promise<{ id: string; sku: string } | null>;
   findVariantsBySkus(skus: string[], region: string): Promise<Map<string, { id: string; sku: string }>>;
   findCustomerById(customerId: string): Promise<{ id: string; name: string; email?: string } | null>;

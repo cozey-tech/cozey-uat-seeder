@@ -237,9 +237,9 @@ export class WmsService {
     lineItems: Array<{ lineItemId: string; sku: string; quantity: number }>,
     region: string,
   ): Promise<Array<{ prepPartId: string; prepPartItemId: string; partId: string }>> {
-    // Batch lookup all parts at once (still run in dry-run for validation)
-    const skus = lineItems.map((item) => item.sku);
-    const partMap = await this.repository.findPartsBySkus(skus, region);
+    // Batch lookup all parts by variant IDs (through variantPart relationship)
+    const variantIds = preps.map((prep) => prep.variantId);
+    const partsByVariantId = await this.repository.findPartsByVariantIds(variantIds, region);
 
     const results: Array<{ prepPartId: string; prepPartItemId: string; partId: string }> = [];
 
@@ -249,54 +249,63 @@ export class WmsService {
         throw new WmsServiceError(`Line item not found: ${prep.lineItemId}`);
       }
 
-      const part = partMap.get(lineItem.sku);
-      if (!part) {
-        throw new WmsServiceError(`Part not found for SKU: ${lineItem.sku}`);
+      // Get all parts associated with this variant
+      const variantParts = partsByVariantId.get(prep.variantId) || [];
+      if (variantParts.length === 0) {
+        throw new WmsServiceError(`No parts found for variant ID: ${prep.variantId} (SKU: ${lineItem.sku})`);
       }
 
-      if (this.dryRun) {
-        const prepPartId = uuidv4();
-        const prepPartItemId = uuidv4();
-        Logger.info("DRY RUN: Would create prep part and item", {
+      // Create prep parts for each part in the variant
+      // The quantity for each prep part is: variantPart.quantity * lineItem.quantity
+      for (const variantPart of variantParts) {
+        const prepPartQuantity = variantPart.quantity * lineItem.quantity;
+
+        if (this.dryRun) {
+          const prepPartId = uuidv4();
+          const prepPartItemId = uuidv4();
+          Logger.info("DRY RUN: Would create prep part and item", {
+            prepId: prep.prepId,
+            prepPartId,
+            prepPartItemId,
+            partId: variantPart.id,
+            partSku: variantPart.sku,
+            variantPartQuantity: variantPart.quantity,
+            lineItemQuantity: lineItem.quantity,
+            prepPartQuantity,
+            region,
+          });
+          results.push({
+            prepPartId,
+            prepPartItemId,
+            partId: variantPart.id,
+          });
+          continue;
+        }
+
+        // Create prepPart
+        const prepPart = await this.repository.createPrepPart({
           prepId: prep.prepId,
-          prepPartId,
-          prepPartItemId,
-          partId: part.id,
-          sku: lineItem.sku,
-          quantity: lineItem.quantity,
-          region,
+          partId: variantPart.id,
+          quantity: prepPartQuantity,
+          region: region,
         });
+
+        const prepPartId = (prepPart as { id: string }).id;
+
+        // Create prepPartItem
+        const prepPartItem = await this.repository.createPrepPartItem({
+          prepPartId: prepPartId,
+          region: region as "CA" | "US",
+        });
+
+        const prepPartItemId = (prepPartItem as { id: string }).id;
+
         results.push({
-          prepPartId,
-          prepPartItemId,
-          partId: part.id,
+          prepPartId: prepPartId,
+          prepPartItemId: prepPartItemId,
+          partId: variantPart.id,
         });
-        continue;
       }
-
-      // Create prepPart
-      const prepPart = await this.repository.createPrepPart({
-        prepId: prep.prepId,
-        partId: part.id,
-        quantity: lineItem.quantity,
-        region: region,
-      });
-
-      const prepPartId = (prepPart as { id: string }).id;
-
-      // Create prepPartItem
-      const prepPartItem = await this.repository.createPrepPartItem({
-        prepPartId: prepPartId,
-        region: region as "CA" | "US",
-      });
-
-      const prepPartItemId = (prepPartItem as { id: string }).id;
-
-      results.push({
-        prepPartId: prepPartId,
-        prepPartItemId: prepPartItemId,
-        partId: part.id,
-      });
     }
 
     return results;

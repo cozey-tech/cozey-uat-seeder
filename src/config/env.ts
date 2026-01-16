@@ -13,6 +13,7 @@ export type EnvConfig = z.infer<typeof envSchema>;
 
 let cachedConfig: EnvConfig | null = null;
 let isInitialized = false;
+let secretsFromAws = false;
 
 /**
  * Get AWS configuration from environment variables
@@ -52,6 +53,43 @@ function loadEnvVars(): Partial<EnvConfig> {
 }
 
 /**
+ * Transform AWS secrets to use environment variable names instead of secret names
+ * When secrets are stored as plain strings (not JSON), AwsSecretsService uses the
+ * secret name as the key (e.g., "dev/uat-database-url"), but we need env var names
+ * (e.g., "DATABASE_URL") for validation.
+ *
+ * @param awsSecrets - Raw secrets from AWS (may have secret names as keys)
+ * @param databaseSecretName - Name of the database secret
+ * @param shopifySecretName - Name of the shopify secret
+ * @returns Transformed secrets with env var names as keys
+ */
+function transformAwsSecrets(
+  awsSecrets: Record<string, unknown>,
+  databaseSecretName: string,
+  shopifySecretName: string,
+): Record<string, unknown> {
+  const transformed: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(awsSecrets)) {
+    // If the key matches a secret name, it's a plain string secret that needs mapping
+    if (key === databaseSecretName) {
+      // Plain string database secret → DATABASE_URL
+      transformed.DATABASE_URL = value;
+    } else if (key === shopifySecretName) {
+      // Plain string shopify secret → SHOPIFY_ACCESS_TOKEN
+      // Note: If the shopify secret is JSON, it will already have correct keys
+      // and won't match this condition, so it will be copied as-is below
+      transformed.SHOPIFY_ACCESS_TOKEN = value;
+    } else {
+      // JSON secrets or other keys already have correct env var names, copy as-is
+      transformed[key] = value;
+    }
+  }
+
+  return transformed;
+}
+
+/**
  * Initialize environment configuration by loading from AWS Secrets Manager and .env files
  * This should be called once at application startup before any services are initialized
  */
@@ -71,9 +109,16 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
     try {
       const awsService = new AwsSecretsService(awsConfig.region, awsConfig.profile);
       const secretNames = [awsConfig.databaseSecretName, awsConfig.shopifySecretName];
-      awsSecrets = await awsService.fetchSecrets(secretNames);
+      const rawAwsSecrets = await awsService.fetchSecrets(secretNames);
 
-      if (awsSecrets) {
+      if (rawAwsSecrets) {
+        // Transform secret names to env var names (for plain string secrets)
+        awsSecrets = transformAwsSecrets(
+          rawAwsSecrets,
+          awsConfig.databaseSecretName,
+          awsConfig.shopifySecretName,
+        );
+        secretsFromAws = true;
         Logger.info("Loaded secrets from AWS Secrets Manager", {
           secretCount: Object.keys(awsSecrets).length,
           secrets: Object.keys(awsSecrets),
@@ -132,4 +177,14 @@ export function getEnvConfig(): EnvConfig {
   }
 
   return cachedConfig;
+}
+
+/**
+ * Check if secrets were successfully loaded from AWS Secrets Manager
+ * When secrets come from AWS, we trust them and skip staging pattern validation
+ *
+ * @returns true if secrets were loaded from AWS, false otherwise
+ */
+export function areSecretsFromAws(): boolean {
+  return secretsFromAws;
 }

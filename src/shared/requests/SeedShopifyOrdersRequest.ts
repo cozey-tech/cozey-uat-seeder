@@ -6,6 +6,10 @@ export const seedShopifyOrdersRequestSchema = z.object({
       customer: z.object({
         name: z.string(),
         email: z.string().email(),
+        address: z.string().optional(),
+        city: z.string().optional(),
+        province: z.string().optional(),
+        postalCode: z.string().optional(),
       }),
       lineItems: z.array(
         z.object({
@@ -16,6 +20,7 @@ export const seedShopifyOrdersRequestSchema = z.object({
     }),
   ),
   batchId: z.string().uuid(),
+  region: z.enum(["CA", "US"]).optional(), // Region for determining country code in shipping address
 });
 
 export type SeedShopifyOrdersRequest = z.infer<typeof seedShopifyOrdersRequestSchema>;

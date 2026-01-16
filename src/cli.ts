@@ -164,7 +164,7 @@ function initializeServices(dryRun: boolean): ServiceDependencies {
   const seedWmsEntitiesUseCase = new SeedWmsEntitiesUseCase(wmsService);
   const seedWmsEntitiesHandler = new SeedWmsEntitiesHandler(seedWmsEntitiesUseCase);
 
-  const createCollectionPrepUseCase = new CreateCollectionPrepUseCase(collectionPrepService);
+  const createCollectionPrepUseCase = new CreateCollectionPrepUseCase(collectionPrepService, prisma);
   const createCollectionPrepHandler = new CreateCollectionPrepHandler(createCollectionPrepUseCase);
 
   return {
@@ -245,6 +245,7 @@ async function executeSeedingFlow(
       })),
     })),
     batchId,
+    region: config.region || config.collectionPrep?.region || "CA",
   };
 
   const shopifyResult = await services.seedShopifyOrdersHandler.execute(shopifyRequest);
@@ -266,6 +267,7 @@ async function executeSeedingFlow(
       locationId: config.collectionPrep.locationId,
       region: config.collectionPrep.region,
       prepDate: config.collectionPrep.prepDate,
+      testTag: config.collectionPrep.testTag,
     };
 
     const collectionPrepResult = await services.createCollectionPrepHandler.execute(collectionPrepRequest);
@@ -289,7 +291,7 @@ async function executeSeedingFlow(
       return {
         shopifyOrderId: shopifyOrder.shopifyOrderId,
         shopifyOrderNumber: shopifyOrder.shopifyOrderNumber,
-        status: "fulfilled",
+        status: "paid", // Orders are paid but not fulfilled during seeding
         customerName: configOrder.customer.name,
         customerEmail: configOrder.customer.email,
         lineItems: lineItemsWithQuantity,

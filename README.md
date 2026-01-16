@@ -14,9 +14,36 @@ The seeder is **staging-only** and includes hard-coded guardrails to prevent exe
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
+- Node.js 20.13.0 (use nvm to manage versions - see below)
 - Access to staging WMS database
 - Access to staging Shopify store with Admin API credentials
+
+#### Node Version Management
+
+This project requires Node.js 20.13.0. We recommend using [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager) to manage Node versions.
+
+**Install nvm** (if not already installed):
+```bash
+# macOS/Linux
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+
+# Or using Homebrew on macOS
+brew install nvm
+```
+
+**Use the correct Node version:**
+```bash
+# Install Node 20.13.0 (if not already installed)
+nvm install 20.13.0
+
+# Use Node 20.13.0 for this project
+nvm use
+
+# Or set it as default
+nvm alias default 20.13.0
+```
+
+The project includes an `.nvmrc` file, so running `nvm use` in the project directory will automatically switch to the correct version.
 
 ### Installation
 
@@ -38,7 +65,7 @@ By default, the seeder attempts to fetch secrets from AWS Secrets Manager with a
 
 **Configuration options:**
 - `USE_AWS_SECRETS`: Enable/disable AWS secrets (default: `true`)
-- `AWS_REGION`: AWS region (default: `us-east-1`)
+- `AWS_REGION`: AWS region (default: `us-east-1`). **Important:** Check your secret ARNs in AWS Secrets Manager to determine the correct region (e.g., if ARN contains `us-east-2`, set `AWS_REGION=us-east-2`)
 - `AWS_PROFILE`: AWS profile name from `~/.aws/credentials` (optional, defaults to "default" profile)
 - `AWS_DATABASE_SECRET_NAME`: Custom database secret name (default: `dev/uat-database-url`)
 - `AWS_SHOPIFY_SECRET_NAME`: Custom Shopify secret name (default: `dev/shopify-access-token`)

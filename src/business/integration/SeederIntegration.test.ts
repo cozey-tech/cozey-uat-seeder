@@ -7,6 +7,7 @@ import { ShopifyService } from "../../services/ShopifyService";
 import { WmsService } from "../../services/WmsService";
 import { CollectionPrepService } from "../../services/CollectionPrepService";
 import type { WmsRepository } from "../../repositories/interface/WmsRepository";
+import type { PrismaClient } from "@prisma/client";
 
 /**
  * Integration tests for the full seeding flow
@@ -17,6 +18,7 @@ describe("Seeder Integration", () => {
   let mockWmsRepository: WmsRepository;
   let mockWmsService: WmsService;
   let mockCollectionPrepService: CollectionPrepService;
+  let mockPrisma: PrismaClient;
 
   beforeEach(() => {
     // Setup mocks for all services
@@ -34,6 +36,7 @@ describe("Seeder Integration", () => {
       createOrderWithCustomerTransaction: vi.fn(),
       findVariantsBySkus: vi.fn(),
       findPartsBySkus: vi.fn(),
+      findPartsByVariantIds: vi.fn(),
       createVariantOrder: vi.fn(),
       createPrep: vi.fn(),
       createPrepPart: vi.fn(),
@@ -41,6 +44,15 @@ describe("Seeder Integration", () => {
       createShipment: vi.fn(),
       createCollectionPrep: vi.fn(),
     } as unknown as WmsRepository;
+
+    mockPrisma = {
+      carriers: {
+        findUnique: vi.fn(),
+      },
+      location: {
+        findUnique: vi.fn(),
+      },
+    } as unknown as PrismaClient;
 
     mockWmsService = new WmsService(mockWmsRepository);
     mockCollectionPrepService = new CollectionPrepService(mockWmsRepository);
@@ -103,8 +115,8 @@ describe("Seeder Integration", () => {
       vi.mocked(mockWmsRepository.findVariantsBySkus).mockResolvedValue(
         new Map([["SKU-001", { id: "variant-1", sku: "SKU-001" }]]),
       );
-      vi.mocked(mockWmsRepository.findPartsBySkus).mockResolvedValue(
-        new Map([["SKU-001", { id: "part-1", sku: "SKU-001" }]]),
+      vi.mocked(mockWmsRepository.findPartsByVariantIds).mockResolvedValue(
+        new Map([["variant-1", [{ id: "part-1", sku: "PART-SKU-001", quantity: 1 }]]]),
       );
       vi.mocked(mockWmsRepository.createVariantOrder).mockResolvedValue({} as never);
       vi.mocked(mockWmsRepository.createPrep).mockResolvedValue({} as never);
@@ -131,10 +143,30 @@ describe("Seeder Integration", () => {
       expect(wmsResponse.orders).toHaveLength(1);
 
       // Step 3: Create collection prep
-      const collectionPrepUseCase = new CreateCollectionPrepUseCase(mockCollectionPrepService);
+      // Mock Prisma queries for carrier and location
+      vi.mocked(mockPrisma.carriers.findUnique).mockResolvedValue({
+        id: "UPS",
+        name: "UPS",
+        region: "CA",
+        postalCodes: [],
+        updatedAt: new Date(),
+        createdAt: new Date(),
+      });
+
+      vi.mocked(mockPrisma.location.findUnique).mockResolvedValue({
+        id: "loc-123",
+        name: "Test Location",
+        region: "CA",
+        provinces: [],
+        allowDynamicEstimates: false,
+        allowPrepCreation: false,
+        priorityLocations: [],
+      });
+
+      const collectionPrepUseCase = new CreateCollectionPrepUseCase(mockCollectionPrepService, mockPrisma);
 
       vi.mocked(mockWmsRepository.createCollectionPrep).mockResolvedValue({
-        id: "cp-123",
+        id: "Test-Ups-TestLocation-1234",
         region: "CA",
         carrier: "UPS",
         locationId: "loc-123",
@@ -148,9 +180,10 @@ describe("Seeder Integration", () => {
         locationId: "loc-123",
         region: "CA",
         prepDate: "2026-01-15T10:00:00Z",
+        testTag: "Test",
       });
 
-      expect(collectionPrepResponse.collectionPrepId).toBe("cp-123");
+      expect(collectionPrepResponse.collectionPrepId).toMatch(/^Test-Ups-TestLocation-[0-9A-F]{4}$/);
     });
 
     it("should handle idempotency - skip existing orders", async () => {

@@ -406,19 +406,19 @@ export class InteractivePromptService {
   /**
    * Prompt for collection prep count with suggestion
    */
-  async promptCollectionPrepCount(orderCount: number): Promise<number> {
+  async promptCollectionPrepCount(orderCount: number, hasCarriers: boolean = true): Promise<number> {
     const suggested = Math.max(1, Math.ceil(orderCount / 5)); // Suggest 1 prep per 5 orders
 
     const { count } = await inquirer.prompt<{ count: string }>([
       {
         type: "input",
         name: "count",
-        message: `How many collection preps would you like to create?`,
-        default: suggested.toString(),
+        message: `How many collection preps would you like to create?${!hasCarriers ? " (Enter 0 to skip - no carriers available)" : ""}`,
+        default: hasCarriers ? suggested.toString() : "0",
         validate: (input: string): boolean | string => {
           const num = parseInt(input, 10);
-          if (isNaN(num) || !Number.isInteger(num) || num < 1) {
-            return "Please enter a positive integer (minimum 1)";
+          if (isNaN(num) || !Number.isInteger(num) || num < 0) {
+            return "Please enter a non-negative integer (minimum 0)";
           }
           if (num > orderCount) {
             return `Cannot have more collection preps than orders (${orderCount})`;
@@ -454,6 +454,34 @@ export class InteractivePromptService {
     }
 
     return carrier;
+  }
+
+  /**
+   * Prompt for test tag for collection prep naming
+   */
+  async promptTestTag(): Promise<string> {
+    const { testTag } = await inquirer.prompt<{ testTag: string }>([
+      {
+        type: "input",
+        name: "testTag",
+        message: "Enter test tag for collection prep name (e.g., 'Outbound_Compliance'):",
+        default: "Outbound_Compliance",
+        validate: (input: string): boolean | string => {
+          const trimmed = input.trim();
+          if (!trimmed) {
+            return "Test tag cannot be empty";
+          }
+          // Allow alphanumeric, underscores, and hyphens
+          if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+            return "Test tag can only contain letters, numbers, underscores, and hyphens";
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    return testTag;
   }
 
   /**
