@@ -263,6 +263,29 @@ describe("ShopifyService", () => {
     });
   });
 
+  describe("formatBatchTag", () => {
+    it("should format short batch IDs correctly", () => {
+      const tag = service.formatBatchTag("batch-123");
+      expect(tag).toBe("seed_batch_id:batch-123");
+      expect(tag.length).toBeLessThanOrEqual(40);
+    });
+
+    it("should truncate long batch IDs to fit 40 character limit", () => {
+      const longBatchId = "d7ce8ef2-712d-40b8-ba0e-994ea84e25e8"; // 36 char UUID
+      const tag = service.formatBatchTag(longBatchId);
+      // Prefix is 14 chars, so batchId gets 26 chars: "d7ce8ef2-712d-40b8-ba0e-99"
+      expect(tag).toBe("seed_batch_id:d7ce8ef2-712d-40b8-ba0e-99");
+      expect(tag.length).toBe(40);
+    });
+
+    it("should handle batch IDs exactly at the limit", () => {
+      const batchId = "a".repeat(26); // 26 chars (prefix is 14, total = 40)
+      const tag = service.formatBatchTag(batchId);
+      expect(tag).toBe(`seed_batch_id:${batchId}`);
+      expect(tag.length).toBe(40);
+    });
+  });
+
   describe("queryOrdersByTag", () => {
     it("should return orders with line items", async () => {
       mockClient.request.mockResolvedValueOnce({

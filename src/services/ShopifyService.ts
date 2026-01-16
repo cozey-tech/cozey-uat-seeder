@@ -78,6 +78,24 @@ export class ShopifyService {
   }
 
   /**
+   * Formats a batch tag for Shopify (ensures it doesn't exceed 40 character limit)
+   * @param batchId - Unique batch ID
+   * @returns Tag string truncated to 40 characters
+   */
+  formatBatchTag(batchId: string): string {
+    const prefix = "seed_batch_id:";
+    const maxTagLength = 40;
+    const maxBatchIdLength = maxTagLength - prefix.length;
+    
+    // Truncate batchId if needed to fit within 40 character limit
+    const truncatedBatchId = batchId.length > maxBatchIdLength 
+      ? batchId.substring(0, maxBatchIdLength)
+      : batchId;
+    
+    return `${prefix}${truncatedBatchId}`;
+  }
+
+  /**
    * Creates a draft order in Shopify
    *
    * @param input - Customer and line items for the draft order
@@ -138,7 +156,7 @@ export class ShopifyService {
         input: {
           email: input.customer.email,
           note: `WMS Seed Order - Batch: ${batchId}`,
-          tags: [`wms_seed`, `seed_batch_id:${batchId}`],
+          tags: [`wms_seed`, this.formatBatchTag(batchId)],
           customAttributes: [
             {
               key: "seed_batch_id",

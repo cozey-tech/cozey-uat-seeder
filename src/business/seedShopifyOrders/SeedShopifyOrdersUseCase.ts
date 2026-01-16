@@ -29,7 +29,9 @@ export class SeedShopifyOrdersUseCase {
         const fulfillmentResult = await this.shopifyService.fulfillOrder(orderResult.orderId);
 
         // Query order to get line item IDs
-        const orderQueryResults = await this.shopifyService.queryOrdersByTag(`seed_batch_id:${request.batchId}`);
+        // Use the same tag format as when creating the order (truncated to 40 chars)
+        const batchTag = this.shopifyService.formatBatchTag(request.batchId);
+        const orderQueryResults = await this.shopifyService.queryOrdersByTag(batchTag);
         const createdOrder = orderQueryResults.find((o) => o.orderId === orderResult.orderId);
 
         // In dry-run mode, queryOrdersByTag returns empty array, so construct from input
