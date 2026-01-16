@@ -59,18 +59,20 @@ export class DataValidationService {
       }
     }
 
-    // Query parts by SKU
-    const parts = await this.prisma.part.findMany({
+    // Query variants by SKU (config uses variant SKUs, not part SKUs)
+    const region = config.region || config.collectionPrep?.region || "CA";
+    const variants = await this.prisma.variant.findMany({
       where: {
         sku: { in: Array.from(allSkus) },
-        region: config.region || config.collectionPrep?.region || "CA", // Use region from config, collectionPrep, or default
+        region,
+        disabled: false,
       },
       select: {
         sku: true,
       },
     });
 
-    const existingSkus = new Set(parts.map((p) => p.sku));
+    const existingSkus = new Set(variants.map((v) => v.sku));
     const missingSkus = Array.from(allSkus).filter((sku) => !existingSkus.has(sku));
 
     if (missingSkus.length > 0) {

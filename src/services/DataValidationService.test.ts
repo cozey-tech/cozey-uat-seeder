@@ -7,7 +7,7 @@ import { PickType } from "../shared/enums/PickType";
 
 describe("DataValidationService", () => {
   let mockPrisma: {
-    part: {
+    variant: {
       findMany: ReturnType<typeof vi.fn>;
     };
   };
@@ -15,7 +15,7 @@ describe("DataValidationService", () => {
 
   beforeEach(() => {
     mockPrisma = {
-      part: {
+      variant: {
         findMany: vi.fn(),
       },
     };
@@ -42,7 +42,7 @@ describe("DataValidationService", () => {
         ],
       };
 
-      mockPrisma.part.findMany.mockResolvedValue([
+      mockPrisma.variant.findMany.mockResolvedValue([
         { sku: "SKU-001" },
       ]);
 
@@ -73,7 +73,7 @@ describe("DataValidationService", () => {
         ],
       };
 
-      mockPrisma.part.findMany.mockResolvedValue([
+      mockPrisma.variant.findMany.mockResolvedValue([
         { sku: "SKU-001" },
       ]);
 
@@ -100,7 +100,7 @@ describe("DataValidationService", () => {
         ],
       };
 
-      mockPrisma.part.findMany.mockResolvedValue([
+      mockPrisma.variant.findMany.mockResolvedValue([
         { sku: "SKU-001" },
       ]);
 
@@ -127,7 +127,7 @@ describe("DataValidationService", () => {
         ],
       };
 
-      mockPrisma.part.findMany.mockResolvedValue([
+      mockPrisma.variant.findMany.mockResolvedValue([
         { sku: "SKU-001" },
       ]);
 
@@ -154,7 +154,7 @@ describe("DataValidationService", () => {
         ],
       };
 
-      mockPrisma.part.findMany.mockResolvedValue([
+      mockPrisma.variant.findMany.mockResolvedValue([
         { sku: "SKU-001" },
       ]);
 
@@ -196,7 +196,7 @@ describe("DataValidationService", () => {
         },
       };
 
-      mockPrisma.part.findMany.mockResolvedValue([
+      mockPrisma.variant.findMany.mockResolvedValue([
         { sku: "SKU-001" },
       ]);
 
