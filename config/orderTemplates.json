@@ -1,24 +1,24 @@
 {
   "templates": [
     {
-      "id": "sofa-2x",
-      "name": "2 Sofas",
-      "description": "Two sofas of the same model",
+      "id": "regular-2x",
+      "name": "2 Regular Items",
+      "description": "Two regular fulfillment items of the same model",
       "lineItems": [
         {
-          "sku": "1+2+1049-0-0-800",
+          "sku": "42024-101-1",
           "quantity": 2,
           "pickType": "Regular"
         }
       ]
     },
     {
-      "id": "sofa-1x",
-      "name": "1 Sofa",
-      "description": "Single sofa order",
+      "id": "regular-1x",
+      "name": "1 Regular Item",
+      "description": "Single regular fulfillment item",
       "lineItems": [
         {
-          "sku": "1+2+1049-0-0-800",
+          "sku": "42024-101-1",
           "quantity": 1,
           "pickType": "Regular"
         }
@@ -27,15 +27,15 @@
     {
       "id": "mixed-order",
       "name": "Mixed Order",
-      "description": "1 Regular Sofa + 1 Pick and Pack item (Regular + Pick and Pack)",
+      "description": "1 Regular item + 1 Pick and Pack item (Regular + Pick and Pack)",
       "lineItems": [
         {
-          "sku": "1+2+1049-0-0-800",
+          "sku": "42024-101-1",
           "quantity": 1,
           "pickType": "Regular"
         },
         {
-          "sku": "1+2+1001-0-0-700",
+          "sku": "LEG-2102-111-1",
           "quantity": 1,
           "pickType": "Pick and Pack"
         }
@@ -47,7 +47,7 @@
       "description": "Order with only Pick and Pack items",
       "lineItems": [
         {
-          "sku": "1+2+1001-0-0-700",
+          "sku": "LEG-2102-111-1",
           "quantity": 2,
           "pickType": "Pick and Pack"
         }
@@ -59,12 +59,12 @@
       "description": "Order with only regular fulfillment items",
       "lineItems": [
         {
-          "sku": "1+2+1049-0-0-800",
+          "sku": "42024-101-1",
           "quantity": 1,
           "pickType": "Regular"
         },
         {
-          "sku": "1+2+1049-0-0-900",
+          "sku": "42023-101-1",
           "quantity": 1,
           "pickType": "Regular"
         }
@@ -76,29 +76,29 @@
       "description": "Multiple items of different types",
       "lineItems": [
         {
-          "sku": "1+2+1049-0-0-800",
+          "sku": "42024-101-1",
           "quantity": 2,
           "pickType": "Regular"
         },
         {
-          "sku": "1+2+1001-0-0-700",
+          "sku": "LEG-2102-111-1",
           "quantity": 2,
           "pickType": "Pick and Pack"
         }
       ]
     },
     {
-      "id": "sofa-chair-combo",
-      "name": "Sofa Combo",
-      "description": "1 Regular Sofa + 1 Pick and Pack item",
+      "id": "regular-pnp-combo",
+      "name": "Regular + Pick and Pack Combo",
+      "description": "1 Regular item + 1 Pick and Pack item",
       "lineItems": [
         {
-          "sku": "1+2+1049-0-0-800",
+          "sku": "42024-101-1",
           "quantity": 1,
           "pickType": "Regular"
         },
         {
-          "sku": "1+2+1001-0-0-700",
+          "sku": "LEG-2102-111-1",
           "quantity": 1,
           "pickType": "Pick and Pack"
         }
@@ -110,12 +110,12 @@
       "description": "Multiple Pick and Pack items",
       "lineItems": [
         {
-          "sku": "1+2+1001-0-0-700",
+          "sku": "LEG-2102-111-1",
           "quantity": 2,
           "pickType": "Pick and Pack"
         },
         {
-          "sku": "1+2+1001-0-0-701",
+          "sku": "LEG-2202-111-1",
           "quantity": 1,
           "pickType": "Pick and Pack"
         }

@@ -115,17 +115,36 @@ function filterValidTemplates(
   // Create a set of valid SKUs for quick lookup
   const validSkus = new Set(variants.map((v) => v.sku));
   
-  const validTemplates = templates.filter((template) => {
-    // Check if all SKUs in template exist in available variants
-    // Note: We don't validate pickType here - the variant's pickType from database will be used when building orders
-    return template.lineItems.every((item) => validSkus.has(item.sku));
-  });
+  const validTemplates: OrderTemplate[] = [];
+  const invalidTemplates: Array<{ template: OrderTemplate; reasons: string[] }> = [];
 
-  const invalidCount = templates.length - validTemplates.length;
-  if (invalidCount > 0) {
-    console.warn(
-      `⚠️  Filtered out ${invalidCount} template(s) with invalid SKUs for this region`,
-    );
+  for (const template of templates) {
+    const reasons: string[] = [];
+    
+    // Check each line item in the template
+    for (const item of template.lineItems) {
+      if (!validSkus.has(item.sku)) {
+        reasons.push(`SKU "${item.sku}" not found in database for this region`);
+      }
+    }
+
+    if (reasons.length === 0) {
+      validTemplates.push(template);
+    } else {
+      invalidTemplates.push({ template, reasons });
+    }
+  }
+
+  // Report invalid templates with detailed error messages
+  if (invalidTemplates.length > 0) {
+    console.warn(`\n⚠️  Filtered out ${invalidTemplates.length} invalid template(s):`);
+    for (const { template, reasons } of invalidTemplates) {
+      console.warn(`   ❌ Template "${template.name}" (${template.id}):`);
+      for (const reason of reasons) {
+        console.warn(`      - ${reason}`);
+      }
+    }
+    console.warn("");
   }
 
   return validTemplates;
