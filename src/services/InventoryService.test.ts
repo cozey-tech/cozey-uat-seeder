@@ -61,6 +61,8 @@ describe("InventoryService", () => {
           colorId: "BLK",
           shopifyIds: ["shopify-1"],
           region: "CA",
+          description: "Sofa - Black",
+          pickType: "Regular",
         },
       ];
 
@@ -113,6 +115,8 @@ describe("InventoryService", () => {
           colorId: "BLK",
           shopifyIds: ["shopify-1"],
           region: "CA",
+          description: "Sofa - Black",
+          pickType: "Regular",
         },
       ];
 
@@ -165,6 +169,8 @@ describe("InventoryService", () => {
           colorId: "BLK",
           shopifyIds: ["shopify-1"],
           region: "CA",
+          description: "Sofa - Black",
+          pickType: "Regular",
         },
       ];
 
@@ -208,6 +214,8 @@ describe("InventoryService", () => {
           colorId: "BLK",
           shopifyIds: ["shopify-1"],
           region: "CA",
+          description: "Sofa - Black",
+          pickType: "Regular",
         },
       ];
 
@@ -336,6 +344,7 @@ describe("InventoryService", () => {
         colorId: "BLK",
         shopifyIds: ["shopify-1"],
         region: "CA",
+        description: "Sofa - Black",
         disabled: false,
       };
 
@@ -395,13 +404,15 @@ describe("InventoryService", () => {
         colorId: "BLK",
         shopifyIds: ["shopify-1"],
         region: "CA",
+        description: "Sofa - Black",
         disabled: false,
       };
 
       // Mock variant.findMany (called once in ensureInventoryForOrder)
       mockPrisma.variant.findMany.mockResolvedValue([variant]);
 
-      // Mock variantPart.findMany - will be called twice (before and after modification)
+      // Mock variantPart.findMany for pickType lookup (called in ensureInventoryForOrder)
+      // Then called twice in checkInventoryAvailability (before and after modification)
       const variantPartData = [
         {
           variantId: "variant-1",
@@ -410,6 +421,7 @@ describe("InventoryService", () => {
           part: {
             id: "part-1",
             sku: "PART-001",
+            pickType: "Regular",
           },
           variant: {
             id: "variant-1",
@@ -418,9 +430,10 @@ describe("InventoryService", () => {
         },
       ];
 
-      // Setup mocks to handle two calls to checkInventoryAvailability
+      // Setup mocks: first for pickType lookup, then two for inventory checks
       mockPrisma.variantPart.findMany
-        .mockResolvedValueOnce(variantPartData) // First check
+        .mockResolvedValueOnce(variantPartData) // PickType lookup in ensureInventoryForOrder
+        .mockResolvedValueOnce(variantPartData) // First checkInventoryAvailability
         .mockResolvedValueOnce(variantPartData); // Re-check after modification
 
       // First check - insufficient inventory

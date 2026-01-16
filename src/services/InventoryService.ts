@@ -175,14 +175,54 @@ export class InventoryService {
     region: string,
   ): Promise<InventoryCheckResult> {
     // First, get variants for the SKUs in the order
+    // We need to get pickType from parts, so we'll use ConfigDataRepository
+    // For now, we'll fetch variants and determine pickType
     const skus = order.lineItems.map((item) => item.sku);
-    const variants = await this.prisma.variant.findMany({
+    const variantRecords = await this.prisma.variant.findMany({
       where: {
         sku: { in: skus },
         region,
         disabled: false,
       },
     });
+
+    // Convert to Variant type with pickType
+    const variants: Variant[] = await Promise.all(
+      variantRecords.map(async (v) => {
+        // Get pickType from parts
+        const variantParts = await this.prisma.variantPart.findMany({
+          where: { variantId: v.id },
+          include: { part: { select: { pickType: true } } },
+        });
+
+        let pickType: "Regular" | "Pick and Pack" = "Regular";
+        if (variantParts.length > 0) {
+          const pickTypeCounts = new Map<string, number>();
+          for (const vp of variantParts) {
+            const pt = vp.part.pickType;
+            pickTypeCounts.set(pt, (pickTypeCounts.get(pt) || 0) + 1);
+          }
+          let maxCount = 0;
+          for (const [pt, count] of pickTypeCounts.entries()) {
+            if (count > maxCount) {
+              maxCount = count;
+              pickType = pt as "Regular" | "Pick and Pack";
+            }
+          }
+        }
+
+        return {
+          id: v.id,
+          sku: v.sku,
+          modelName: v.modelName,
+          colorId: v.colorId,
+          shopifyIds: v.shopifyIds,
+          region: v.region,
+          description: v.description,
+          pickType,
+        };
+      }),
+    );
 
     // Create map of SKU to quantity from order line items
     // Sum quantities for duplicate SKUs (same SKU can appear in multiple line items)

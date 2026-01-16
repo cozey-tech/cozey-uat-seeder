@@ -10,7 +10,13 @@
  * 4. Validating output before saving
  */
 
-import "dotenv/config";
+import { config } from "dotenv";
+import { resolve } from "path";
+
+// Load .env first, then .env.local (which will override .env values)
+config({ path: resolve(process.cwd(), ".env") });
+config({ path: resolve(process.cwd(), ".env.local"), override: true });
+
 import { PrismaClient } from "@prisma/client";
 import { writeFileSync, existsSync, accessSync, constants } from "fs";
 import { ConfigDataRepository } from "./repositories/ConfigDataRepository";

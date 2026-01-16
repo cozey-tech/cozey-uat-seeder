@@ -21,6 +21,9 @@ export interface Variant {
   colorId: string;
   shopifyIds: string[];
   region: string;
+  description: string;
+  pickType: "Regular" | "Pick and Pack";
+  configuration?: string; // Extracted from description for modular products
 }
 
 export interface Location {
@@ -52,7 +55,88 @@ export class ConfigDataRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   /**
-   * Get all available variants for a region, grouped by model/color
+   * Extract configuration from variant description
+   * For modular products, configuration is typically the main part of the description
+   * before color/model details
+   */
+  private extractConfiguration(description: string, modelName: string, colorId: string): string | undefined {
+    // Remove common prefixes/suffixes and extract the configuration part
+    // Examples:
+    // "3-Seater With Corner L - With Ottoman & 2 Lounging Chaises - Obsidian - Original"
+    // -> "3-Seater With Corner L - With Ottoman & 2 Lounging Chaises"
+    // "Altitude - Dove - Storage - Modules - Wall Shelf - 1 unit (S1)"
+    // -> "Storage - Modules - Wall Shelf - 1 unit (S1)"
+    
+    let config = description;
+    
+    // Remove color name if present
+    const colorPattern = new RegExp(`\\s*-\\s*${colorId.replace(/-/g, "\\-")}\\s*-`, "i");
+    config = config.replace(colorPattern, " - ");
+    
+    // Remove model name if at the start
+    const modelPattern = new RegExp(`^${modelName}\\s*-\\s*`, "i");
+    config = config.replace(modelPattern, "");
+    
+    // Remove common suffixes like " - Original", " - Square", " - REFURBISHED", etc.
+    config = config.replace(/\s*-\s*(Original|Square|REFURBISHED|DONATION).*$/i, "");
+    
+    // Remove leading/trailing dashes and whitespace
+    config = config.replace(/^[\s-]+|[\s-]+$/g, "").trim();
+    
+    // If the result is too short or just the model/color, return undefined
+    if (config.length < 10 || config.toLowerCase() === modelName.toLowerCase() || config.toLowerCase() === colorId.toLowerCase()) {
+      return undefined;
+    }
+    
+    return config;
+  }
+
+  /**
+   * Get pickType for a variant by checking its parts
+   * If variant has multiple parts with different pickTypes, use the most common one
+   * Defaults to "Regular" if no parts found
+   */
+  private async getVariantPickType(variantId: string): Promise<"Regular" | "Pick and Pack"> {
+    const variantParts = await this.prisma.variantPart.findMany({
+      where: {
+        variantId,
+      },
+      include: {
+        part: {
+          select: {
+            pickType: true,
+          },
+        },
+      },
+    });
+
+    if (variantParts.length === 0) {
+      return "Regular"; // Default
+    }
+
+    // Count pickTypes
+    const pickTypeCounts = new Map<string, number>();
+    for (const vp of variantParts) {
+      const pickType = vp.part.pickType;
+      pickTypeCounts.set(pickType, (pickTypeCounts.get(pickType) || 0) + 1);
+    }
+
+    // Return the most common pickType, defaulting to "Regular"
+    let maxCount = 0;
+    let mostCommonPickType = "Regular";
+    for (const [pickType, count] of pickTypeCounts.entries()) {
+      if (count > maxCount) {
+        maxCount = count;
+        mostCommonPickType = pickType;
+      }
+    }
+
+    return mostCommonPickType as "Regular" | "Pick and Pack";
+  }
+
+  /**
+   * Get all available variants for a region with pickType and configuration
+   * Variants are grouped by: model > color > configuration > variant
    */
   async getAvailableVariants(region: string): Promise<Variant[]> {
     const variants = await this.prisma.variant.findMany({
@@ -67,22 +151,37 @@ export class ConfigDataRepository {
         colorId: true,
         shopifyIds: true,
         region: true,
+        description: true,
       },
       orderBy: [
         { modelName: "asc" },
         { colorId: "asc" },
+        { description: "asc" },
         { sku: "asc" },
       ],
     });
 
-    return variants.map((v) => ({
-      id: v.id,
-      sku: v.sku,
-      modelName: v.modelName,
-      colorId: v.colorId,
-      shopifyIds: v.shopifyIds,
-      region: v.region,
-    }));
+    // Get pickType for each variant
+    const variantsWithPickType = await Promise.all(
+      variants.map(async (v) => {
+        const pickType = await this.getVariantPickType(v.id);
+        const configuration = this.extractConfiguration(v.description, v.modelName, v.colorId);
+        
+        return {
+          id: v.id,
+          sku: v.sku,
+          modelName: v.modelName,
+          colorId: v.colorId,
+          shopifyIds: v.shopifyIds,
+          region: v.region,
+          description: v.description,
+          pickType,
+          configuration,
+        };
+      }),
+    );
+
+    return variantsWithPickType;
   }
 
   /**

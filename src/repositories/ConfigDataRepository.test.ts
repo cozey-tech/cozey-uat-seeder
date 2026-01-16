@@ -21,6 +21,9 @@ describe("ConfigDataRepository", () => {
       findMany: ReturnType<typeof vi.fn>;
       findFirst: ReturnType<typeof vi.fn>;
     };
+    variantPart: {
+      findMany: ReturnType<typeof vi.fn>;
+    };
     location: {
       findMany: ReturnType<typeof vi.fn>;
       findUnique: ReturnType<typeof vi.fn>;
@@ -35,6 +38,9 @@ describe("ConfigDataRepository", () => {
       variant: {
         findMany: vi.fn(),
         findFirst: vi.fn(),
+      },
+      variantPart: {
+        findMany: vi.fn(),
       },
       location: {
         findMany: vi.fn(),
@@ -58,6 +64,7 @@ describe("ConfigDataRepository", () => {
           colorId: "BLK",
           shopifyIds: ["shopify-1"],
           region: "CA",
+          description: "Sofa - Black",
         },
         {
           id: "variant-2",
@@ -66,16 +73,33 @@ describe("ConfigDataRepository", () => {
           colorId: "WHT",
           shopifyIds: ["shopify-2"],
           region: "CA",
+          description: "Sofa - White",
         },
       ];
 
       mockPrisma.variant.findMany.mockResolvedValue(mockVariants);
+      // Mock variantPart.findMany for pickType lookup (called for each variant)
+      mockPrisma.variantPart.findMany
+        .mockResolvedValueOnce([
+          {
+            variantId: "variant-1",
+            part: { pickType: "Regular" },
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            variantId: "variant-2",
+            part: { pickType: "Regular" },
+          },
+        ]);
 
       const result = await repository.getAvailableVariants("CA");
 
       expect(result).toHaveLength(2);
       expect(result[0].sku).toBe("SOFA-001-BLK");
+      expect(result[0].pickType).toBe("Regular");
       expect(result[1].sku).toBe("SOFA-001-WHT");
+      expect(result[1].pickType).toBe("Regular");
       expect(mockPrisma.variant.findMany).toHaveBeenCalledWith({
         where: {
           region: "CA",
@@ -88,10 +112,12 @@ describe("ConfigDataRepository", () => {
           colorId: true,
           shopifyIds: true,
           region: true,
+          description: true,
         },
         orderBy: [
           { modelName: "asc" },
           { colorId: "asc" },
+          { description: "asc" },
           { sku: "asc" },
         ],
       });

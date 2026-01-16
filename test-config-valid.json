@@ -1,0 +1,30 @@
+{
+  "collectionPrep": {
+    "carrier": "UPS",
+    "locationId": "loc-123",
+    "region": "CA",
+    "prepDate": "2026-01-20T10:00:00Z"
+  },
+  "orders": [
+    {
+      "orderType": "regular-only",
+      "customer": {
+        "name": "Test Customer",
+        "email": "test@example.com"
+      },
+      "lineItems": [
+        {
+          "sku": "SKU-001",
+          "quantity": 2,
+          "pickType": "Regular",
+          "hasBarcode": true
+        },
+        {
+          "sku": "SKU-002",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ]
+    }
+  ]
+}

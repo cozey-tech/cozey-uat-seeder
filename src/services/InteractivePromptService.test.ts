@@ -19,6 +19,8 @@ describe("InteractivePromptService", () => {
   beforeEach(() => {
     service = new InteractivePromptService();
     vi.clearAllMocks();
+    // Mock console.log to avoid cluttering test output
+    vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
   describe("promptOrderCount", () => {
@@ -145,7 +147,7 @@ describe("InteractivePromptService", () => {
   });
 
   describe("promptVariantSelection", () => {
-    it("should return selected variants", async () => {
+    it("should return selected variants with hierarchical selection", async () => {
       const variants: Variant[] = [
         {
           id: "variant-1",
@@ -154,6 +156,8 @@ describe("InteractivePromptService", () => {
           colorId: "BLK",
           shopifyIds: ["shopify-1"],
           region: "CA",
+          description: "Sofa - Black",
+          pickType: "Regular",
         },
         {
           id: "variant-2",
@@ -162,15 +166,122 @@ describe("InteractivePromptService", () => {
           colorId: "WHT",
           shopifyIds: ["shopify-2"],
           region: "CA",
+          description: "Sofa - White",
+          pickType: "Regular",
+        },
+        {
+          id: "variant-3",
+          sku: "CHAIR-001-BLK",
+          modelName: "Chair",
+          colorId: "BLK",
+          shopifyIds: ["shopify-3"],
+          region: "CA",
+          description: "Chair - Black",
+          pickType: "Pick and Pack",
         },
       ];
 
-      vi.mocked(inquirer.prompt).mockResolvedValue({ variantIds: ["variant-1", "variant-2"] });
+      // Mock the new hierarchical flow:
+      // 1. Search input (empty to show all)
+      // 2. Model selection
+      // 3. Color selection (single select)
+      // 4. Configuration selection (auto if only one)
+      // 5. Variant selection (checkbox)
+      // 6. Add more products (false)
+      vi.mocked(inquirer.prompt)
+        .mockResolvedValueOnce({ searchInput: "" }) // Search step
+        .mockResolvedValueOnce({ selectedModel: "Sofa" }) // Model selection
+        .mockResolvedValueOnce({ selectedColor: "BLK" }) // Color selection
+        .mockResolvedValueOnce({ selectedVariantSkus: ["SOFA-001-BLK"] }) // Variant selection
+        .mockResolvedValueOnce({ addMore: false }); // Don't add more
+
+      const result = await service.promptVariantSelection(variants);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("variant-1");
+      expect(inquirer.prompt).toHaveBeenCalledTimes(5);
+    });
+
+    it("should support filtering models by search term", async () => {
+      const variants: Variant[] = [
+        {
+          id: "variant-1",
+          sku: "SOFA-001-BLK",
+          modelName: "Sofa",
+          colorId: "BLK",
+          shopifyIds: ["shopify-1"],
+          region: "CA",
+          description: "Sofa - Black",
+          pickType: "Regular",
+        },
+        {
+          id: "variant-3",
+          sku: "CHAIR-001-BLK",
+          modelName: "Chair",
+          colorId: "BLK",
+          shopifyIds: ["shopify-3"],
+          region: "CA",
+          description: "Chair - Black",
+          pickType: "Pick and Pack",
+        },
+      ];
+
+      // Search for "Sofa" to filter
+      vi.mocked(inquirer.prompt)
+        .mockResolvedValueOnce({ searchInput: "Sofa" }) // Search step
+        .mockResolvedValueOnce({ selectedModel: "Sofa" }) // Model selection
+        .mockResolvedValueOnce({ selectedColor: "BLK" }) // Color selection
+        .mockResolvedValueOnce({ selectedVariantSkus: ["SOFA-001-BLK"] }) // Variant selection
+        .mockResolvedValueOnce({ addMore: false }); // Don't add more
+
+      const result = await service.promptVariantSelection(variants);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("variant-1");
+    });
+
+    it("should allow adding multiple products", async () => {
+      const variants: Variant[] = [
+        {
+          id: "variant-1",
+          sku: "SOFA-001-BLK",
+          modelName: "Sofa",
+          colorId: "BLK",
+          shopifyIds: ["shopify-1"],
+          region: "CA",
+          description: "Sofa - Black",
+          pickType: "Regular",
+        },
+        {
+          id: "variant-3",
+          sku: "CHAIR-001-BLK",
+          modelName: "Chair",
+          colorId: "BLK",
+          shopifyIds: ["shopify-3"],
+          region: "CA",
+          description: "Chair - Black",
+          pickType: "Pick and Pack",
+        },
+      ];
+
+      // First product
+      vi.mocked(inquirer.prompt)
+        .mockResolvedValueOnce({ searchInput: "" })
+        .mockResolvedValueOnce({ selectedModel: "Sofa" })
+        .mockResolvedValueOnce({ selectedColor: "BLK" })
+        .mockResolvedValueOnce({ selectedVariantSkus: ["SOFA-001-BLK"] })
+        .mockResolvedValueOnce({ addMore: true }) // Add more
+        // Second product
+        .mockResolvedValueOnce({ searchInput: "" })
+        .mockResolvedValueOnce({ selectedModel: "Chair" })
+        .mockResolvedValueOnce({ selectedColor: "BLK" })
+        .mockResolvedValueOnce({ selectedVariantSkus: ["CHAIR-001-BLK"] })
+        .mockResolvedValueOnce({ addMore: false }); // Done
 
       const result = await service.promptVariantSelection(variants);
 
       expect(result).toHaveLength(2);
-      expect(result[0].id).toBe("variant-1");
+      expect(result.map((v) => v.id)).toEqual(expect.arrayContaining(["variant-1", "variant-3"]));
     });
   });
 

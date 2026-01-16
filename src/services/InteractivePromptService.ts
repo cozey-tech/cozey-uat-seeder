@@ -147,52 +147,189 @@ export class InteractivePromptService {
   }
 
   /**
-   * Prompt for variant selection (multi-select with search)
+   * Prompt for variant selection with hierarchical model -> color -> configuration -> variant selection
+   * 
+   * Flow:
+   * 1. Search/filter models by name
+   * 2. Select a model
+   * 3. Select colors for that model
+   * 4. Select configurations for that model/color (if applicable)
+   * 5. Select variants for that configuration
+   * 6. Optionally add more products
    */
   async promptVariantSelection(variants: Variant[]): Promise<Variant[]> {
-    // Group variants by model for better UX
-    const groupedVariants = variants.reduce(
+    // Group variants by model
+    const variantsByModel = variants.reduce(
       (acc, variant) => {
-        const key = `${variant.modelName} - ${variant.colorId}`;
-        if (!acc[key]) {
-          acc[key] = [];
+        if (!acc[variant.modelName]) {
+          acc[variant.modelName] = [];
         }
-        acc[key].push(variant);
+        acc[variant.modelName].push(variant);
         return acc;
       },
       {} as Record<string, Variant[]>,
     );
 
-    const choices: Array<{ name: string; value: string } | { type: string }> = Object.entries(
-      groupedVariants,
-    ).flatMap(([groupName, groupVariants]) => [
-      new inquirer.Separator(`─── ${groupName} ───`) as { type: string },
-      ...groupVariants.map((v) => ({
-        name: `${v.sku} (${v.modelName}, ${v.colorId})`,
-        value: v.id,
-      })),
-    ]);
+    const modelNames = Object.keys(variantsByModel).sort();
+    const selectedVariants: Variant[] = [];
 
-    const { variantIds } = await inquirer.prompt<{ variantIds: string[] }>([
-      {
-        type: "checkbox",
-        name: "variantIds",
-        message: "Select variants (use space to select, enter to confirm):",
-        choices: choices as unknown as Array<{ name: string; value: string } | { type: string }>,
-        validate: (input: string[]): boolean | string => {
-          if (input.length === 0) {
-            return "Please select at least one variant";
-          }
-          return true;
+    let addMoreProducts = true;
+    let searchTerm = "";
+
+    while (addMoreProducts) {
+      // Step 1: Search/filter models
+      const { searchInput } = await inquirer.prompt<{ searchInput: string }>([
+        {
+          type: "input",
+          name: "searchInput",
+          message: "Search for a product/model (press Enter to see all, or type to filter):",
+          default: searchTerm,
+          filter: (input: string): string => input.trim(),
         },
-        // Note: Type assertion needed due to inquirer v10's strict typing for checkbox prompts.
-        // The choices array with Separator objects doesn't match the expected type signature,
-        // but works correctly at runtime. This is a known limitation of inquirer v10 types.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
-    ]);
+      ]);
 
-    return variants.filter((v) => variantIds.includes(v.id));
+      searchTerm = searchInput.toLowerCase();
+
+      // Filter models based on search
+      const filteredModels = modelNames.filter((model) =>
+        model.toLowerCase().includes(searchTerm),
+      );
+
+      if (filteredModels.length === 0) {
+        console.log("❌ No models found matching your search. Please try again.");
+        continue;
+      }
+
+      // Step 2: Select a model
+      const { selectedModel } = await inquirer.prompt<{ selectedModel: string }>([
+        {
+          type: "list",
+          name: "selectedModel",
+          message: `Select a product/model${searchTerm ? ` (filtered: "${searchTerm}")` : ""}:`,
+          choices: filteredModels.map((model) => ({
+            name: model,
+            value: model,
+          })),
+          pageSize: 10,
+        },
+      ]);
+
+      // Step 3: Get all color variants for the selected model
+      const modelVariants = variantsByModel[selectedModel];
+      
+      // Group by color
+      const variantsByColor = modelVariants.reduce(
+        (acc, variant) => {
+          if (!acc[variant.colorId]) {
+            acc[variant.colorId] = [];
+          }
+          acc[variant.colorId].push(variant);
+          return acc;
+        },
+        {} as Record<string, Variant[]>,
+      );
+
+      const colors = Object.keys(variantsByColor).sort();
+
+      // Step 4: Select colors for this model
+      const { selectedColor } = await inquirer.prompt<{ selectedColor: string }>([
+        {
+          type: "list",
+          name: "selectedColor",
+          message: `Select a color for "${selectedModel}":`,
+          choices: colors.map((color) => ({
+            name: color,
+            value: color,
+          })),
+        },
+      ]);
+
+      // Step 5: Get variants for selected model/color and group by configuration
+      const colorVariants = variantsByColor[selectedColor];
+      
+      // Group by configuration (if available)
+      const variantsByConfig = colorVariants.reduce(
+        (acc, variant) => {
+          const configKey = variant.configuration || "Standard"; // Use "Standard" if no configuration
+          if (!acc[configKey]) {
+            acc[configKey] = [];
+          }
+          acc[configKey].push(variant);
+          return acc;
+        },
+        {} as Record<string, Variant[]>,
+      );
+
+      const configurations = Object.keys(variantsByConfig).sort();
+
+      // Step 6: Select configuration (if multiple exist, otherwise auto-select)
+      let selectedConfig: string;
+      if (configurations.length === 1) {
+        selectedConfig = configurations[0];
+        console.log(`📦 Using configuration: ${selectedConfig === "Standard" ? "Standard (no specific configuration)" : selectedConfig}`);
+      } else {
+        const { config } = await inquirer.prompt<{ config: string }>([
+          {
+            type: "list",
+            name: "config",
+            message: `Select a configuration for "${selectedModel}" - "${selectedColor}":`,
+            choices: configurations.map((cfg) => ({
+              name: cfg === "Standard" ? "Standard (no specific configuration)" : cfg,
+              value: cfg,
+            })),
+          },
+        ]);
+        selectedConfig = config;
+      }
+
+      // Step 7: Select variants for this configuration (multi-select)
+      const configVariants = variantsByConfig[selectedConfig];
+      const { selectedVariantSkus } = await inquirer.prompt<{ selectedVariantSkus: string[] }>([
+        {
+          type: "checkbox",
+          name: "selectedVariantSkus",
+          message: `Select variants for "${selectedModel}" - "${selectedColor}"${selectedConfig !== "Standard" ? ` - "${selectedConfig}"` : ""}:`,
+          choices: configVariants.map((variant) => ({
+            name: `${variant.sku} - ${variant.description} [${variant.pickType}]`,
+            value: variant.sku,
+          })),
+          validate: (input: string[]): boolean | string => {
+            if (input.length === 0) {
+              return "Please select at least one variant";
+            }
+            return true;
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+      ]);
+
+      // Add selected variants to the result
+      const selected = configVariants.filter((v) => selectedVariantSkus.includes(v.sku));
+      selectedVariants.push(...selected);
+
+      console.log(
+        `✅ Added ${selected.length} variant(s) from "${selectedModel}" - "${selectedColor}"${selectedConfig !== "Standard" ? ` - "${selectedConfig}"` : ""} (${selectedVariants.length} variant(s) total)`,
+      );
+
+      // Step 8: Ask if they want to add another product
+      const { addMore } = await inquirer.prompt<{ addMore: boolean }>([
+        {
+          type: "confirm",
+          name: "addMore",
+          message: "Would you like to add another product?",
+          default: false,
+        },
+      ]);
+
+      addMoreProducts = addMore;
+      searchTerm = ""; // Reset search for next product
+    }
+
+    if (selectedVariants.length === 0) {
+      throw new Error("No variants selected");
+    }
+
+    return selectedVariants;
   }
 
   /**

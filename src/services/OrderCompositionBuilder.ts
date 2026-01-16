@@ -60,11 +60,11 @@ export class OrderCompositionBuilder {
         const selectedVariants = await this.promptService.promptVariantSelection(variants);
         for (const variant of selectedVariants) {
           const quantity = await this.promptService.promptQuantity(variant.sku);
-          const pickType = await this.promptService.promptPickType();
+          // PickType comes from the variant (database)
           lineItems.push({
             sku: variant.sku,
             quantity,
-            pickType,
+            pickType: variant.pickType,
           });
         }
       }
@@ -104,12 +104,11 @@ export class OrderCompositionBuilder {
 
       for (const variant of selectedVariants) {
         const quantity = await this.promptService.promptQuantity(variant.sku);
-        const pickType = await this.promptService.promptPickType();
-
+        // PickType comes from the variant (database)
         lineItems.push({
           sku: variant.sku,
           quantity,
-          pickType,
+          pickType: variant.pickType,
         });
       }
 

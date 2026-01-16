@@ -9,7 +9,6 @@ describe("OrderCompositionBuilder", () => {
   let mockPromptService: {
     promptVariantSelection: ReturnType<typeof vi.fn>;
     promptQuantity: ReturnType<typeof vi.fn>;
-    promptPickType: ReturnType<typeof vi.fn>;
     promptConfirm: ReturnType<typeof vi.fn>;
   };
 
@@ -17,7 +16,6 @@ describe("OrderCompositionBuilder", () => {
     mockPromptService = {
       promptVariantSelection: vi.fn(),
       promptQuantity: vi.fn(),
-      promptPickType: vi.fn(),
       promptConfirm: vi.fn(),
     };
 
@@ -72,6 +70,8 @@ describe("OrderCompositionBuilder", () => {
           colorId: "WHT",
           shopifyIds: ["shopify-1"],
           region: "CA",
+          description: "Chair - White",
+          pickType: "Pick and Pack",
         },
       ];
 
@@ -84,7 +84,6 @@ describe("OrderCompositionBuilder", () => {
 
       mockPromptService.promptVariantSelection.mockResolvedValue(variants);
       mockPromptService.promptQuantity.mockResolvedValue(2);
-      mockPromptService.promptPickType.mockResolvedValue("Pick and Pack");
 
       const result = await builder.buildFromTemplate(template, variants);
 
@@ -103,12 +102,13 @@ describe("OrderCompositionBuilder", () => {
           colorId: "BLK",
           shopifyIds: ["shopify-1"],
           region: "CA",
+          description: "Sofa - Black",
+          pickType: "Regular",
         },
       ];
 
       mockPromptService.promptVariantSelection.mockResolvedValue(variants);
       mockPromptService.promptQuantity.mockResolvedValue(1);
-      mockPromptService.promptPickType.mockResolvedValue("Regular");
       mockPromptService.promptConfirm.mockResolvedValue(false); // Don't add more
 
       const result = await builder.buildCustom(variants);
@@ -127,12 +127,13 @@ describe("OrderCompositionBuilder", () => {
           colorId: "BLK",
           shopifyIds: ["shopify-1"],
           region: "CA",
+          description: "Sofa - Black",
+          pickType: "Regular",
         },
       ];
 
       mockPromptService.promptVariantSelection.mockResolvedValue(variants);
       mockPromptService.promptQuantity.mockResolvedValue(1);
-      mockPromptService.promptPickType.mockResolvedValue("Regular");
       mockPromptService.promptConfirm
         .mockResolvedValueOnce(true) // Add more
         .mockResolvedValueOnce(false); // Done
