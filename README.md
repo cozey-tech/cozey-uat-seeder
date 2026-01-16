@@ -52,7 +52,68 @@ npm install
    ```
 
 3. Optional flags:
+   - `--validate`: Validate configuration file against schema only (no DB/API calls)
+   - `--dry-run`: Simulate the full seeding flow without making actual changes
    - `--skip-confirmation`: Bypass staging confirmation prompt (not recommended)
+
+### Validation and Dry-Run Modes
+
+#### `--validate` Flag
+
+Validates your configuration file against the schema without making any external API or database calls. Useful for checking config files offline.
+
+```bash
+npm run seed config.json --validate
+```
+
+**Output:**
+```
+✅ Configuration file validation passed
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Schema: Valid
+   Orders: 2
+   Collection Prep: Configured
+   PnP Config: Present
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**Note:** `--validate` does not require a database connection or staging environment check.
+
+#### `--dry-run` Flag
+
+Simulates the complete seeding flow and displays what would be created, without actually creating any records in Shopify or the WMS database. Useful for previewing changes before execution.
+
+```bash
+npm run seed config.json --dry-run
+```
+
+**Output:**
+```
+🔍 DRY RUN MODE - No changes will be made
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔒 Staging Environment Check
+   Database: postgresql://***@staging-db.example.com:5432/wms_staging
+   Shopify: staging-store.myshopify.com
+   Status: ✅ Staging
+
+📄 Configuration: config.json
+🆔 Batch ID: <generated-uuid>
+
+🛒 Step 1: Would seed Shopify orders...
+   ✅ Would create 2 Shopify order(s)
+
+🗄️  Step 2: Would seed WMS entities...
+   ✅ Would create 2 WMS order(s)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️  DRY RUN - No actual changes were made
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**Note:** `--dry-run` requires a database connection for SKU validation (read-only operations) and performs staging environment checks (same safety as normal run).
+
+**Important:** The `--validate` and `--dry-run` flags are mutually exclusive and cannot be used together.
 
 ### Configuration Format
 
@@ -151,6 +212,8 @@ src/
 - **Idempotent**: Safe to re-run without creating duplicates
 - **Tagging**: All seed records tagged with batch IDs for easy cleanup
 - **Validation**: Comprehensive validation of SKUs, customers, and configuration
+- **Dry-Run Mode**: Preview changes before execution with `--dry-run` flag
+- **Offline Validation**: Validate config files without database connection using `--validate` flag
 
 ## Troubleshooting
 
