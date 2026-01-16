@@ -11,7 +11,13 @@
  * 5. Creates collection prep (if configured)
  */
 
-import "dotenv/config";
+import { config } from "dotenv";
+import { resolve } from "path";
+
+// Load .env first, then .env.local (which will override .env values)
+config({ path: resolve(process.cwd(), ".env") });
+config({ path: resolve(process.cwd(), ".env.local"), override: true });
+
 import { PrismaClient } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import { assertStagingEnvironment, displayStagingEnvironment } from "./config/stagingGuardrails";
@@ -392,12 +398,30 @@ async function executeDryRun(configFilePath: string): Promise<void> {
       true,
     );
 
-    displaySummary(shopifyResult, wmsResult, collectionPrepResult, true);
-  } finally {
-    // Ensure Prisma connection is always closed, even on errors
-    await services.prisma.$disconnect();
-  }
-}
+    const shopifyResult = await seedShopifyOrdersHandler.execute(shopifyRequest);
+    console.log(`✅ Created ${shopifyResult.shopifyOrders.length} Shopify order(s)\n`);
+
+    // Step 2: Seed WMS entities
+    console.log("🗄️  Step 2: Seeding WMS entities...");
+    const region = config.region || config.collectionPrep?.region || "CA";
+    let collectionPrepId: string | undefined;
+
+    // Create collection prep first if configured (needed for linking)
+    if (config.collectionPrep) {
+      console.log("📋 Creating collection prep...");
+      const collectionPrepRequest = {
+        orderIds: shopifyResult.shopifyOrders.map((o) => o.shopifyOrderId),
+        carrier: config.collectionPrep.carrier,
+        locationId: config.collectionPrep.locationId,
+        region: config.collectionPrep.region,
+        prepDate: config.collectionPrep.prepDate,
+      };
+
+      const collectionPrepResult = await createCollectionPrepHandler.execute(collectionPrepRequest);
+      collectionPrepId = collectionPrepResult.collectionPrepId;
+      console.log(`✅ Created collection prep: ${collectionPrepId}\n`);
+    }
+
 
 /**
  * Main orchestrator function

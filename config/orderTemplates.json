@@ -1,0 +1,125 @@
+{
+  "templates": [
+    {
+      "id": "sofa-2x",
+      "name": "2 Sofas",
+      "description": "Two sofas of the same model",
+      "lineItems": [
+        {
+          "sku": "1+2+1049-0-0-800",
+          "quantity": 2,
+          "pickType": "Regular"
+        }
+      ]
+    },
+    {
+      "id": "sofa-1x",
+      "name": "1 Sofa",
+      "description": "Single sofa order",
+      "lineItems": [
+        {
+          "sku": "1+2+1049-0-0-800",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ]
+    },
+    {
+      "id": "mixed-order",
+      "name": "Mixed Order",
+      "description": "1 Regular Sofa + 1 Pick and Pack item (Regular + Pick and Pack)",
+      "lineItems": [
+        {
+          "sku": "1+2+1049-0-0-800",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1+2+1001-0-0-700",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        }
+      ]
+    },
+    {
+      "id": "pnp-only",
+      "name": "Pick and Pack Only",
+      "description": "Order with only Pick and Pack items",
+      "lineItems": [
+        {
+          "sku": "1+2+1001-0-0-700",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        }
+      ]
+    },
+    {
+      "id": "regular-only",
+      "name": "Regular Items Only",
+      "description": "Order with only regular fulfillment items",
+      "lineItems": [
+        {
+          "sku": "1+2+1049-0-0-800",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1+2+1049-0-0-900",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ]
+    },
+    {
+      "id": "large-order",
+      "name": "Large Order",
+      "description": "Multiple items of different types",
+      "lineItems": [
+        {
+          "sku": "1+2+1049-0-0-800",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1+2+1001-0-0-700",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        }
+      ]
+    },
+    {
+      "id": "sofa-chair-combo",
+      "name": "Sofa Combo",
+      "description": "1 Regular Sofa + 1 Pick and Pack item",
+      "lineItems": [
+        {
+          "sku": "1+2+1049-0-0-800",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1+2+1001-0-0-700",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        }
+      ]
+    },
+    {
+      "id": "accessories-only",
+      "name": "Pick and Pack Only (Multiple)",
+      "description": "Multiple Pick and Pack items",
+      "lineItems": [
+        {
+          "sku": "1+2+1001-0-0-700",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "1+2+1001-0-0-701",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        }
+      ]
+    }
+  ]
+}
