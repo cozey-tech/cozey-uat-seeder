@@ -105,6 +105,30 @@ function loadOrderTemplates(): OrderTemplate[] {
 }
 
 /**
+ * Filter templates to only include those with valid SKUs for the given variants
+ */
+function filterValidTemplates(
+  templates: OrderTemplate[],
+  variants: Array<{ sku: string }>,
+): OrderTemplate[] {
+  const validSkus = new Set(variants.map((v) => v.sku));
+  
+  const validTemplates = templates.filter((template) => {
+    // Check if all SKUs in template exist in available variants
+    return template.lineItems.every((item) => validSkus.has(item.sku));
+  });
+
+  const invalidCount = templates.length - validTemplates.length;
+  if (invalidCount > 0) {
+    console.warn(
+      `⚠️  Filtered out ${invalidCount} template(s) with invalid SKUs for this region`,
+    );
+  }
+
+  return validTemplates;
+}
+
+/**
  * Main orchestrator function
  */
 async function main(): Promise<void> {
@@ -141,17 +165,20 @@ async function main(): Promise<void> {
 
       // Load reference data
       console.log("📊 Loading reference data...");
-      const [variants, customers, carriers, templates] = await Promise.all([
+      const [variants, customers, carriers, allTemplates] = await Promise.all([
         dataRepository.getAvailableVariants(region),
         dataRepository.getCustomers(),
         dataRepository.getCarriers(region),
         Promise.resolve(loadOrderTemplates()),
       ]);
 
+      // Filter templates to only include those with valid SKUs for this region
+      const templates = filterValidTemplates(allTemplates, variants);
+
       console.log(`   ✓ Found ${variants.length} variants`);
       console.log(`   ✓ Found ${customers.length} customers`);
       console.log(`   ✓ Found ${carriers.length} carriers`);
-      console.log(`   ✓ Found ${templates.length} templates\n`);
+      console.log(`   ✓ Found ${templates.length} valid template(s)${templates.length !== allTemplates.length ? ` (${allTemplates.length - templates.length} filtered out)` : ""}\n`);
 
       // Validate reference data is not empty
       if (variants.length === 0) {
