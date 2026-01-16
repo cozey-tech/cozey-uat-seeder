@@ -36,6 +36,11 @@ export class SeedShopifyOrdersUseCase {
         let lineItems: Array<{ lineItemId: string; sku: string }>;
         if (!createdOrder) {
           // This happens in dry-run mode - construct line items from input
+          // In normal mode, this would indicate a problem (order not found after creation)
+          Logger.warn("Order not found in query results, constructing line items from input", {
+            orderId: orderResult.orderId,
+            batchId: request.batchId,
+          });
           lineItems = orderInput.lineItems.map((item) => ({
             lineItemId: `gid://shopify/LineItem/${uuidv4()}`,
             sku: item.sku,

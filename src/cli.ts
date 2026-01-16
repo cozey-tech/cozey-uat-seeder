@@ -46,6 +46,10 @@ function parseArgs(): CliOptions {
 
   if (args.length === 0) {
     console.error("Usage: npm run seed <config-file.json> [--validate|--dry-run] [--skip-confirmation]");
+    console.error("\nFlags:");
+    console.error("  --validate           Validate config file schema only (no DB/API calls)");
+    console.error("  --dry-run            Simulate seeding without making changes");
+    console.error("  --skip-confirmation  Skip staging confirmation prompt");
     process.exit(1);
   }
 
@@ -58,6 +62,10 @@ function parseArgs(): CliOptions {
   if (validate && dryRun) {
     console.error("Error: --validate and --dry-run cannot be used together");
     console.error("Usage: npm run seed <config-file.json> [--validate|--dry-run] [--skip-confirmation]");
+    console.error("\nFlags:");
+    console.error("  --validate           Validate config file schema only (no DB/API calls)");
+    console.error("  --dry-run            Simulate seeding without making changes");
+    console.error("  --skip-confirmation  Skip staging confirmation prompt");
     process.exit(1);
   }
 
@@ -78,6 +86,19 @@ async function validateConfig(configFilePath: string): Promise<void> {
       order.lineItems.some((item) => item.pickType === "Pick and Pack"),
     );
 
+    // Validate PnP config completeness if PnP items are present
+    if (hasPnpItems) {
+      if (!config.pnpConfig) {
+        throw new InputValidationError("PnP items present but pnpConfig is missing");
+      }
+      if (!config.pnpConfig.packageInfo || config.pnpConfig.packageInfo.length === 0) {
+        throw new InputValidationError("PnP items present but no packageInfo defined");
+      }
+      if (!config.pnpConfig.boxes || config.pnpConfig.boxes.length === 0) {
+        throw new InputValidationError("PnP items present but no boxes defined");
+      }
+    }
+
     // Display validation results
     console.log("✅ Configuration file validation passed");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -85,7 +106,7 @@ async function validateConfig(configFilePath: string): Promise<void> {
     console.log(`   Orders: ${config.orders.length}`);
     console.log(`   Collection Prep: ${config.collectionPrep ? "Configured" : "Not configured"}`);
     if (hasPnpItems) {
-      console.log(`   PnP Config: ${config.pnpConfig ? "Present" : "Missing"}`);
+      console.log(`   PnP Config: Present`);
     }
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   } catch (error) {
@@ -94,7 +115,10 @@ async function validateConfig(configFilePath: string): Promise<void> {
       console.error(`   ${error.message}`);
       process.exit(1);
     }
-    throw error;
+    // Handle file I/O errors, permission errors, etc.
+    console.error("❌ Failed to read configuration file:");
+    console.error(`   ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
   }
 }
 
@@ -167,12 +191,13 @@ async function executeDryRun(configFilePath: string): Promise<void> {
   // Initialize services with dryRun=true
   console.log("🔧 Initializing services (DRY RUN mode)...");
   const prisma = new PrismaClient();
-  const wmsRepository = new WmsPrismaRepository(prisma);
-  const shopifyService = new ShopifyService(true);
-  const wmsService = new WmsService(wmsRepository, true);
-  const collectionPrepService = new CollectionPrepService(wmsRepository, true);
-  const inputParser = new InputParserService();
-  const dataValidator = new DataValidationService(prisma);
+  try {
+    const wmsRepository = new WmsPrismaRepository(prisma);
+    const shopifyService = new ShopifyService(true);
+    const wmsService = new WmsService(wmsRepository, true);
+    const collectionPrepService = new CollectionPrepService(wmsRepository, true);
+    const inputParser = new InputParserService();
+    const dataValidator = new DataValidationService(prisma);
 
   // Initialize use cases and handlers
   const seedShopifyOrdersUseCase = new SeedShopifyOrdersUseCase(shopifyService);
@@ -281,14 +306,15 @@ async function executeDryRun(configFilePath: string): Promise<void> {
   console.log(`✅ Would create ${wmsResult.orders.length} WMS order(s)`);
   console.log(`✅ Would create ${wmsResult.shipments.length} shipment(s)\n`);
 
-  // Display summary
-  const collectionPrepResult = collectionPrepId
-    ? { collectionPrepId, region: config.collectionPrep!.region }
-    : undefined;
-  displaySummary(shopifyResult, wmsResult, collectionPrepResult, true);
-
-  // Cleanup
-  await prisma.$disconnect();
+    // Display summary
+    const collectionPrepResult = collectionPrepId
+      ? { collectionPrepId, region: config.collectionPrep!.region }
+      : undefined;
+    displaySummary(shopifyResult, wmsResult, collectionPrepResult, true);
+  } finally {
+    // Ensure Prisma connection is always closed, even on errors
+    await prisma.$disconnect();
+  }
 }
 
 /**

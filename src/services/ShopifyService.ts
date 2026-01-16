@@ -60,6 +60,7 @@ export class ShopifyServiceError extends Error {
 export class ShopifyService {
   private readonly client: ReturnType<typeof createAdminApiClient>;
   private readonly dryRun: boolean;
+  private orderNumberCounter: number;
 
   /**
    * Initializes Shopify Admin API client with credentials from environment variables
@@ -67,6 +68,7 @@ export class ShopifyService {
    */
   constructor(dryRun: boolean = false) {
     this.dryRun = dryRun;
+    this.orderNumberCounter = 1000; // Start from #1000 for deterministic order numbers
     const config = getEnvConfig();
     this.client = createAdminApiClient({
       storeDomain: config.SHOPIFY_STORE_DOMAIN,
@@ -172,8 +174,8 @@ export class ShopifyService {
 
   async completeDraftOrder(draftOrderId: string): Promise<OrderResult> {
     if (this.dryRun) {
-      // Generate a mock order number (e.g., #1001, #1002, etc.)
-      const orderNumber = `#${Math.floor(Math.random() * 9000) + 1000}`;
+      // Generate a deterministic order number (e.g., #1000, #1001, #1002, etc.)
+      const orderNumber = `#${this.orderNumberCounter++}`;
       const orderId = `gid://shopify/Order/${uuidv4()}`;
       Logger.info("DRY RUN: Would complete draft order", {
         draftOrderId,
