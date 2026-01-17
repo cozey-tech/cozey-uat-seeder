@@ -395,6 +395,12 @@ async function main(): Promise<void> {
           true,
         );
 
+        // Validate baseCustomer location exists (consistent with other modes)
+        const baseLocation = locationsCache.get(baseCustomer.id);
+        if (!baseLocation) {
+          throw new Error(`Location not found for customer ${baseCustomer.id} (${baseCustomer.name})`);
+        }
+
         console.log(`\n📦 Creating ${bulkCount} orders from template "${template.name}"...`);
 
         // Create variant map for pickType lookup
@@ -408,6 +414,14 @@ async function main(): Promise<void> {
           const customer = useSameForAll
             ? baseCustomer
             : await promptService.promptCustomerSelection(customers);
+
+          // Validate customer location exists (if not using same for all, validate each customer)
+          if (!useSameForAll) {
+            const location = locationsCache.get(customer.id);
+            if (!location) {
+              throw new Error(`Location not found for customer ${customer.id} (${customer.name})`);
+            }
+          }
 
           // Build composition from template
           const lineItems = template.lineItems.map((item) => {
