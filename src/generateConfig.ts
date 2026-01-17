@@ -240,6 +240,11 @@ async function main(): Promise<void> {
       // Filter templates to only include those with valid SKUs for this region
       let templates = filterValidTemplates(allTemplates, variants);
 
+      // Batch fetch all locations for customers upfront (performance optimization)
+      console.log("📊 Loading locations...");
+      const locationsCache = await dataRepository.getLocationsForCustomers(customers);
+      console.log(`   ✓ Loaded ${locationsCache.size} location(s)\n`);
+
       console.log(`   ✓ Found ${variants.length} variants`);
       console.log(`   ✓ Found ${customers.length} customers`);
       console.log(`   ✓ Found ${carriers.length} carriers`);
@@ -284,7 +289,8 @@ async function main(): Promise<void> {
 
         // Select customer
         const customer = await promptService.promptCustomerSelection(customers);
-        const location = await dataRepository.getLocationForCustomer(customer);
+        // Use cached location (batched lookup)
+        const location = locationsCache.get(customer.id);
         if (!location) {
           throw new Error(`Location not found for customer ${customer.id}`);
         }
@@ -429,7 +435,7 @@ async function main(): Promise<void> {
 
         // Create first order
         const firstCustomer = await promptService.promptCustomerSelection(customers);
-        const firstLocation = await dataRepository.getLocationForCustomer(firstCustomer);
+        const firstLocation = locationsCache.get(firstCustomer.id);
         if (!firstLocation) {
           throw new Error(`Location not found for customer ${firstCustomer.id}`);
         }
@@ -474,7 +480,7 @@ async function main(): Promise<void> {
           }
 
           const duplicateCustomer = await promptService.promptCustomerSelection(customers);
-          const duplicateLocation = await dataRepository.getLocationForCustomer(duplicateCustomer);
+          const duplicateLocation = locationsCache.get(duplicateCustomer.id);
           if (!duplicateLocation) {
             throw new Error(`Location not found for customer ${duplicateCustomer.id}`);
           }
@@ -567,7 +573,7 @@ async function main(): Promise<void> {
           console.log("\n📦 Adding more orders...");
           // Reuse the creation mode logic (simplified - just add one more order)
           const customer = await promptService.promptCustomerSelection(customers);
-          const location = await dataRepository.getLocationForCustomer(customer);
+          const location = locationsCache.get(customer.id);
           if (!location) {
             throw new Error(`Location not found for customer ${customer.id}`);
           }
@@ -606,7 +612,7 @@ async function main(): Promise<void> {
 
           // Rebuild the order
           const customer = await promptService.promptCustomerSelection(customers);
-          const location = await dataRepository.getLocationForCustomer(customer);
+          const location = locationsCache.get(customer.id);
           if (!location) {
             throw new Error(`Location not found for customer ${customer.id}`);
           }
