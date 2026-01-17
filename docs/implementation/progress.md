@@ -8,7 +8,7 @@
 ## Status Summary
 
 - ✅ **Phase 0**: UX Improvements & Schema Updates - COMPLETE
-- 🔄 **Phase 1**: Foundation & Batching - IN PROGRESS
+- ✅ **Phase 1**: Foundation & Batching - COMPLETE
 - ⏳ **Phase 2**: Parallel Collection Prep Generation - NOT STARTED
 - ⏳ **Phase 3**: Integration & Caching - NOT STARTED
 - ⏳ **Phase 4**: Connection Pool & Monitoring - NOT STARTED
@@ -58,21 +58,29 @@
 - ✅ Delete orders capability
 - ✅ Add more orders from review
 
-## Phase 1: Foundation & Batching 🔄
+## Phase 1: Foundation & Batching ✅
 
-### Task 1.1: Add Batch Location Lookup ⏳
-**Status**: NOT STARTED  
-**Dependencies**: None  
-**Files to modify**:
-- `src/repositories/ConfigDataRepository.ts`
-- `src/repositories/ConfigDataRepository.test.ts` (create if needed)
+### Task 1.1: Add Batch Location Lookup ✅
+**Commit**: `b4df1fb`  
+**Status**: Complete  
+**Verification**:
+- ✅ `getLocationsForCustomers` method added
+- ✅ Batches queries by region
+- ✅ Returns Map for O(1) lookup
+- ✅ Updated generateConfig.ts to use batched lookup
+- ✅ All `getLocationForCustomer` calls replaced with cache
+- ✅ Comprehensive tests added (empty, single, multiple, missing, multi-region)
+- ✅ Performance: 10 orders = 10 queries → 1 query (90% reduction)
 
-### Task 1.2: Optimize Inventory Queries ⏳
-**Status**: NOT STARTED  
-**Dependencies**: None  
-**Files to modify**:
-- `src/services/InventoryService.ts`
-- `src/services/InventoryService.test.ts`
+### Task 1.2: Optimize Inventory Queries ✅
+**Commit**: `f7e485c`  
+**Status**: Complete  
+**Verification**:
+- ✅ `checkInventoryAvailability` uses `findMany` with IN clause
+- ✅ All part queries batched into single query
+- ✅ `ensureInventoryForOrder` batches variantPart queries
+- ✅ Tests updated and passing
+- ✅ Performance: 10 parts = 10 queries → 1 query (90% reduction)
 
 ## Scope Additions
 
