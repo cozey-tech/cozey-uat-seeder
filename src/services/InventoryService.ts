@@ -70,37 +70,48 @@ export class InventoryService {
       partRequirements.set(key, existing);
     }
 
-    // Check inventory for each part
-    for (const [partId, requirement] of partRequirements.entries()) {
-      const inventory = await this.prisma.inventory.findFirst({
+    // Batch check inventory for all parts in a single query
+    const partIds = Array.from(partRequirements.keys());
+    if (partIds.length > 0) {
+      const inventories = await this.prisma.inventory.findMany({
         where: {
-          partId,
+          partId: { in: partIds },
           locationId,
           region,
         },
       });
 
-      if (!inventory) {
-        shortages.push({
-          partId,
-          sku: requirement.sku,
-          required: requirement.required,
-          available: 0,
-          shortfall: requirement.required,
-        });
-        continue;
-      }
+      // Create a map for O(1) lookup
+      const inventoryMap = new Map(
+        inventories.map((inv) => [inv.partId, inv]),
+      );
 
-      const available = inventory.onHand - inventory.openOrders - inventory.onHandCommitted;
+      // Check each part requirement against batched inventory results
+      for (const [partId, requirement] of partRequirements.entries()) {
+        const inventory = inventoryMap.get(partId);
 
-      if (available < requirement.required) {
-        shortages.push({
-          partId,
-          sku: requirement.sku,
-          required: requirement.required,
-          available,
-          shortfall: requirement.required - available,
-        });
+        if (!inventory) {
+          shortages.push({
+            partId,
+            sku: requirement.sku,
+            required: requirement.required,
+            available: 0,
+            shortfall: requirement.required,
+          });
+          continue;
+        }
+
+        const available = inventory.onHand - inventory.openOrders - inventory.onHandCommitted;
+
+        if (available < requirement.required) {
+          shortages.push({
+            partId,
+            sku: requirement.sku,
+            required: requirement.required,
+            available,
+            shortfall: requirement.required - available,
+          });
+        }
       }
     }
 
@@ -186,43 +197,60 @@ export class InventoryService {
       },
     });
 
-    // Convert to Variant type with pickType
-    const variants: Variant[] = await Promise.all(
-      variantRecords.map(async (v) => {
-        // Get pickType from parts
-        const variantParts = await this.prisma.variantPart.findMany({
-          where: { variantId: v.id },
-          include: { part: { select: { pickType: true } } },
-        });
+    // Batch fetch variant parts for all variants
+    const variantIds = variantRecords.map((v) => v.id);
+    const allVariantParts = await this.prisma.variantPart.findMany({
+      where: {
+        variantId: { in: variantIds },
+      },
+      include: {
+        part: {
+          select: {
+            pickType: true,
+          },
+        },
+      },
+    });
 
-        let pickType: "Regular" | "Pick and Pack" = "Regular";
-        if (variantParts.length > 0) {
-          const pickTypeCounts = new Map<string, number>();
-          for (const vp of variantParts) {
-            const pt = vp.part.pickType;
-            pickTypeCounts.set(pt, (pickTypeCounts.get(pt) || 0) + 1);
-          }
-          let maxCount = 0;
-          for (const [pt, count] of pickTypeCounts.entries()) {
-            if (count > maxCount) {
-              maxCount = count;
-              pickType = pt as "Regular" | "Pick and Pack";
-            }
+    // Group variant parts by variantId
+    const variantPartsByVariantId = new Map<string, typeof allVariantParts>();
+    for (const vp of allVariantParts) {
+      const existing = variantPartsByVariantId.get(vp.variantId) || [];
+      existing.push(vp);
+      variantPartsByVariantId.set(vp.variantId, existing);
+    }
+
+    // Convert to Variant type with pickType (using batched data)
+    const variants: Variant[] = variantRecords.map((v) => {
+      const variantParts = variantPartsByVariantId.get(v.id) || [];
+
+      let pickType: "Regular" | "Pick and Pack" = "Regular";
+      if (variantParts.length > 0) {
+        const pickTypeCounts = new Map<string, number>();
+        for (const vp of variantParts) {
+          const pt = vp.part.pickType;
+          pickTypeCounts.set(pt, (pickTypeCounts.get(pt) || 0) + 1);
+        }
+        let maxCount = 0;
+        for (const [pt, count] of pickTypeCounts.entries()) {
+          if (count > maxCount) {
+            maxCount = count;
+            pickType = pt as "Regular" | "Pick and Pack";
           }
         }
+      }
 
-        return {
-          id: v.id,
-          sku: v.sku,
-          modelName: v.modelName,
-          colorId: v.colorId,
-          shopifyIds: v.shopifyIds,
-          region: v.region,
-          description: v.description,
-          pickType,
-        };
-      }),
-    );
+      return {
+        id: v.id,
+        sku: v.sku,
+        modelName: v.modelName,
+        colorId: v.colorId,
+        shopifyIds: v.shopifyIds,
+        region: v.region,
+        description: v.description,
+        pickType,
+      };
+    });
 
     // Create map of SKU to quantity from order line items
     // Sum quantities for duplicate SKUs (same SKU can appear in multiple line items)
