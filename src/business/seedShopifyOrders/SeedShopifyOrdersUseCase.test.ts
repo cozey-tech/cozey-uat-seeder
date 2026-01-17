@@ -43,6 +43,7 @@ describe("SeedShopifyOrdersUseCase", () => {
     vi.mocked(mockShopifyService.completeDraftOrder).mockResolvedValue({
       orderId: "gid://shopify/Order/456",
       orderNumber: "#1001",
+      lineItems: undefined, // Not available in response, will query
     });
 
     vi.mocked(mockShopifyService.queryOrdersByTag).mockResolvedValue([
@@ -95,8 +96,8 @@ describe("SeedShopifyOrdersUseCase", () => {
       .mockResolvedValueOnce({ draftOrderId: "gid://shopify/DraftOrder/2" });
 
     vi.mocked(mockShopifyService.completeDraftOrder)
-      .mockResolvedValueOnce({ orderId: "gid://shopify/Order/1", orderNumber: "#1001" })
-      .mockResolvedValueOnce({ orderId: "gid://shopify/Order/2", orderNumber: "#1002" });
+      .mockResolvedValueOnce({ orderId: "gid://shopify/Order/1", orderNumber: "#1001", lineItems: undefined })
+      .mockResolvedValueOnce({ orderId: "gid://shopify/Order/2", orderNumber: "#1002", lineItems: undefined });
 
     vi.mocked(mockShopifyService.queryOrdersByTag)
       .mockResolvedValueOnce([
@@ -143,6 +144,7 @@ describe("SeedShopifyOrdersUseCase", () => {
     vi.mocked(mockShopifyService.completeDraftOrder).mockResolvedValue({
       orderId: "gid://shopify/Order/456",
       orderNumber: "#1001",
+      lineItems: undefined, // Not available in response, will query
     });
 
     vi.mocked(mockShopifyService.queryOrdersByTag).mockResolvedValue([]); // Empty (e.g., dry-run mode)
