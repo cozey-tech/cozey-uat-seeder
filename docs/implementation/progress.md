@@ -1,171 +1,104 @@
 # Implementation Progress Ledger
 
-**Plan**: See main plan document in repository (if available)  
-**Branch**: `feat/implement-seeder-phase1`  
-**Last Updated**: 2026-01-15
+**Plan**: Optimize Config Generation Performance  
+**Plan File**: `/Users/sammorrison/.cursor/plans/optimize_config_generation_performance_355c8a0f.plan.md`  
+**Branch**: `feature/config-generation-optimization`  
+**Last Updated**: 2025-01-27
 
-## Phase 1: Foundation & Dependencies
+## Status Summary
 
-### Epic 1.1: Project Setup & Dependencies
+- ✅ **Phase 0**: UX Improvements & Schema Updates - COMPLETE
+- 🔄 **Phase 1**: Foundation & Batching - IN PROGRESS
+- ⏳ **Phase 2**: Parallel Collection Prep Generation - NOT STARTED
+- ⏳ **Phase 3**: Integration & Caching - NOT STARTED
+- ⏳ **Phase 4**: Connection Pool & Monitoring - NOT STARTED
 
-- [x] **Task 1.1.1**: Install Runtime Dependencies
-  - Commit: `9371e91`
-  - Status: ✅ COMPLETE
-  - Verified: All dependencies installed (zod, @shopify/admin-api-client, csv-parse, dotenv, inquirer)
+## Phase 0: UX Improvements & Schema Updates ✅
 
-- [ ] **Task 1.1.2**: Copy WMS Prisma Schema into Codebase
-  - Status: 🔄 IN PROGRESS
-  - Blocker: Schema file now available at `ai-docs/prisma-generate-schema.prisma`
-  - Next: Copy schema to `prisma/schema.prisma` and verify models
+### Task 0.1: Update SeedConfig Schema for Multiple Collection Preps ✅
+**Commit**: `8b9e453`  
+**Status**: Complete  
+**Verification**:
+- ✅ Schema updated to support `collectionPreps` array
+- ✅ `CollectionPrepConfig` interface added
+- ✅ `ConfigGeneratorService` handles multiple collection preps
+- ✅ `ConfigValidationService` validates multiple collection preps
+- ✅ Test added for multiple collection preps
+- ✅ Backward compatibility maintained
 
-- [x] **Task 1.1.3**: Create Folder Structure
-  - Commit: `41276da`
-  - Status: ✅ COMPLETE
-  - Verified: All directories created matching plan module boundaries
+### Task 0.2: Add Bulk Order Creation Modes ✅
+**Commit**: `26e60cc`  
+**Status**: Complete  
+**Verification**:
+- ✅ Order creation mode selection implemented
+- ✅ Bulk template mode works
+- ✅ Quick duplicate mode works
+- ✅ Inventory checks deferred to end
+- ✅ Prompt methods added
 
-### Epic 1.2: Core Types & Validation
+### Task 0.3: Add Collection Prep Builder ✅
+**Commit**: `3c58ec5`  
+**Status**: Complete  
+**Verification**:
+- ✅ Builder mode selection (single vs multiple)
+- ✅ Multiple collection preps configuration
+- ✅ Carrier selection per prep
+- ✅ Auto and manual order allocation
+- ✅ Allocation preview summary
 
-- [x] **Task 1.2.1**: Define Input File Schema
-  - Commit: `af42b3e`
-  - Status: ✅ COMPLETE
-  - Verified: Zod schema created, tests pass
+**Note**: Current implementation requires configuring each prep individually. Bulk creation mode for collection preps (create N preps with same config) is NOT yet implemented.
 
-- [x] **Task 1.2.2**: Define CQRS Request/Response Types
-  - Commit: `72d93ea`
-  - Status: ✅ COMPLETE
-  - Verified: All request/response types defined with Zod validation
+### Task 0.4: Add Order Review Step ✅
+**Commit**: `6eac145`  
+**Status**: Complete  
+**Verification**:
+- ✅ Review step after order creation
+- ✅ Summary display
+- ✅ Edit orders capability
+- ✅ Delete orders capability
+- ✅ Add more orders from review
 
-- [x] **Task 1.2.3**: Define Enums
-  - Commit: `2c0ce51`
-  - Status: ✅ COMPLETE
-  - Verified: OrderType, PickType, SeedStatus enums created
+## Phase 1: Foundation & Batching 🔄
 
-## Phase 2: Staging Safety & Configuration
+### Task 1.1: Add Batch Location Lookup ⏳
+**Status**: NOT STARTED  
+**Dependencies**: None  
+**Files to modify**:
+- `src/repositories/ConfigDataRepository.ts`
+- `src/repositories/ConfigDataRepository.test.ts` (create if needed)
 
-- [x] **Task 2.1.1**: Environment Variable Validation
-  - Commit: `f8763ee`
-  - Status: ✅ COMPLETE
-  - Verified: Zod schema validates env vars, tests pass
+### Task 1.2: Optimize Inventory Queries ⏳
+**Status**: NOT STARTED  
+**Dependencies**: None  
+**Files to modify**:
+- `src/services/InventoryService.ts`
+- `src/services/InventoryService.test.ts`
 
-- [x] **Task 2.1.2**: Staging Guardrail Checks
-  - Commit: `e1502d8`
-  - Status: ✅ COMPLETE
-  - Verified: Guardrails validate staging patterns, tests pass
+## Scope Additions
 
-- [x] **Task 2.1.3**: Input File Parser
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Parses JSON files, validates with Zod, tests pass
+### Bulk Collection Prep Creation Mode (NEW)
+**Status**: NOT STARTED  
+**Justification**: User requested bulk collection prep creation modes. Current builder requires configuring each prep individually. Need to add:
+- Option to create N collection preps with same base config
+- Allow carrier variation per prep or same carrier for all
+- Batch allocation of orders across preps
 
-- [x] **Task 2.1.4**: Data Validation Service
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Validates SKUs, customer data, quantities, PnP config, tests pass
+**Files to modify**:
+- `src/services/InteractivePromptService.ts` (add bulk prep prompts)
+- `src/generateConfig.ts` (add bulk prep creation flow)
 
 ## Known Blockers
 
-- ESLint v9 requires migration to new config format (eslint.config.js)
-- Schema file available - ready to copy
+None currently.
 
-## Quality Gates Status
+## Repository Gates Status
 
-- ✅ TypeScript: Compiles without errors
-- ⚠️ ESLint: Config needs migration to v9 format (non-blocking)
-- ✅ Tests: All tests pass (44 tests, 9 test files)
-- ✅ Prisma: Schema copied and client generated
+- ✅ Typecheck: Passing
+- ✅ Lint: Passing
+- ✅ Tests: Passing (verified for Phase 0 tasks)
 
-## Phase 5: Collection Prep Creation
+## Next Steps
 
-- [x] **Task 5.1.1**: CollectionPrepService
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Service creates collection prep, validates order mix, tests pass
-
-- [x] **Task 5.2.1**: CreateCollectionPrepUseCase
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Use case creates collection prep, returns ID and region, tests pass
-
-- [x] **Task 5.2.2**: CreateCollectionPrepHandler
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Handler validates request, calls use case, tests pass
-
-## Phase 3: Shopify Seeding
-
-- [x] **Task 3.1.1**: Shopify Service Setup
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Service initializes with GraphQL client, methods defined, tests pass
-
-- [x] **Task 3.1.2**: Draft Order Creation Logic
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Creates draft orders with tags and batch ID, variant lookup works
-
-- [x] **Task 3.1.3**: Draft Order Completion
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Completes draft orders, returns order ID and number, tests pass
-
-- [x] **Task 3.1.4**: Query Created Orders
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Queries orders by tag, returns structured data, tests pass
-
-- [x] **Task 3.1.5**: Order Fulfillment Implementation
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Fulfills orders without payment, returns fulfillment status, tests pass
-
-- [x] **Task 3.2.1**: SeedShopifyOrdersUseCase
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Orchestrates order creation flow, processes sequentially, tests pass
-
-- [x] **Task 3.2.2**: SeedShopifyOrdersHandler
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Validates request, calls use case, handles errors, tests pass
-
-## Phase 4: WMS Seeding
-
-- [x] **Task 4.1.1**: Prisma Client Setup
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: WmsPrismaRepository created, Prisma client initialized
-
-- [x] **Task 4.1.2**: WMS Repository Interface
-  - Commit: (earlier)
-  - Status: ✅ COMPLETE
-  - Verified: Interface defined with all required methods
-
-- [x] **Task 4.1.3**: WMS Repository Implementation
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: All repository methods implemented, tests pass
-
-- [x] **Task 4.2.1**: WmsService - Order Creation
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Creates orders with customer links
-
-- [x] **Task 4.2.2**: WmsService - VariantOrder & Prep Creation
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Creates variantOrders and preps correctly linked
-
-- [x] **Task 4.2.3**: WmsService - PnP Entity Creation
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Creates PnP entities with proper methods
-
-- [x] **Task 4.3.1**: SeedWmsEntitiesUseCase
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Orchestrates WMS entity creation flow
-
-- [x] **Task 4.3.2**: SeedWmsEntitiesHandler
-  - Commit: (latest)
-  - Status: ✅ COMPLETE
-  - Verified: Validates request, calls use case
+1. Add bulk collection prep creation mode (scope addition)
+2. Implement Task 1.1: Batch Location Lookup
+3. Implement Task 1.2: Optimize Inventory Queries

@@ -711,8 +711,8 @@ export class InteractivePromptService {
   /**
    * Prompt for collection prep builder mode
    */
-  async promptCollectionPrepBuilderMode(): Promise<"single" | "multiple"> {
-    const { mode } = await inquirer.prompt<{ mode: "single" | "multiple" }>([
+  async promptCollectionPrepBuilderMode(): Promise<"single" | "multiple" | "bulk"> {
+    const { mode } = await inquirer.prompt<{ mode: "single" | "multiple" | "bulk" }>([
       {
         type: "list",
         name: "mode",
@@ -720,12 +720,83 @@ export class InteractivePromptService {
         choices: [
           { name: "Single collection prep (simple)", value: "single" },
           { name: "Multiple collection preps with different carriers (builder)", value: "multiple" },
+          { name: "Bulk create multiple preps (same config, vary carriers)", value: "bulk" },
         ],
         default: "single",
       },
     ]);
 
     return mode;
+  }
+
+  /**
+   * Prompt for bulk collection prep configuration
+   */
+  async promptBulkCollectionPrepConfig(
+    carriers: Carrier[],
+    orderCount: number,
+  ): Promise<{
+    count: number;
+    baseTestTag: string;
+    carrierMode: "same" | "different";
+    carriers: Carrier[];
+  }> {
+    const { count } = await inquirer.prompt<{ count: string }>([
+      {
+        type: "input",
+        name: "count",
+        message: "How many collection preps would you like to create?",
+        default: "3",
+        validate: (input: string): boolean | string => {
+          const num = parseInt(input, 10);
+          if (isNaN(num) || !Number.isInteger(num) || num < 1) {
+            return "Please enter a positive integer (minimum 1)";
+          }
+          if (num > orderCount) {
+            return `Cannot have more collection preps than orders (${orderCount})`;
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    const prepCount = parseInt(count, 10);
+    const baseTestTag = await this.promptTestTag();
+
+    const { carrierMode } = await inquirer.prompt<{ carrierMode: "same" | "different" }>([
+      {
+        type: "list",
+        name: "carrierMode",
+        message: "How should carriers be assigned?",
+        choices: [
+          { name: "Same carrier for all preps", value: "same" },
+          { name: "Different carrier per prep", value: "different" },
+        ],
+        default: "same",
+      },
+    ]);
+
+    let selectedCarriers: Carrier[];
+    if (carrierMode === "same") {
+      const carrier = await this.promptCarrierSelection(carriers);
+      selectedCarriers = Array(prepCount).fill(carrier);
+    } else {
+      // Select carriers for each prep
+      selectedCarriers = [];
+      for (let i = 0; i < prepCount; i++) {
+        console.log(`\nSelect carrier for Prep ${i + 1} of ${prepCount}:`);
+        const carrier = await this.promptCarrierSelection(carriers);
+        selectedCarriers.push(carrier);
+      }
+    }
+
+    return {
+      count: prepCount,
+      baseTestTag,
+      carrierMode,
+      carriers: selectedCarriers,
+    };
   }
 
   /**

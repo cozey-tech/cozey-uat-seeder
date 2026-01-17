@@ -704,7 +704,58 @@ async function main(): Promise<void> {
       } else {
         const builderMode = await promptService.promptCollectionPrepBuilderMode();
 
-        if (builderMode === "multiple") {
+        if (builderMode === "bulk") {
+          // Bulk collection prep creation mode
+          const bulkConfig = await promptService.promptBulkCollectionPrepConfig(
+            carriers,
+            orders.length,
+          );
+
+          // Get locationId from orders (validate all orders have same location)
+          const locationIds = new Set(orders.map((o) => o.locationId).filter(Boolean));
+          if (locationIds.size > 1) {
+            throw new Error(
+              `Cannot create collection prep: orders have different locationIds: ${Array.from(locationIds).join(", ")}. ` +
+                `All orders must have the same locationId for collection prep.`,
+            );
+          }
+          const locationId = orders[0]?.locationId || "";
+          if (!locationId) {
+            throw new Error("Cannot create collection prep: no locationId found in orders");
+          }
+
+          // Create collection preps with auto-allocated orders
+          collectionPreps = [];
+          for (let i = 0; i < bulkConfig.count; i++) {
+            // Round-robin order allocation
+            const orderIndices: number[] = [];
+            for (let j = i; j < orders.length; j += bulkConfig.count) {
+              orderIndices.push(j);
+            }
+
+            collectionPreps.push({
+              carrier: bulkConfig.carriers[i],
+              locationId,
+              prepDate: new Date(),
+              testTag: bulkConfig.baseTestTag,
+              orderIndices,
+            });
+          }
+
+          // Show allocation summary
+          console.log("\n📊 Bulk Collection Prep Summary:");
+          console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+          for (let i = 0; i < collectionPreps.length; i++) {
+            const prep = collectionPreps[i];
+            const orderList = prep.orderIndices
+              ? prep.orderIndices.map((idx) => idx + 1).join(", ")
+              : "None";
+            console.log(
+              `   Prep ${i + 1}: ${prep.carrier.name} - Orders: ${orderList} (${prep.orderIndices?.length || 0} orders)`,
+            );
+          }
+          console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        } else if (builderMode === "multiple") {
           // Collection prep builder: configure multiple preps
           collectionPreps = [];
           let addMore = true;
