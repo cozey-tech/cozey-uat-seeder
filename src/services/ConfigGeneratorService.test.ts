@@ -351,6 +351,87 @@ describe("ConfigGeneratorService", () => {
       // Verify the method was called (documentation is in the code)
       expect(mockPrisma.collectionPrep.findMany).toHaveBeenCalled();
     });
+
+    it("should generate config with multiple collection preps", async () => {
+      const customer1: Customer = {
+        id: "customer-1",
+        name: "Test Customer 1",
+        email: "test1@example.com",
+        region: "CA",
+        locationId: "langley",
+      };
+
+      const customer2: Customer = {
+        id: "customer-2",
+        name: "Test Customer 2",
+        email: "test2@example.com",
+        region: "CA",
+        locationId: "langley",
+      };
+
+      const composition: OrderComposition = {
+        lineItems: [
+          {
+            sku: "SOFA-001-BLK",
+            quantity: 1,
+            pickType: "Regular",
+          },
+        ],
+      };
+
+      const carrier1: Carrier = {
+        id: "CANPAR",
+        name: "Canpar",
+        region: "CA",
+      };
+
+      const carrier2: Carrier = {
+        id: "FEDEX",
+        name: "FedEx",
+        region: "CA",
+      };
+
+      const options = {
+        orders: [
+          {
+            customer: customer1,
+            composition,
+            locationId: "langley",
+          },
+          {
+            customer: customer2,
+            composition,
+            locationId: "langley",
+          },
+        ],
+        collectionPreps: [
+          {
+            carrier: carrier1,
+            locationId: "langley",
+            prepDate: new Date("2024-01-15"),
+            testTag: "Test1",
+          },
+          {
+            carrier: carrier2,
+            locationId: "langley",
+            prepDate: new Date("2024-01-15"),
+            testTag: "Test2",
+          },
+        ],
+        region: "CA",
+      };
+
+      const result = await service.generateConfig(options);
+
+      expect(result.collectionPreps).toBeDefined();
+      expect(result.collectionPreps).toHaveLength(2);
+      expect(result.collectionPreps?.[0]?.carrier).toBe("CANPAR");
+      expect(result.collectionPreps?.[0]?.testTag).toBe("Test1");
+      expect(result.collectionPreps?.[1]?.carrier).toBe("FEDEX");
+      expect(result.collectionPreps?.[1]?.testTag).toBe("Test2");
+      // Legacy collectionPrep should be undefined when using new format
+      expect(result.collectionPrep).toBeUndefined();
+    });
   });
 
   describe("allocateOrdersToCollectionPreps", () => {

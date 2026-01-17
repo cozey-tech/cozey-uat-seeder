@@ -1,16 +1,18 @@
 import { z } from "zod";
 
+const collectionPrepSchema = z.object({
+  carrier: z.string(),
+  locationId: z.string(),
+  region: z.string(),
+  prepDate: z.string().datetime(),
+  testTag: z.string().optional(), // Optional test tag for collection prep naming
+});
+
 export const seedConfigSchema = z.object({
-  region: z.enum(["CA", "US"]).optional(), // Region for all orders (required if collectionPrep is not present)
-  collectionPrep: z
-    .object({
-      carrier: z.string(),
-      locationId: z.string(),
-      region: z.string(),
-      prepDate: z.string().datetime(),
-      testTag: z.string().optional(), // Optional test tag for collection prep naming
-    })
-    .optional(), // Optional - seeder can create orders without collection prep
+  region: z.enum(["CA", "US"]).optional(), // Region for all orders (required if collectionPreps is not present)
+  collectionPreps: z.array(collectionPrepSchema).optional(), // Array of collection preps, each can have different carrier
+  // Legacy support: keep collectionPrep for backward compatibility during migration
+  collectionPrep: collectionPrepSchema.optional().describe("Deprecated: Use collectionPreps array instead"),
   orders: z.array(
     z.object({
       orderType: z.enum(["regular-only", "pnp-only", "mixed"]).optional(), // Flexible order configurations

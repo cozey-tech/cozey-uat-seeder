@@ -3,13 +3,23 @@ import type { Customer, Carrier } from "../repositories/ConfigDataRepository";
 import type { OrderComposition } from "./OrderCompositionBuilder";
 import { PrismaClient } from "@prisma/client";
 
+export interface CollectionPrepConfig {
+  carrier: Carrier;
+  locationId: string;
+  prepDate: Date;
+  testTag?: string;
+  orderIndices?: number[]; // Optional: specific orders to assign to this prep
+}
+
 export interface GenerateConfigOptions {
   orders: Array<{
     customer: Customer;
     composition: OrderComposition;
     locationId: string;
   }>;
-  collectionPrepCount: number;
+  collectionPreps?: CollectionPrepConfig[]; // Array of collection prep configs (new)
+  // Legacy support for single collection prep
+  collectionPrepCount?: number;
   carrier?: Carrier;
   prepDate?: Date;
   region: string;
@@ -64,9 +74,24 @@ export class ConfigGeneratorService {
       }
     }
 
-    // Generate collection prep configuration if needed
-    let collectionPrep: SeedConfig["collectionPrep"] | undefined;
-    if (options.collectionPrepCount > 0) {
+    // Generate collection prep configuration(s) if needed
+    let collectionPreps: SeedConfig["collectionPreps"] | undefined;
+    let collectionPrep: SeedConfig["collectionPrep"] | undefined; // Legacy support
+
+    // New approach: array of collection preps
+    if (options.collectionPreps && options.collectionPreps.length > 0) {
+      collectionPreps = await Promise.all(
+        options.collectionPreps.map(async (prepConfig) => ({
+          carrier: prepConfig.carrier.id,
+          locationId: prepConfig.locationId,
+          region: options.region,
+          prepDate: prepConfig.prepDate.toISOString(),
+          testTag: prepConfig.testTag,
+        })),
+      );
+    }
+    // Legacy approach: single collection prep
+    else if (options.collectionPrepCount && options.collectionPrepCount > 0) {
       if (!options.carrier || !options.prepDate) {
         throw new Error(
           "Carrier and prepDate are required when collectionPrepCount > 0",
@@ -116,7 +141,8 @@ export class ConfigGeneratorService {
     return {
       region: options.region as "CA" | "US",
       orders,
-      collectionPrep,
+      collectionPreps,
+      collectionPrep, // Legacy support
       pnpConfig,
     };
   }

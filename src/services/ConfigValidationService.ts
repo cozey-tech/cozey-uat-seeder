@@ -117,7 +117,11 @@ export class ConfigValidationService {
         // Check if variant exists and has Shopify ID
         // This should never fail if variants are properly filtered, but validate as safety check
         try {
-          const configRegion = config.region || config.collectionPrep?.region || "CA";
+          const configRegion =
+            config.region ||
+            config.collectionPreps?.[0]?.region ||
+            config.collectionPrep?.region ||
+            "CA";
           const variant = await this.dataRepository.getShopifyVariantId(item.sku, configRegion);
           if (!variant) {
             result.valid = false;
@@ -156,7 +160,11 @@ export class ConfigValidationService {
     }
 
     // Validate SKUs exist in database
-    const configRegion = config.region || config.collectionPrep?.region || "CA";
+    const configRegion =
+      config.region ||
+      config.collectionPreps?.[0]?.region ||
+      config.collectionPrep?.region ||
+      "CA";
     for (const sku of allSkus) {
       const variant = await this.prisma.variant.findFirst({
         where: {
@@ -172,8 +180,69 @@ export class ConfigValidationService {
       }
     }
 
-    // Validate collection prep location exists
-    if (config.collectionPrep) {
+    // Validate collection preps (new array format)
+    if (config.collectionPreps && config.collectionPreps.length > 0) {
+      for (let i = 0; i < config.collectionPreps.length; i++) {
+        const prep = config.collectionPreps[i];
+        const prepPrefix = `Collection Prep ${i + 1}`;
+
+        // Validate location exists
+        const location = await this.prisma.location.findUnique({
+          where: {
+            id_region: {
+              id: prep.locationId,
+              region: prep.region,
+            },
+          },
+        });
+
+        if (!location) {
+          result.valid = false;
+          result.errors.push(
+            `${prepPrefix}: Location ${prep.locationId} does not exist for region ${prep.region}`,
+          );
+        }
+
+        // Validate carrier exists in enum and is available for region
+        const carrierCode = prep.carrier;
+        const carrier = carriers.find(
+          (c) => c.code.toLowerCase() === carrierCode.toLowerCase(),
+        );
+
+        if (!carrier) {
+          result.valid = false;
+          result.errors.push(
+            `${prepPrefix}: Carrier ${carrierCode} not found in carriers enum. This carrier should not have been selectable.`,
+          );
+        } else {
+          // Check if carrier is available for the specified region
+          // Carriers with region: null are available for all regions
+          const isAvailableForRegion =
+            carrier.region === null || carrier.region === prep.region;
+
+          if (!isAvailableForRegion) {
+            result.valid = false;
+            result.errors.push(
+              `${prepPrefix}: Carrier ${carrierCode} is not available for region ${prep.region}. This carrier should not have been selectable.`,
+            );
+          }
+        }
+
+        // Validate prepDate is valid
+        try {
+          const prepDate = new Date(prep.prepDate);
+          if (isNaN(prepDate.getTime())) {
+            result.valid = false;
+            result.errors.push(`${prepPrefix}: prepDate is invalid: ${prep.prepDate}`);
+          }
+        } catch {
+          result.valid = false;
+          result.errors.push(`${prepPrefix}: prepDate parsing failed: ${prep.prepDate}`);
+        }
+      }
+    }
+    // Validate legacy single collection prep
+    else if (config.collectionPrep) {
       const location = await this.prisma.location.findUnique({
         where: {
           id_region: {
@@ -228,20 +297,28 @@ export class ConfigValidationService {
       }
     }
 
-      // Validate region consistency between top-level region and collectionPrep.region
-      if (config.region && config.collectionPrep && config.collectionPrep.region !== config.region) {
-        result.warnings.push(
-          `Region mismatch: top-level region is "${config.region}" but collectionPrep.region is "${config.collectionPrep.region}". Using collectionPrep.region.`,
-        );
-      }
-
       // Validate region consistency
       const regions = new Set<string>();
       if (config.region) {
         regions.add(config.region);
       }
+      if (config.collectionPreps) {
+        for (const prep of config.collectionPreps) {
+          regions.add(prep.region);
+          if (config.region && prep.region !== config.region) {
+            result.warnings.push(
+              `Region mismatch: top-level region is "${config.region}" but collection prep has region "${prep.region}".`,
+            );
+          }
+        }
+      }
       if (config.collectionPrep) {
         regions.add(config.collectionPrep.region);
+        if (config.region && config.collectionPrep.region !== config.region) {
+          result.warnings.push(
+            `Region mismatch: top-level region is "${config.region}" but collectionPrep.region is "${config.collectionPrep.region}". Using collectionPrep.region.`,
+          );
+        }
       }
 
     if (regions.size > 1) {
