@@ -487,7 +487,7 @@ export class InteractivePromptService {
   /**
    * Prompt for save file location
    */
-  async promptSaveLocation(defaultPath: string = "seed-config.json"): Promise<string> {
+  async promptSaveLocation(defaultPath: string = "output/seed-config.json"): Promise<string> {
     const { filePath } = await inquirer.prompt<{ filePath: string }>([
       {
         type: "input",

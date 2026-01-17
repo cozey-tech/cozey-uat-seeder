@@ -431,8 +431,16 @@ async function main(): Promise<void> {
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         console.log(JSON.stringify(config, null, 2));
       } else {
-        const outputPath =
-          options.output || (await promptService.promptSaveLocation("seed-config.json"));
+        const defaultPath = options.output || "output/seed-config.json";
+        const outputPath = options.output || (await promptService.promptSaveLocation(defaultPath));
+        
+        // Ensure output directory exists
+        const outputDir = dirname(outputPath);
+        if (!existsSync(outputDir)) {
+          const { mkdirSync } = await import("fs");
+          mkdirSync(outputDir, { recursive: true });
+        }
+        
         writeFileSync(outputPath, JSON.stringify(config, null, 2), "utf-8");
         console.log(`\n✅ Configuration saved to: ${outputPath}`);
       }
