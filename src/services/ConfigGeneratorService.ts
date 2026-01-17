@@ -14,6 +14,7 @@ export interface GenerateConfigOptions {
   prepDate?: Date;
   region: string;
   testTag?: string;
+  pnpConfig?: SeedConfig["pnpConfig"];
 }
 
 /**
@@ -108,10 +109,15 @@ export class ConfigGeneratorService {
       };
     }
 
+    // Include pnpConfig only if explicitly provided
+    // Note: Boxes already exist in the database, so pnpConfig is optional
+    const pnpConfig: SeedConfig["pnpConfig"] | undefined = options.pnpConfig;
+
     return {
       region: options.region as "CA" | "US",
       orders,
       collectionPrep,
+      pnpConfig,
     };
   }
 

@@ -75,6 +75,8 @@ describe("ConfigGeneratorService", () => {
       expect(result.orders[0].lineItems).toHaveLength(1);
       expect(result.orders[0].orderType).toBe("regular-only");
       expect(result.collectionPrep).toBeUndefined();
+      // Should not include pnpConfig when no PnP items are present
+      expect(result.pnpConfig).toBeUndefined();
     });
 
     it("should determine order type correctly", async () => {
@@ -124,6 +126,63 @@ describe("ConfigGeneratorService", () => {
       const result = await service.generateConfig(options);
 
       expect(result.orders[0].orderType).toBe("mixed");
+      // pnpConfig is optional - boxes exist in database, so it's not automatically included
+      expect(result.pnpConfig).toBeUndefined();
+    });
+
+    it("should use provided pnpConfig when PnP items are present", async () => {
+      const customer: Customer = {
+        id: "customer-1",
+        name: "Test Customer",
+        email: "test@example.com",
+        region: "CA",
+        locationId: "langley",
+      };
+
+      const composition: OrderComposition = {
+        lineItems: [
+          {
+            sku: "LEG-001",
+            quantity: 1,
+            pickType: "Pick and Pack",
+          },
+        ],
+      };
+
+      const customPnpConfig = {
+        packageInfo: [
+          {
+            identifier: "CUSTOM-PKG-1",
+            dimensions: { length: 10, width: 10, height: 10 },
+            weight: 2.0,
+          },
+        ],
+        boxes: [
+          {
+            identifier: "CUSTOM-BOX-1",
+            dimensions: { length: 10, width: 10, height: 10 },
+          },
+        ],
+      };
+
+      const options = {
+        orders: [
+          {
+            customer,
+            composition,
+            locationId: "langley",
+          },
+        ],
+        collectionPrepCount: 0,
+        region: "CA",
+        pnpConfig: customPnpConfig,
+      };
+
+      const result = await service.generateConfig(options);
+
+      expect(result.pnpConfig).toBeDefined();
+      expect(result.pnpConfig?.packageInfo[0]?.identifier).toBe("CUSTOM-PKG-1");
+      expect(result.pnpConfig?.boxes[0]?.identifier).toBe("CUSTOM-BOX-1");
     });
 
     it("should generate collection prep config when count > 0", async () => {

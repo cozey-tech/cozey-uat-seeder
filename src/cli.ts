@@ -89,21 +89,14 @@ async function validateConfig(configFilePath: string): Promise<void> {
   try {
     const config = inputParser.parseInputFile(configFilePath);
 
-    // Check for PnP items
-    const hasPnpItems = config.orders.some((order) =>
-      order.lineItems.some((item) => item.pickType === "Pick and Pack"),
-    );
-
-    // Validate PnP config completeness if PnP items are present
-    if (hasPnpItems) {
-      if (!config.pnpConfig) {
-        throw new InputValidationError("PnP items present but pnpConfig is missing");
-      }
+    // Note: pnpConfig is optional - boxes already exist in the database
+    // If pnpConfig is provided, validate it, but don't require it for PnP items
+    if (config.pnpConfig) {
       if (!config.pnpConfig.packageInfo || config.pnpConfig.packageInfo.length === 0) {
-        throw new InputValidationError("PnP items present but no packageInfo defined");
+        throw new InputValidationError("pnpConfig provided but no packageInfo defined");
       }
       if (!config.pnpConfig.boxes || config.pnpConfig.boxes.length === 0) {
-        throw new InputValidationError("PnP items present but no boxes defined");
+        throw new InputValidationError("pnpConfig provided but no boxes defined");
       }
     }
 
@@ -113,7 +106,7 @@ async function validateConfig(configFilePath: string): Promise<void> {
     console.log(`   Schema: Valid`);
     console.log(`   Orders: ${config.orders.length}`);
     console.log(`   Collection Prep: ${config.collectionPrep ? "Configured" : "Not configured"}`);
-    if (hasPnpItems) {
+    if (config.pnpConfig) {
       console.log(`   PnP Config: Present`);
     }
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

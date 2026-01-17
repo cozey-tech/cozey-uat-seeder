@@ -135,7 +135,7 @@ describe("DataValidationService", () => {
       await expect(service.validateSeedConfig(config)).rejects.toThrow("Quantity must be positive");
     });
 
-    it("should throw DataValidationError for PnP items without pnpConfig", async () => {
+    it("should allow PnP items without pnpConfig (boxes exist in database)", async () => {
       const config: SeedConfig = {
         orders: [
           {
@@ -158,8 +158,44 @@ describe("DataValidationService", () => {
         { sku: "SKU-001" },
       ]);
 
+      // Should not throw - pnpConfig is optional since boxes exist in database
+      await expect(service.validateSeedConfig(config)).resolves.toBeUndefined();
+    });
+
+    it("should throw DataValidationError if pnpConfig is provided but incomplete", async () => {
+      const config: SeedConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test Customer",
+              email: "test@example.com",
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 1,
+                pickType: PickType.PickAndPack,
+              },
+            ],
+          },
+        ],
+        pnpConfig: {
+          packageInfo: [], // Empty - should fail
+          boxes: [
+            {
+              identifier: "BOX-1",
+              dimensions: { length: 12, width: 12, height: 12 },
+            },
+          ],
+        },
+      };
+
+      mockPrisma.variant.findMany.mockResolvedValue([
+        { sku: "SKU-001" },
+      ]);
+
       await expect(service.validateSeedConfig(config)).rejects.toThrow(DataValidationError);
-      await expect(service.validateSeedConfig(config)).rejects.toThrow("pnpConfig is missing");
+      await expect(service.validateSeedConfig(config)).rejects.toThrow("packageInfo");
     });
 
     it("should validate PnP config when PnP items are present", async () => {

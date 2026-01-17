@@ -34,11 +34,9 @@ export class DataValidationService {
       errors.push(...orderMixErrors);
     }
 
-    // Validate PnP configuration if PnP items present
-    const hasPnpItems = config.orders.some((order) =>
-      order.lineItems.some((item) => item.pickType === PickType.PickAndPack),
-    );
-    if (hasPnpItems) {
+    // Note: pnpConfig is optional - boxes already exist in the database
+    // If pnpConfig is provided, validate it, but don't require it for PnP items
+    if (config.pnpConfig) {
       const pnpConfigErrors = this.validatePnpConfig(config);
       errors.push(...pnpConfigErrors);
     }
@@ -146,17 +144,17 @@ export class DataValidationService {
   private validatePnpConfig(config: SeedConfig): string[] {
     const errors: string[] = [];
 
+    // Only validate if pnpConfig is provided (it's optional)
     if (!config.pnpConfig) {
-      errors.push("PnP items present but pnpConfig is missing");
       return errors;
     }
 
     if (!config.pnpConfig.packageInfo || config.pnpConfig.packageInfo.length === 0) {
-      errors.push("PnP items present but no packageInfo defined");
+      errors.push("pnpConfig provided but no packageInfo defined");
     }
 
     if (!config.pnpConfig.boxes || config.pnpConfig.boxes.length === 0) {
-      errors.push("PnP items present but no boxes defined");
+      errors.push("pnpConfig provided but no boxes defined");
     }
 
     return errors;
