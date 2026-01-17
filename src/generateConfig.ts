@@ -289,7 +289,11 @@ async function main(): Promise<void> {
 
       // Build orders based on mode
       const orderCreationStart = Date.now();
-      const orders = [];
+      const orders: Array<{
+        customer: Customer;
+        composition: OrderComposition;
+        locationId: string;
+      }> = [];
       let inventoryChecks: Array<{
         orderIndex: number;
         composition: OrderComposition;
@@ -750,35 +754,51 @@ async function main(): Promise<void> {
             orders.length,
           );
 
-          // Get locationId from orders (validate all orders have same location)
-          const locationIds = new Set(orders.map((o) => o.locationId).filter(Boolean));
-          if (locationIds.size > 1) {
-            throw new Error(
-              `Cannot create collection prep: orders have different locationIds: ${Array.from(locationIds).join(", ")}. ` +
-                `All orders must have the same locationId for collection prep.`,
-            );
+          // Group orders by locationId
+          const ordersByLocation = new Map<string, number[]>();
+          for (let i = 0; i < orders.length; i++) {
+            const locationId = orders[i].locationId;
+            if (!locationId) {
+              throw new Error(`Order ${i + 1} has no locationId`);
+            }
+            if (!ordersByLocation.has(locationId)) {
+              ordersByLocation.set(locationId, []);
+            }
+            ordersByLocation.get(locationId)!.push(i);
           }
-          const locationId = orders[0]?.locationId || "";
-          if (!locationId) {
+
+          if (ordersByLocation.size === 0) {
             throw new Error("Cannot create collection prep: no locationId found in orders");
           }
 
-          // Create collection preps with auto-allocated orders
+          // Create collection preps with auto-allocated orders, grouped by locationId
           collectionPreps = [];
-          for (let i = 0; i < bulkConfig.count; i++) {
-            // Round-robin order allocation
-            const orderIndices: number[] = [];
-            for (let j = i; j < orders.length; j += bulkConfig.count) {
-              orderIndices.push(j);
-            }
+          let prepIndex = 0;
 
-            collectionPreps.push({
-              carrier: bulkConfig.carriers[i],
-              locationId,
-              prepDate: new Date(),
-              testTag: bulkConfig.baseTestTag,
-              orderIndices,
-            });
+          // Process each locationId group separately
+          for (const [locationId, locationOrderIndices] of ordersByLocation.entries()) {
+            // Allocate carriers for this location (round-robin across all carriers)
+            const carriersForLocation = bulkConfig.carriers;
+            const prepsPerLocation = Math.min(bulkConfig.count, locationOrderIndices.length);
+
+            for (let i = 0; i < prepsPerLocation; i++) {
+              // Round-robin order allocation within this location
+              const orderIndices: number[] = [];
+              for (let j = i; j < locationOrderIndices.length; j += prepsPerLocation) {
+                orderIndices.push(locationOrderIndices[j]);
+              }
+
+              // Round-robin carrier assignment
+              const carrierIndex = prepIndex % carriersForLocation.length;
+              collectionPreps.push({
+                carrier: carriersForLocation[carrierIndex],
+                locationId,
+                prepDate: new Date(),
+                testTag: bulkConfig.baseTestTag,
+                orderIndices,
+              });
+              prepIndex++;
+            }
           }
 
           // Show allocation summary
@@ -790,7 +810,7 @@ async function main(): Promise<void> {
               ? prep.orderIndices.map((idx) => idx + 1).join(", ")
               : "None";
             console.log(
-              `   Prep ${i + 1}: ${prep.carrier.name} - Orders: ${orderList} (${prep.orderIndices?.length || 0} orders)`,
+              `   Prep ${i + 1}: ${prep.carrier.name} @ ${prep.locationId} - Orders: ${orderList} (${prep.orderIndices?.length || 0} orders)`,
             );
           }
           console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
@@ -800,26 +820,49 @@ async function main(): Promise<void> {
           let addMore = true;
           let prepNumber = 1;
 
-          // Get locationId from orders (validate all orders have same location for now)
-          const locationIds = new Set(orders.map((o) => o.locationId).filter(Boolean));
-          if (locationIds.size > 1) {
-            throw new Error(
-              `Cannot create collection prep: orders have different locationIds: ${Array.from(locationIds).join(", ")}. ` +
-                `All orders must have the same locationId for collection prep.`,
-            );
-          }
-          const locationId = orders[0]?.locationId || "";
-          if (!locationId) {
-            throw new Error("Cannot create collection prep: no locationId found in orders");
-          }
+          // Determine total number of preps upfront (ask user or use a reasonable default)
+          // For now, we'll ask the user how many preps they plan to create
+          const plannedPrepCount = await promptService.promptPlannedCollectionPrepCount();
+          const totalPreps = plannedPrepCount;
 
           while (addMore) {
+            // Get locationId for selected orders (will be determined from order selection)
+            // For auto-allocation, we need to know which locationId the orders belong to
             const prepConfig = await promptService.promptCollectionPrepConfig(
               prepNumber,
-              collectionPreps.length + 1,
+              totalPreps,
               carriers,
               orders.length,
             );
+
+            // Determine locationId from selected orders
+            // If auto-allocated, determine from the first order's locationId
+            // If manually selected, validate all selected orders have the same locationId
+            const selectedOrderIndices = prepConfig.orderIndices;
+            if (selectedOrderIndices.length === 0) {
+              throw new Error("No orders selected for collection prep");
+            }
+
+            // Get locationIds for selected orders
+            const selectedLocationIds = new Set(
+              selectedOrderIndices.map((idx) => orders[idx].locationId).filter(Boolean),
+            );
+
+            if (selectedLocationIds.size === 0) {
+              throw new Error("Selected orders have no locationId");
+            }
+
+            if (selectedLocationIds.size > 1) {
+              throw new Error(
+                `Selected orders have different locationIds: ${Array.from(selectedLocationIds).join(", ")}. ` +
+                  `All orders in a collection prep must have the same locationId.`,
+              );
+            }
+
+            const locationId = Array.from(selectedLocationIds)[0];
+            if (!locationId) {
+              throw new Error("Cannot determine locationId for collection prep");
+            }
 
             collectionPreps.push({
               carrier: prepConfig.carrier,

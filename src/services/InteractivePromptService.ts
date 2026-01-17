@@ -871,6 +871,33 @@ export class InteractivePromptService {
   }
 
   /**
+   * Prompt for planned number of collection preps (for round-robin allocation)
+   */
+  async promptPlannedCollectionPrepCount(): Promise<number> {
+    const { count } = await inquirer.prompt<{ count: string }>([
+      {
+        type: "input",
+        name: "count",
+        message: "How many collection preps do you plan to create? (needed for round-robin allocation)",
+        default: "1",
+        validate: (input: string): boolean | string => {
+          const num = parseInt(input, 10);
+          if (isNaN(num) || !Number.isInteger(num) || num < 1) {
+            return "Please enter a positive integer (minimum 1)";
+          }
+          if (num > 50) {
+            return "Maximum 50 collection preps allowed";
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    return parseInt(count, 10);
+  }
+
+  /**
    * Prompt to add another collection prep
    */
   async promptAddAnotherCollectionPrep(): Promise<boolean> {
