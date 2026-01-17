@@ -30,10 +30,6 @@ logs/
 
 # Generated output files
 output/
-*.csv
-config/customers.json
 
 # Generated config files (from generate-config)
 *-config.json
-my-config.json
-test-config*.json
