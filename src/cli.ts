@@ -144,6 +144,7 @@ interface ServiceDependencies {
   seedShopifyOrdersHandler: SeedShopifyOrdersHandler;
   seedWmsEntitiesHandler: SeedWmsEntitiesHandler;
   createCollectionPrepHandler: CreateCollectionPrepHandler;
+  createCollectionPrepUseCase: CreateCollectionPrepUseCase;
 }
 
 /**
@@ -178,6 +179,7 @@ function initializeServices(dryRun: boolean): ServiceDependencies {
     seedShopifyOrdersHandler,
     seedWmsEntitiesHandler,
     createCollectionPrepHandler,
+    createCollectionPrepUseCase,
   };
 }
 
@@ -233,6 +235,18 @@ async function executeSeedingFlow(
   wmsResult: { orders: Array<{ orderId: string }>; shipments: Array<{ shipmentId: string }> };
   collectionPrepResult?: { collectionPrepId: string; region: string };
 }> {
+  // Generate collection prep name early if collection prep is configured
+  // This allows us to include it in Shopify order notes
+  let collectionPrepName: string | undefined;
+  if (config.collectionPrep) {
+    collectionPrepName = await services.createCollectionPrepUseCase.generateCollectionPrepName(
+      config.collectionPrep.testTag,
+      config.collectionPrep.carrier,
+      config.collectionPrep.locationId,
+      config.collectionPrep.region,
+    );
+  }
+
   // Step 1: Seed Shopify orders
   const step1Label = isDryRun ? "Would seed" : "Seeding";
   console.log(`🛒 Step 1: ${step1Label} Shopify orders...`);
@@ -246,6 +260,7 @@ async function executeSeedingFlow(
     })),
     batchId,
     region: config.region || config.collectionPrep?.region || "CA",
+    collectionPrepName,
   };
 
   const shopifyResult = await services.seedShopifyOrdersHandler.execute(shopifyRequest);
@@ -257,7 +272,7 @@ async function executeSeedingFlow(
   const region = config.collectionPrep?.region || "CA";
   let collectionPrepId: string | undefined;
 
-  // Create collection prep first if configured
+  // Create collection prep if configured (using pre-generated name)
   if (config.collectionPrep) {
     const creatingLabel = isDryRun ? "Would create" : "Creating";
     console.log(`📋 ${creatingLabel} collection prep...`);
@@ -268,6 +283,7 @@ async function executeSeedingFlow(
       region: config.collectionPrep.region,
       prepDate: config.collectionPrep.prepDate,
       testTag: config.collectionPrep.testTag,
+      collectionPrepName, // Use pre-generated name
     };
 
     const collectionPrepResult = await services.createCollectionPrepHandler.execute(collectionPrepRequest);

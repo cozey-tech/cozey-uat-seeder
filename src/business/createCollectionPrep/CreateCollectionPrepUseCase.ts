@@ -23,7 +23,7 @@ export class CreateCollectionPrepUseCase {
    * Generate collection prep name in format: [Test Tag]-[Carrier]-[FC]-[4-digit UUID]
    * Example: Outbound_Compliance-Canpar-Langley-1234
    */
-  private async generateCollectionPrepName(
+  async generateCollectionPrepName(
     testTag: string | undefined,
     carrierId: string,
     locationId: string,
@@ -88,8 +88,8 @@ export class CreateCollectionPrepUseCase {
   }
 
   async execute(request: CreateCollectionPrepRequest): Promise<CreateCollectionPrepResponse> {
-    // Generate collection prep name in new format
-    const collectionPrepId = await this.generateCollectionPrepName(
+    // Use pre-generated collection prep name if provided, otherwise generate it
+    const collectionPrepId = request.collectionPrepName || await this.generateCollectionPrepName(
       request.testTag,
       request.carrier,
       request.locationId,

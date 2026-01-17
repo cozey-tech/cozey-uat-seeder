@@ -7,6 +7,7 @@ export const createCollectionPrepRequestSchema = z.object({
   region: z.string(),
   prepDate: z.string().datetime(),
   testTag: z.string().optional(),
+  collectionPrepName: z.string().optional(), // Pre-generated collection prep name
 });
 
 export type CreateCollectionPrepRequest = z.infer<typeof createCollectionPrepRequestSchema>;

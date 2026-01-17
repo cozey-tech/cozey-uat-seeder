@@ -1,0 +1,235 @@
+{
+  "customers": [
+    {
+      "id": "test-customer-langley-1",
+      "name": "Test Customer Langley 1",
+      "email": "test-langley-1@example.com",
+      "address": "123 Test Street",
+      "city": "Vancouver",
+      "province": "BC",
+      "postalCode": "V6B 1A1",
+      "region": "CA",
+      "locationId": "langley"
+    },
+    {
+      "id": "test-customer-langley-2",
+      "name": "Test Customer Langley 2",
+      "email": "test-langley-2@example.com",
+      "address": "456 Main Avenue",
+      "city": "Surrey",
+      "province": "BC",
+      "postalCode": "V3T 2B2",
+      "region": "CA",
+      "locationId": "langley"
+    },
+    {
+      "id": "test-customer-langley-3",
+      "name": "Test Customer Langley 3",
+      "email": "test-langley-3@example.com",
+      "address": "789 Oak Boulevard",
+      "city": "Burnaby",
+      "province": "BC",
+      "postalCode": "V5A 1B2",
+      "region": "CA",
+      "locationId": "langley"
+    },
+    {
+      "id": "test-customer-windsor-1",
+      "name": "Test Customer Windsor 1",
+      "email": "test-windsor-1@example.com",
+      "address": "789 Ontario Road",
+      "city": "Windsor",
+      "province": "ON",
+      "postalCode": "N9A 1A1",
+      "region": "CA",
+      "locationId": "windsor"
+    },
+    {
+      "id": "test-customer-windsor-2",
+      "name": "Test Customer Windsor 2",
+      "email": "test-windsor-2@example.com",
+      "address": "321 Windsor Drive",
+      "city": "Windsor",
+      "province": "ON",
+      "postalCode": "N9B 2B2",
+      "region": "CA",
+      "locationId": "windsor"
+    },
+    {
+      "id": "test-customer-windsor-3",
+      "name": "Test Customer Windsor 3",
+      "email": "test-windsor-3@example.com",
+      "address": "555 Riverside Drive",
+      "city": "Windsor",
+      "province": "ON",
+      "postalCode": "N9C 3C3",
+      "region": "CA",
+      "locationId": "windsor"
+    },
+    {
+      "id": "test-customer-royalmount-1",
+      "name": "Test Customer Royalmount 1",
+      "email": "test-royalmount-1@example.com",
+      "address": "123 Saint-Laurent Boulevard",
+      "city": "Montreal",
+      "province": "QC",
+      "postalCode": "H2Y 1A6",
+      "region": "CA",
+      "locationId": "royalmount"
+    },
+    {
+      "id": "test-customer-royalmount-2",
+      "name": "Test Customer Royalmount 2",
+      "email": "test-royalmount-2@example.com",
+      "address": "456 Sherbrooke Street",
+      "city": "Montreal",
+      "province": "QC",
+      "postalCode": "H3A 1B7",
+      "region": "CA",
+      "locationId": "royalmount"
+    },
+    {
+      "id": "test-customer-royalmount-3",
+      "name": "Test Customer Royalmount 3",
+      "email": "test-royalmount-3@example.com",
+      "address": "789 Rue Sainte-Catherine",
+      "city": "Montreal",
+      "province": "QC",
+      "postalCode": "H3B 2C8",
+      "region": "CA",
+      "locationId": "royalmount"
+    },
+    {
+      "id": "test-customer-ironlink-ca-1",
+      "name": "Test Customer Ironlink CA 1",
+      "email": "test-ironlink-ca-1@example.com",
+      "address": "123 Main Street",
+      "city": "Calgary",
+      "province": "AB",
+      "postalCode": "T2P 1A1",
+      "region": "CA",
+      "locationId": "ironlink-ca"
+    },
+    {
+      "id": "test-customer-ironlink-ca-2",
+      "name": "Test Customer Ironlink CA 2",
+      "email": "test-ironlink-ca-2@example.com",
+      "address": "456 8th Avenue",
+      "city": "Calgary",
+      "province": "AB",
+      "postalCode": "T2P 2B2",
+      "region": "CA",
+      "locationId": "ironlink-ca"
+    },
+    {
+      "id": "test-customer-ironlink-ca-3",
+      "name": "Test Customer Ironlink CA 3",
+      "email": "test-ironlink-ca-3@example.com",
+      "address": "789 9th Avenue",
+      "city": "Calgary",
+      "province": "AB",
+      "postalCode": "T2P 3C3",
+      "region": "CA",
+      "locationId": "ironlink-ca"
+    },
+    {
+      "id": "test-customer-ironlink-us-1",
+      "name": "Test Customer Ironlink US 1",
+      "email": "test-ironlink-us-1@example.com",
+      "address": "123 Broadway",
+      "city": "New York",
+      "province": "NY",
+      "postalCode": "10001",
+      "region": "US",
+      "locationId": "ironlink"
+    },
+    {
+      "id": "test-customer-ironlink-us-2",
+      "name": "Test Customer Ironlink US 2",
+      "email": "test-ironlink-us-2@example.com",
+      "address": "456 5th Avenue",
+      "city": "New York",
+      "province": "NY",
+      "postalCode": "10018",
+      "region": "US",
+      "locationId": "ironlink"
+    },
+    {
+      "id": "test-customer-ironlink-us-3",
+      "name": "Test Customer Ironlink US 3",
+      "email": "test-ironlink-us-3@example.com",
+      "address": "789 Park Avenue",
+      "city": "New York",
+      "province": "NY",
+      "postalCode": "10021",
+      "region": "US",
+      "locationId": "ironlink"
+    },
+    {
+      "id": "test-customer-moreno-1",
+      "name": "Test Customer Moreno 1",
+      "email": "test-moreno-1@example.com",
+      "address": "123 Main Street",
+      "city": "Los Angeles",
+      "province": "CA",
+      "postalCode": "90001",
+      "region": "US",
+      "locationId": "moreno"
+    },
+    {
+      "id": "test-customer-moreno-2",
+      "name": "Test Customer Moreno 2",
+      "email": "test-moreno-2@example.com",
+      "address": "456 Sunset Boulevard",
+      "city": "Los Angeles",
+      "province": "CA",
+      "postalCode": "90028",
+      "region": "US",
+      "locationId": "moreno"
+    },
+    {
+      "id": "test-customer-moreno-3",
+      "name": "Test Customer Moreno 3",
+      "email": "test-moreno-3@example.com",
+      "address": "789 Hollywood Boulevard",
+      "city": "Los Angeles",
+      "province": "CA",
+      "postalCode": "90038",
+      "region": "US",
+      "locationId": "moreno"
+    },
+    {
+      "id": "test-customer-dayton-1",
+      "name": "Test Customer Dayton 1",
+      "email": "test-dayton-1@example.com",
+      "address": "123 Main Street",
+      "city": "Dayton",
+      "province": "NJ",
+      "postalCode": "08810",
+      "region": "US",
+      "locationId": "dayton"
+    },
+    {
+      "id": "test-customer-dayton-2",
+      "name": "Test Customer Dayton 2",
+      "email": "test-dayton-2@example.com",
+      "address": "456 Route 130",
+      "city": "Dayton",
+      "province": "NJ",
+      "postalCode": "08810",
+      "region": "US",
+      "locationId": "dayton"
+    },
+    {
+      "id": "test-customer-dayton-3",
+      "name": "Test Customer Dayton 3",
+      "email": "test-dayton-3@example.com",
+      "address": "789 Industrial Way",
+      "city": "Dayton",
+      "province": "NJ",
+      "postalCode": "08810",
+      "region": "US",
+      "locationId": "dayton"
+    }
+  ]
+}
