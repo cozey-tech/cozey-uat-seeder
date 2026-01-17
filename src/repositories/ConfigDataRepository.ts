@@ -203,8 +203,9 @@ export class ConfigDataRepository {
   /**
    * Load customers from config/customers.json file
    * Customers are pre-created for each FC location
+   * @param region Optional region filter. If provided, only returns customers matching that region.
    */
-  async getCustomers(): Promise<Customer[]> {
+  async getCustomers(region?: string): Promise<Customer[]> {
     try {
       const configPath = join(process.cwd(), "config", "customers.json");
       const fileContent = readFileSync(configPath, "utf-8");
@@ -217,7 +218,15 @@ export class ConfigDataRepository {
         }
       }
 
-      return config.customers;
+      // Filter by region if provided
+      let customers = config.customers;
+      if (region) {
+        customers = config.customers.filter(
+          (customer) => customer.region === region,
+        );
+      }
+
+      return customers;
     } catch (error) {
       if (error instanceof Error && error.message.includes("ENOENT")) {
         throw new Error(

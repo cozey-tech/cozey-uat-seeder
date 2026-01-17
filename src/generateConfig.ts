@@ -232,7 +232,7 @@ async function main(): Promise<void> {
       console.log("📊 Loading reference data...");
       let [variants, customers, carriers, allTemplates] = await Promise.all([
         dataRepository.getAvailableVariants(region),
-        dataRepository.getCustomers(),
+        dataRepository.getCustomers(region),
         dataRepository.getCarriers(region),
         Promise.resolve(loadOrderTemplates()),
       ]);
