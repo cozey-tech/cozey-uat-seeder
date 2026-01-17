@@ -1,6 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 import type { SeedConfig } from "../shared/types/SeedConfig";
-import { PickType } from "../shared/enums/PickType";
 
 export class DataValidationError extends Error {
   constructor(message: string) {

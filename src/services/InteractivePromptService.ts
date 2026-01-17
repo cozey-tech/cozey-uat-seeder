@@ -31,6 +31,27 @@ export interface InventoryCheckResult {
  */
 export class InteractivePromptService {
   /**
+   * Prompt for order creation mode
+   */
+  async promptOrderCreationMode(): Promise<"individual" | "bulk-template" | "quick-duplicate"> {
+    const { mode } = await inquirer.prompt<{ mode: "individual" | "bulk-template" | "quick-duplicate" }>([
+      {
+        type: "list",
+        name: "mode",
+        message: "How would you like to create orders?",
+        choices: [
+          { name: "Individual (one at a time)", value: "individual" },
+          { name: "Bulk from template (create many from a template)", value: "bulk-template" },
+          { name: "Quick duplicate (create one, then duplicate with edits)", value: "quick-duplicate" },
+        ],
+        default: "individual",
+      },
+    ]);
+
+    return mode;
+  }
+
+  /**
    * Prompt for number of orders to create
    */
   async promptOrderCount(): Promise<number> {
@@ -630,5 +651,59 @@ export class InteractivePromptService {
     ]);
 
     return id;
+  }
+
+  /**
+   * Prompt for bulk order count
+   */
+  async promptBulkOrderCount(max?: number): Promise<number> {
+    const { count } = await inquirer.prompt<{ count: string }>([
+      {
+        type: "input",
+        name: "count",
+        message: `How many orders would you like to create?${max ? ` (max ${max})` : ""}`,
+        default: "10",
+        validate: (input: string): boolean | string => {
+          const num = parseInt(input, 10);
+          if (isNaN(num) || !Number.isInteger(num) || num < 1) {
+            return "Please enter a positive integer (minimum 1)";
+          }
+          if (max !== undefined && num > max) {
+            return `Maximum ${max} orders allowed`;
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    return parseInt(count, 10);
+  }
+
+  /**
+   * Prompt for customer selection for bulk orders (with option to use same customer)
+   */
+  async promptBulkCustomerSelection(
+    customers: Customer[],
+    allowSame: boolean = true,
+  ): Promise<{ customer: Customer; useSameForAll: boolean }> {
+    if (allowSame) {
+      const { useSame } = await inquirer.prompt<{ useSame: boolean }>([
+        {
+          type: "confirm",
+          name: "useSame",
+          message: "Use the same customer for all orders?",
+          default: true,
+        },
+      ]);
+
+      if (useSame) {
+        const customer = await this.promptCustomerSelection(customers);
+        return { customer, useSameForAll: true };
+      }
+    }
+
+    const customer = await this.promptCustomerSelection(customers);
+    return { customer, useSameForAll: false };
   }
 }

@@ -19,9 +19,9 @@ config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
 import { PrismaClient } from "@prisma/client";
 import { writeFileSync, existsSync, accessSync, constants } from "fs";
-import { ConfigDataRepository, type Carrier } from "./repositories/ConfigDataRepository";
+import { ConfigDataRepository, type Carrier, type Customer, type Variant } from "./repositories/ConfigDataRepository";
 import { InteractivePromptService } from "./services/InteractivePromptService";
-import { OrderCompositionBuilder } from "./services/OrderCompositionBuilder";
+import { OrderCompositionBuilder, type OrderComposition } from "./services/OrderCompositionBuilder";
 import { ConfigGeneratorService } from "./services/ConfigGeneratorService";
 import { ConfigValidationService } from "./services/ConfigValidationService";
 import { InventoryService } from "./services/InventoryService";
@@ -263,12 +263,22 @@ async function main(): Promise<void> {
         );
       }
 
-      // Prompt for number of orders
-      const orderCount = await promptService.promptOrderCount();
+      // Prompt for order creation mode
+      const creationMode = await promptService.promptOrderCreationMode();
 
-      // Build orders
+      // Build orders based on mode
       const orders = [];
-      for (let i = 0; i < orderCount; i++) {
+      let inventoryChecks: Array<{
+        orderIndex: number;
+        composition: OrderComposition;
+        customer: Customer;
+        locationId: string;
+      }> = [];
+
+      if (creationMode === "individual") {
+        // Individual mode: original flow
+        const orderCount = await promptService.promptOrderCount();
+        for (let i = 0; i < orderCount; i++) {
         console.log(`\n📦 Building Order ${i + 1} of ${orderCount}`);
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
@@ -333,37 +343,14 @@ async function main(): Promise<void> {
           }
         }
 
-        // Check inventory if enabled
+        // Defer inventory check for bulk operations
         if (options.modifyInventory) {
-          // Get variants for the actual SKUs in composition
-          const compositionSkus = composition.lineItems.map((item) => item.sku);
-          const compositionVariants = variants.filter((v) => compositionSkus.includes(v.sku));
-          
-          // Create map of SKU to quantity (sum quantities for duplicate SKUs)
-          const variantQuantities = new Map<string, number>();
-          for (const item of composition.lineItems) {
-            const existingQuantity = variantQuantities.get(item.sku) || 0;
-            variantQuantities.set(item.sku, existingQuantity + item.quantity);
-          }
-
-          const inventoryCheck = await inventoryService.checkInventoryAvailability(
-            compositionVariants,
-            customer.locationId,
-            region,
-            variantQuantities,
-          );
-
-          if (!inventoryCheck.sufficient) {
-            const shouldModify = await promptService.promptInventoryModification(inventoryCheck);
-            if (shouldModify) {
-              await inventoryService.ensureInventoryForOrder(
-                composition,
-                customer.locationId,
-                region,
-              );
-              console.log("✅ Inventory updated");
-            }
-          }
+          inventoryChecks.push({
+            orderIndex: orders.length,
+            composition,
+            customer,
+            locationId: customer.locationId,
+          });
         }
 
         orders.push({
@@ -371,12 +358,207 @@ async function main(): Promise<void> {
           composition,
           locationId: customer.locationId,
         });
+        }
+      } else if (creationMode === "bulk-template") {
+        // Bulk template mode
+        if (templates.length === 0) {
+          throw new Error("No templates available. Please create a template first or use individual mode.");
+        }
+
+        const template = await promptService.promptTemplateSelection(templates);
+        const bulkCount = await promptService.promptBulkOrderCount(50);
+        const { customer: baseCustomer, useSameForAll } = await promptService.promptBulkCustomerSelection(
+          customers,
+          true,
+        );
+
+        console.log(`\n📦 Creating ${bulkCount} orders from template "${template.name}"...`);
+
+        // Create variant map for pickType lookup
+        const variantMap = new Map<string, Variant>();
+        for (const variant of variants) {
+          variantMap.set(variant.sku, variant);
+        }
+
+        for (let i = 0; i < bulkCount; i++) {
+          // Select customer (if not using same for all)
+          const customer = useSameForAll
+            ? baseCustomer
+            : await promptService.promptCustomerSelection(customers);
+
+          // Build composition from template
+          const lineItems = template.lineItems.map((item) => {
+            const variant = variantMap.get(item.sku);
+            if (!variant) {
+              throw new Error(`Variant not found for SKU ${item.sku} in template`);
+            }
+            return {
+              sku: item.sku,
+              quantity: item.quantity,
+              pickType: variant.pickType,
+            };
+          });
+
+          const composition: OrderComposition = { lineItems };
+
+          if (options.modifyInventory) {
+            inventoryChecks.push({
+              orderIndex: orders.length,
+              composition,
+              customer,
+              locationId: customer.locationId,
+            });
+          }
+
+          orders.push({
+            customer,
+            composition,
+            locationId: customer.locationId,
+          });
+
+          if ((i + 1) % 10 === 0) {
+            console.log(`   ✓ Created ${i + 1} of ${bulkCount} orders...`);
+          }
+        }
+
+        console.log(`✅ Created ${bulkCount} orders from template\n`);
+      } else if (creationMode === "quick-duplicate") {
+        // Quick duplicate mode: create first order, then duplicate with edits
+        console.log("\n📦 Create your first order (this will be used as a template):");
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        // Create first order
+        const firstCustomer = await promptService.promptCustomerSelection(customers);
+        const firstLocation = await dataRepository.getLocationForCustomer(firstCustomer);
+        if (!firstLocation) {
+          throw new Error(`Location not found for customer ${firstCustomer.id}`);
+        }
+
+        const firstCompositionType = await promptService.promptOrderComposition(variants, templates);
+        let firstComposition: OrderComposition;
+        if (firstCompositionType === "template") {
+          const template = await promptService.promptTemplateSelection(templates);
+          firstComposition = await compositionBuilder.buildFromTemplate(template, variants);
+        } else {
+          firstComposition = await compositionBuilder.buildCustom(variants);
+        }
+
+        if (options.modifyInventory) {
+          inventoryChecks.push({
+            orderIndex: orders.length,
+            composition: firstComposition,
+            customer: firstCustomer,
+            locationId: firstCustomer.locationId,
+          });
+        }
+
+        orders.push({
+          customer: firstCustomer,
+          composition: firstComposition,
+          locationId: firstCustomer.locationId,
+        });
+
+        console.log("✅ First order created\n");
+
+        // Duplicate and edit
+        let duplicateMore = true;
+        while (duplicateMore) {
+          const shouldDuplicate = await promptService.promptConfirm(
+            "Would you like to duplicate this order with edits?",
+            true,
+          );
+
+          if (!shouldDuplicate) {
+            duplicateMore = false;
+            break;
+          }
+
+          const duplicateCustomer = await promptService.promptCustomerSelection(customers);
+          const duplicateLocation = await dataRepository.getLocationForCustomer(duplicateCustomer);
+          if (!duplicateLocation) {
+            throw new Error(`Location not found for customer ${duplicateCustomer.id}`);
+          }
+
+          // Allow editing the composition
+          const shouldEdit = await promptService.promptConfirm(
+            "Would you like to edit the order composition?",
+            false,
+          );
+
+          let duplicateComposition: OrderComposition;
+          if (shouldEdit) {
+            // Rebuild from template or custom
+            const editCompositionType = await promptService.promptOrderComposition(variants, templates);
+            if (editCompositionType === "template") {
+              const template = await promptService.promptTemplateSelection(templates);
+              duplicateComposition = await compositionBuilder.buildFromTemplate(template, variants);
+            } else {
+              duplicateComposition = await compositionBuilder.buildCustom(variants);
+            }
+          } else {
+            // Use same composition
+            duplicateComposition = { ...firstComposition };
+          }
+
+          if (options.modifyInventory) {
+            inventoryChecks.push({
+              orderIndex: orders.length,
+              composition: duplicateComposition,
+              customer: duplicateCustomer,
+              locationId: duplicateCustomer.locationId,
+            });
+          }
+
+          orders.push({
+            customer: duplicateCustomer,
+            composition: duplicateComposition,
+            locationId: duplicateCustomer.locationId,
+          });
+
+          console.log(`✅ Duplicated order (${orders.length} total)\n`);
+        }
+      }
+
+      // Batch inventory checks at the end (if enabled)
+      if (options.modifyInventory && inventoryChecks.length > 0) {
+        console.log("\n🔍 Checking inventory for all orders...");
+        for (const check of inventoryChecks) {
+          const compositionSkus = check.composition.lineItems.map((item) => item.sku);
+          const compositionVariants = variants.filter((v) => compositionSkus.includes(v.sku));
+
+          const variantQuantities = new Map<string, number>();
+          for (const item of check.composition.lineItems) {
+            const existingQuantity = variantQuantities.get(item.sku) || 0;
+            variantQuantities.set(item.sku, existingQuantity + item.quantity);
+          }
+
+          const inventoryCheck = await inventoryService.checkInventoryAvailability(
+            compositionVariants,
+            check.locationId,
+            region,
+            variantQuantities,
+          );
+
+          if (!inventoryCheck.sufficient) {
+            console.log(`\n⚠️  Order ${check.orderIndex + 1} has inventory shortages:`);
+            const shouldModify = await promptService.promptInventoryModification(inventoryCheck);
+            if (shouldModify) {
+              await inventoryService.ensureInventoryForOrder(
+                check.composition,
+                check.locationId,
+                region,
+              );
+              console.log(`✅ Inventory updated for order ${check.orderIndex + 1}`);
+            }
+          }
+        }
+        console.log("✅ Inventory checks complete\n");
       }
 
       // Prompt for collection prep
       console.log("\n📋 Collection Prep Configuration");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      const collectionPrepCount = await promptService.promptCollectionPrepCount(orderCount, carriers.length > 0);
+      const collectionPrepCount = await promptService.promptCollectionPrepCount(orders.length, carriers.length > 0);
       
       // Only require carriers if collection prep is requested
       if (collectionPrepCount > 0 && carriers.length === 0) {
