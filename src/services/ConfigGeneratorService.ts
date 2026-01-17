@@ -83,11 +83,19 @@ export class ConfigGeneratorService {
     if (options.collectionPreps && options.collectionPreps.length > 0) {
       // Generate collection prep IDs in parallel (batched location lookups + parallelized generation)
       // Note: IDs are generated but not stored in config - they're used for validation/future seeding
+      const startTime = Date.now();
       await this.generateCollectionPrepIdsBatch(
         options.collectionPreps,
         options.region,
         5, // Concurrency limit: 5 parallel ID generations
       );
+      const duration = Date.now() - startTime;
+      // Observability: Log parallel execution timing
+      if (options.collectionPreps.length > 1) {
+        console.log(
+          `   ✓ Generated ${options.collectionPreps.length} collection prep IDs in parallel (${duration}ms)`,
+        );
+      }
 
       // Build collection prep configs
       collectionPreps = options.collectionPreps.map((prepConfig) => ({
