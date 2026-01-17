@@ -197,6 +197,18 @@ function filterValidTemplates(
  * Main orchestrator function
  */
 async function main(): Promise<void> {
+  const startTime = Date.now();
+  const performanceMetrics = {
+    totalTime: 0,
+    referenceDataLoadTime: 0,
+    orderCreationTime: 0,
+    collectionPrepTime: 0,
+    validationTime: 0,
+    orderCount: 0,
+    collectionPrepCount: 0,
+    parallelOperations: 0,
+  };
+
   try {
     // Parse CLI arguments
     const options = parseArgs();
@@ -229,6 +241,7 @@ async function main(): Promise<void> {
       const region = options.region || (await promptService.promptRegion());
 
       // Load reference data
+      const referenceDataStart = Date.now();
       console.log("📊 Loading reference data...");
       let [variants, customers, carriers, allTemplates] = await Promise.all([
         dataRepository.getAvailableVariants(region),
@@ -236,14 +249,17 @@ async function main(): Promise<void> {
         dataRepository.getCarriers(region),
         Promise.resolve(loadOrderTemplates()),
       ]);
+      performanceMetrics.referenceDataLoadTime = Date.now() - referenceDataStart;
 
       // Filter templates to only include those with valid SKUs for this region
       let templates = filterValidTemplates(allTemplates, variants);
 
       // Batch fetch all locations for customers upfront (performance optimization)
+      const locationLoadStart = Date.now();
       console.log("📊 Loading locations...");
       const locationsCache = await dataRepository.getLocationsForCustomers(customers);
-      console.log(`   ✓ Loaded ${locationsCache.size} location(s)\n`);
+      const locationLoadTime = Date.now() - locationLoadStart;
+      console.log(`   ✓ Loaded ${locationsCache.size} location(s) (${locationLoadTime}ms)\n`);
 
       console.log(`   ✓ Found ${variants.length} variants`);
       console.log(`   ✓ Found ${customers.length} customers`);
@@ -272,6 +288,7 @@ async function main(): Promise<void> {
       const creationMode = await promptService.promptOrderCreationMode();
 
       // Build orders based on mode
+      const orderCreationStart = Date.now();
       const orders = [];
       let inventoryChecks: Array<{
         orderIndex: number;
@@ -527,6 +544,7 @@ async function main(): Promise<void> {
 
       // Batch inventory checks at the end (if enabled)
       if (options.modifyInventory && inventoryChecks.length > 0) {
+        const inventoryCheckStart = Date.now();
         console.log("\n🔍 Checking inventory for all orders...");
         for (const check of inventoryChecks) {
           const compositionSkus = check.composition.lineItems.map((item) => item.sku);
@@ -558,7 +576,8 @@ async function main(): Promise<void> {
             }
           }
         }
-        console.log("✅ Inventory checks complete\n");
+        const inventoryCheckTime = Date.now() - inventoryCheckStart;
+        console.log(`✅ Inventory checks complete (${inventoryCheckTime}ms for ${inventoryChecks.length} orders)\n`);
       }
 
       // Order review step
@@ -825,7 +844,11 @@ async function main(): Promise<void> {
         }
       }
 
+      performanceMetrics.orderCount = orders.length;
+      performanceMetrics.orderCreationTime = Date.now() - orderCreationStart;
+
       // Generate config
+      const configGenStart = Date.now();
       console.log("\n⚙️  Generating configuration...");
       const config = await generatorService.generateConfig({
         orders,
@@ -837,9 +860,18 @@ async function main(): Promise<void> {
         testTag,
       });
 
+      performanceMetrics.collectionPrepCount = config.collectionPreps?.length || (config.collectionPrep ? 1 : 0);
+      if (config.collectionPreps && config.collectionPreps.length > 1) {
+        performanceMetrics.parallelOperations = config.collectionPreps.length;
+      }
+      const configGenTime = Date.now() - configGenStart;
+      performanceMetrics.collectionPrepTime = configGenTime;
+
       // Validate config
+      const validationStart = Date.now();
       console.log("✅ Validating configuration...");
       const validationResult = await validationService.validateFull(config);
+      performanceMetrics.validationTime = Date.now() - validationStart;
 
       if (!validationResult.valid) {
         console.error("\n❌ Validation failed:");
@@ -877,6 +909,7 @@ async function main(): Promise<void> {
       }
 
       // Display summary
+      performanceMetrics.totalTime = Date.now() - startTime;
       console.log("\n✅ Config Generation Complete!");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log(`📦 Orders: ${config.orders.length}`);
@@ -889,6 +922,19 @@ async function main(): Promise<void> {
       } else if (config.collectionPrep) {
         console.log(`📋 Collection Prep: ${config.collectionPrep.carrier} at ${config.collectionPrep.locationId}`);
       }
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log("\n📊 Performance Summary:");
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log(`   Total Time: ${performanceMetrics.totalTime}ms (${(performanceMetrics.totalTime / 1000).toFixed(2)}s)`);
+      console.log(`   Reference Data Load: ${performanceMetrics.referenceDataLoadTime}ms`);
+      console.log(`   Order Creation: ${performanceMetrics.orderCreationTime}ms (${performanceMetrics.orderCount} orders)`);
+      if (performanceMetrics.collectionPrepCount > 0) {
+        console.log(`   Collection Prep Generation: ${performanceMetrics.collectionPrepTime}ms (${performanceMetrics.collectionPrepCount} preps)`);
+        if (performanceMetrics.parallelOperations > 0) {
+          console.log(`   Parallel Operations: ${performanceMetrics.parallelOperations} collection preps generated in parallel`);
+        }
+      }
+      console.log(`   Validation: ${performanceMetrics.validationTime}ms`);
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
     } finally {
       await prisma.$disconnect();
