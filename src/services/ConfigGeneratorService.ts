@@ -2,6 +2,7 @@ import type { SeedConfig } from "../shared/types/SeedConfig";
 import type { Customer, Carrier } from "../repositories/ConfigDataRepository";
 import type { OrderComposition } from "./OrderCompositionBuilder";
 import { PrismaClient } from "@prisma/client";
+import { processWithConcurrency } from "../utils/concurrency";
 
 export interface CollectionPrepConfig {
   carrier: Carrier;
@@ -80,15 +81,22 @@ export class ConfigGeneratorService {
 
     // New approach: array of collection preps
     if (options.collectionPreps && options.collectionPreps.length > 0) {
-      collectionPreps = await Promise.all(
-        options.collectionPreps.map(async (prepConfig) => ({
-          carrier: prepConfig.carrier.id,
-          locationId: prepConfig.locationId,
-          region: options.region,
-          prepDate: prepConfig.prepDate.toISOString(),
-          testTag: prepConfig.testTag,
-        })),
+      // Generate collection prep IDs in parallel (batched location lookups + parallelized generation)
+      // Note: IDs are generated but not stored in config - they're used for validation/future seeding
+      await this.generateCollectionPrepIdsBatch(
+        options.collectionPreps,
+        options.region,
+        5, // Concurrency limit: 5 parallel ID generations
       );
+
+      // Build collection prep configs
+      collectionPreps = options.collectionPreps.map((prepConfig) => ({
+        carrier: prepConfig.carrier.id,
+        locationId: prepConfig.locationId,
+        region: options.region,
+        prepDate: prepConfig.prepDate.toISOString(),
+        testTag: prepConfig.testTag,
+      }));
     }
     // Legacy approach: single collection prep
     else if (options.collectionPrepCount && options.collectionPrepCount > 0) {
@@ -167,6 +175,73 @@ export class ConfigGeneratorService {
     }
 
     return allocation;
+  }
+
+  /**
+   * Generate collection prep IDs for multiple collection preps in parallel
+   * Batches location lookups and parallelizes ID generation
+   *
+   * @param configs - Array of collection prep configurations
+   * @param region - Region code
+   * @param concurrencyLimit - Maximum concurrent ID generations (default: 5)
+   * @returns Map of collection prep config index to generated ID
+   */
+  async generateCollectionPrepIdsBatch(
+    configs: CollectionPrepConfig[],
+    region: string,
+    concurrencyLimit: number = 5,
+  ): Promise<Map<number, string>> {
+    if (configs.length === 0) {
+      return new Map();
+    }
+
+    // Batch location lookups: group by locationId to avoid duplicate queries
+    const uniqueLocationIds = Array.from(new Set(configs.map((c) => c.locationId)));
+    const locations = await this.prisma.location.findMany({
+      where: {
+        id: { in: uniqueLocationIds },
+        region,
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    const locationMap = new Map(locations.map((l) => [l.id, l]));
+
+    // Generate IDs in parallel using concurrency control
+    const results = await processWithConcurrency(
+      configs.map((config, index) => ({ config, index })),
+      async ({ config, index }) => {
+        const location = locationMap.get(config.locationId);
+        if (!location) {
+          throw new Error(
+            `Location ${config.locationId} not found for region ${region}`,
+          );
+        }
+
+        // Generate single ID for this collection prep
+        const ids = await this.generateCollectionPrepIds(
+          1,
+          config.carrier.id,
+          config.locationId,
+          config.prepDate,
+          region,
+        );
+
+        return { index, id: ids[0] };
+      },
+      concurrencyLimit,
+    );
+
+    // Build result map
+    const idMap = new Map<number, string>();
+    for (const { index, id } of results) {
+      idMap.set(index, id);
+    }
+
+    return idMap;
   }
 
   /**

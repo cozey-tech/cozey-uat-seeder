@@ -9,6 +9,7 @@ describe("ConfigGeneratorService", () => {
   let mockPrisma: {
     location: {
       findUnique: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
     };
     collectionPrep: {
       findMany: ReturnType<typeof vi.fn>;
@@ -19,6 +20,7 @@ describe("ConfigGeneratorService", () => {
     mockPrisma = {
       location: {
         findUnique: vi.fn(),
+        findMany: vi.fn(),
       },
       collectionPrep: {
         findMany: vi.fn(),
@@ -421,6 +423,24 @@ describe("ConfigGeneratorService", () => {
         region: "CA",
       };
 
+      // Mock batched location lookup
+      mockPrisma.location.findMany.mockResolvedValue([
+        {
+          id: "langley",
+          name: "Langley",
+        },
+      ]);
+
+      // Mock findUnique (used by generateCollectionPrepIds internally)
+      mockPrisma.location.findUnique
+        .mockResolvedValueOnce({ name: "Langley" })
+        .mockResolvedValueOnce({ name: "Langley" });
+
+      // Mock collection prep queries
+      mockPrisma.collectionPrep.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
       const result = await service.generateConfig(options);
 
       expect(result.collectionPreps).toBeDefined();
@@ -431,6 +451,18 @@ describe("ConfigGeneratorService", () => {
       expect(result.collectionPreps?.[1]?.testTag).toBe("Test2");
       // Legacy collectionPrep should be undefined when using new format
       expect(result.collectionPrep).toBeUndefined();
+
+      // Verify batch location lookup was used (batched query)
+      expect(mockPrisma.location.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ["langley"] }, // Unique location IDs
+          region: "CA",
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
     });
   });
 
@@ -516,6 +548,142 @@ describe("ConfigGeneratorService", () => {
 
       await expect(
         service.generateCollectionPrepIds(1, "CANPAR", "invalid", new Date(), "CA"),
+      ).rejects.toThrow("Location invalid not found");
+    });
+  });
+
+  describe("generateCollectionPrepIdsBatch", () => {
+    const carrier1: Carrier = { id: "CANPAR", name: "Canpar", region: "CA" };
+    const carrier2: Carrier = { id: "FEDEX", name: "FedEx", region: "CA" };
+
+    it("should generate IDs for multiple collection preps in parallel", async () => {
+      const configs = [
+        {
+          carrier: carrier1,
+          locationId: "langley",
+          prepDate: new Date("2024-01-15"),
+          testTag: "Test1",
+        },
+        {
+          carrier: carrier2,
+          locationId: "langley",
+          prepDate: new Date("2024-01-15"),
+          testTag: "Test2",
+        },
+      ];
+
+      // Mock batched location lookup (used by batch method)
+      mockPrisma.location.findMany.mockResolvedValue([
+        {
+          id: "langley",
+          name: "Langley",
+        },
+      ]);
+
+      // Mock findUnique (still used by generateCollectionPrepIds internally)
+      mockPrisma.location.findUnique
+        .mockResolvedValueOnce({ name: "Langley" }) // First prep
+        .mockResolvedValueOnce({ name: "Langley" }); // Second prep
+
+      // Mock collection prep queries (one per config, called in parallel)
+      mockPrisma.collectionPrep.findMany
+        .mockResolvedValueOnce([]) // First prep query
+        .mockResolvedValueOnce([]); // Second prep query
+
+      const result = await service.generateCollectionPrepIdsBatch(configs, "CA", 5);
+
+      expect(result.size).toBe(2);
+      expect(result.get(0)).toBeDefined();
+      expect(result.get(1)).toBeDefined();
+      expect(result.get(0)).toMatch(/^\d{6}LYCANPAR\d+$/); // Langley = LY
+      expect(result.get(1)).toMatch(/^\d{6}LYFEDEX\d+$/); // Langley = LY
+
+      // Verify batched location lookup (single query for both)
+      expect(mockPrisma.location.findMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.location.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ["langley"] }, // Unique location IDs
+          region: "CA",
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+    });
+
+    it("should batch location lookups for different locations", async () => {
+      const configs = [
+        {
+          carrier: carrier1,
+          locationId: "langley",
+          prepDate: new Date("2024-01-15"),
+        },
+        {
+          carrier: carrier2,
+          locationId: "windsor",
+          prepDate: new Date("2024-01-15"),
+        },
+      ];
+
+      // Mock batched location lookup (both locations in one query)
+      mockPrisma.location.findMany.mockResolvedValue([
+        {
+          id: "langley",
+          name: "Langley",
+        },
+        {
+          id: "windsor",
+          name: "Windsor",
+        },
+      ]);
+
+      // Mock findUnique (still used by generateCollectionPrepIds internally)
+      mockPrisma.location.findUnique
+        .mockResolvedValueOnce({ name: "Langley" })
+        .mockResolvedValueOnce({ name: "Windsor" });
+
+      mockPrisma.collectionPrep.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.generateCollectionPrepIdsBatch(configs, "CA", 5);
+
+      expect(result.size).toBe(2);
+      // Verify single batched query for both locations
+      expect(mockPrisma.location.findMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.location.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ["langley", "windsor"] },
+          region: "CA",
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+    });
+
+    it("should handle empty configs array", async () => {
+      const result = await service.generateCollectionPrepIdsBatch([], "CA", 5);
+
+      expect(result.size).toBe(0);
+      expect(mockPrisma.location.findMany).not.toHaveBeenCalled();
+    });
+
+    it("should throw error if location not found in batch", async () => {
+      const configs = [
+        {
+          carrier: carrier1,
+          locationId: "invalid",
+          prepDate: new Date("2024-01-15"),
+        },
+      ];
+
+      mockPrisma.location.findMany.mockResolvedValue([]); // No location found
+
+      await expect(
+        service.generateCollectionPrepIdsBatch(configs, "CA", 5),
       ).rejects.toThrow("Location invalid not found");
     });
   });
