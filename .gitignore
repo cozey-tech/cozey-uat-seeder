@@ -27,3 +27,8 @@ logs/
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Generated output files
+output/
+*.csv
+config/customers.json
