@@ -19,9 +19,9 @@ config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
 import { PrismaClient } from "@prisma/client";
 import { writeFileSync, existsSync, accessSync, constants } from "fs";
-import { ConfigDataRepository, type Carrier } from "./repositories/ConfigDataRepository";
+import { ConfigDataRepository, type Carrier, type Customer, type Variant } from "./repositories/ConfigDataRepository";
 import { InteractivePromptService } from "./services/InteractivePromptService";
-import { OrderCompositionBuilder } from "./services/OrderCompositionBuilder";
+import { OrderCompositionBuilder, type OrderComposition } from "./services/OrderCompositionBuilder";
 import { ConfigGeneratorService } from "./services/ConfigGeneratorService";
 import { ConfigValidationService } from "./services/ConfigValidationService";
 import { InventoryService } from "./services/InventoryService";
@@ -197,6 +197,18 @@ function filterValidTemplates(
  * Main orchestrator function
  */
 async function main(): Promise<void> {
+  const startTime = Date.now();
+  const performanceMetrics = {
+    totalTime: 0,
+    referenceDataLoadTime: 0,
+    orderCreationTime: 0,
+    collectionPrepTime: 0,
+    validationTime: 0,
+    orderCount: 0,
+    collectionPrepCount: 0,
+    parallelOperations: 0,
+  };
+
   try {
     // Parse CLI arguments
     const options = parseArgs();
@@ -229,6 +241,7 @@ async function main(): Promise<void> {
       const region = options.region || (await promptService.promptRegion());
 
       // Load reference data
+      const referenceDataStart = Date.now();
       console.log("📊 Loading reference data...");
       let [variants, customers, carriers, allTemplates] = await Promise.all([
         dataRepository.getAvailableVariants(region),
@@ -236,9 +249,17 @@ async function main(): Promise<void> {
         dataRepository.getCarriers(region),
         Promise.resolve(loadOrderTemplates()),
       ]);
+      performanceMetrics.referenceDataLoadTime = Date.now() - referenceDataStart;
 
       // Filter templates to only include those with valid SKUs for this region
       let templates = filterValidTemplates(allTemplates, variants);
+
+      // Batch fetch all locations for customers upfront (performance optimization)
+      const locationLoadStart = Date.now();
+      console.log("📊 Loading locations...");
+      const locationsCache = await dataRepository.getLocationsForCustomers(customers);
+      const locationLoadTime = Date.now() - locationLoadStart;
+      console.log(`   ✓ Loaded ${locationsCache.size} location(s) (${locationLoadTime}ms)\n`);
 
       console.log(`   ✓ Found ${variants.length} variants`);
       console.log(`   ✓ Found ${customers.length} customers`);
@@ -263,18 +284,30 @@ async function main(): Promise<void> {
         );
       }
 
-      // Prompt for number of orders
-      const orderCount = await promptService.promptOrderCount();
+      // Prompt for order creation mode
+      const creationMode = await promptService.promptOrderCreationMode();
 
-      // Build orders
+      // Build orders based on mode
+      const orderCreationStart = Date.now();
       const orders = [];
-      for (let i = 0; i < orderCount; i++) {
+      let inventoryChecks: Array<{
+        orderIndex: number;
+        composition: OrderComposition;
+        customer: Customer;
+        locationId: string;
+      }> = [];
+
+      if (creationMode === "individual") {
+        // Individual mode: original flow
+        const orderCount = await promptService.promptOrderCount();
+        for (let i = 0; i < orderCount; i++) {
         console.log(`\n📦 Building Order ${i + 1} of ${orderCount}`);
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         // Select customer
         const customer = await promptService.promptCustomerSelection(customers);
-        const location = await dataRepository.getLocationForCustomer(customer);
+        // Use cached location (batched lookup)
+        const location = locationsCache.get(customer.id);
         if (!location) {
           throw new Error(`Location not found for customer ${customer.id}`);
         }
@@ -333,37 +366,14 @@ async function main(): Promise<void> {
           }
         }
 
-        // Check inventory if enabled
+        // Defer inventory check for bulk operations
         if (options.modifyInventory) {
-          // Get variants for the actual SKUs in composition
-          const compositionSkus = composition.lineItems.map((item) => item.sku);
-          const compositionVariants = variants.filter((v) => compositionSkus.includes(v.sku));
-          
-          // Create map of SKU to quantity (sum quantities for duplicate SKUs)
-          const variantQuantities = new Map<string, number>();
-          for (const item of composition.lineItems) {
-            const existingQuantity = variantQuantities.get(item.sku) || 0;
-            variantQuantities.set(item.sku, existingQuantity + item.quantity);
-          }
-
-          const inventoryCheck = await inventoryService.checkInventoryAvailability(
-            compositionVariants,
-            customer.locationId,
-            region,
-            variantQuantities,
-          );
-
-          if (!inventoryCheck.sufficient) {
-            const shouldModify = await promptService.promptInventoryModification(inventoryCheck);
-            if (shouldModify) {
-              await inventoryService.ensureInventoryForOrder(
-                composition,
-                customer.locationId,
-                region,
-              );
-              console.log("✅ Inventory updated");
-            }
-          }
+          inventoryChecks.push({
+            orderIndex: orders.length,
+            composition,
+            customer,
+            locationId: customer.locationId,
+          });
         }
 
         orders.push({
@@ -371,34 +381,492 @@ async function main(): Promise<void> {
           composition,
           locationId: customer.locationId,
         });
+        }
+      } else if (creationMode === "bulk-template") {
+        // Bulk template mode
+        if (templates.length === 0) {
+          throw new Error("No templates available. Please create a template first or use individual mode.");
+        }
+
+        const template = await promptService.promptTemplateSelection(templates);
+        const bulkCount = await promptService.promptBulkOrderCount(50);
+        const { customer: baseCustomer, useSameForAll } = await promptService.promptBulkCustomerSelection(
+          customers,
+          true,
+        );
+
+        // Validate baseCustomer location exists (consistent with other modes)
+        const baseLocation = locationsCache.get(baseCustomer.id);
+        if (!baseLocation) {
+          throw new Error(`Location not found for customer ${baseCustomer.id} (${baseCustomer.name})`);
+        }
+
+        console.log(`\n📦 Creating ${bulkCount} orders from template "${template.name}"...`);
+
+        // Create variant map for pickType lookup
+        const variantMap = new Map<string, Variant>();
+        for (const variant of variants) {
+          variantMap.set(variant.sku, variant);
+        }
+
+        for (let i = 0; i < bulkCount; i++) {
+          // Select customer (if not using same for all)
+          const customer = useSameForAll
+            ? baseCustomer
+            : await promptService.promptCustomerSelection(customers);
+
+          // Validate customer location exists (if not using same for all, validate each customer)
+          if (!useSameForAll) {
+            const location = locationsCache.get(customer.id);
+            if (!location) {
+              throw new Error(`Location not found for customer ${customer.id} (${customer.name})`);
+            }
+          }
+
+          // Build composition from template
+          const lineItems = template.lineItems.map((item) => {
+            const variant = variantMap.get(item.sku);
+            if (!variant) {
+              throw new Error(`Variant not found for SKU ${item.sku} in template`);
+            }
+            return {
+              sku: item.sku,
+              quantity: item.quantity,
+              pickType: variant.pickType,
+            };
+          });
+
+          const composition: OrderComposition = { lineItems };
+
+          if (options.modifyInventory) {
+            inventoryChecks.push({
+              orderIndex: orders.length,
+              composition,
+              customer,
+              locationId: customer.locationId,
+            });
+          }
+
+          orders.push({
+            customer,
+            composition,
+            locationId: customer.locationId,
+          });
+
+          if ((i + 1) % 10 === 0) {
+            console.log(`   ✓ Created ${i + 1} of ${bulkCount} orders...`);
+          }
+        }
+
+        console.log(`✅ Created ${bulkCount} orders from template\n`);
+      } else if (creationMode === "quick-duplicate") {
+        // Quick duplicate mode: create first order, then duplicate with edits
+        console.log("\n📦 Create your first order (this will be used as a template):");
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        // Create first order
+        const firstCustomer = await promptService.promptCustomerSelection(customers);
+        const firstLocation = locationsCache.get(firstCustomer.id);
+        if (!firstLocation) {
+          throw new Error(`Location not found for customer ${firstCustomer.id}`);
+        }
+
+        const firstCompositionType = await promptService.promptOrderComposition(variants, templates);
+        let firstComposition: OrderComposition;
+        if (firstCompositionType === "template") {
+          const template = await promptService.promptTemplateSelection(templates);
+          firstComposition = await compositionBuilder.buildFromTemplate(template, variants);
+        } else {
+          firstComposition = await compositionBuilder.buildCustom(variants);
+        }
+
+        if (options.modifyInventory) {
+          inventoryChecks.push({
+            orderIndex: orders.length,
+            composition: firstComposition,
+            customer: firstCustomer,
+            locationId: firstCustomer.locationId,
+          });
+        }
+
+        orders.push({
+          customer: firstCustomer,
+          composition: firstComposition,
+          locationId: firstCustomer.locationId,
+        });
+
+        console.log("✅ First order created\n");
+
+        // Duplicate and edit
+        let duplicateMore = true;
+        while (duplicateMore) {
+          const shouldDuplicate = await promptService.promptConfirm(
+            "Would you like to duplicate this order with edits?",
+            true,
+          );
+
+          if (!shouldDuplicate) {
+            duplicateMore = false;
+            break;
+          }
+
+          const duplicateCustomer = await promptService.promptCustomerSelection(customers);
+          const duplicateLocation = locationsCache.get(duplicateCustomer.id);
+          if (!duplicateLocation) {
+            throw new Error(`Location not found for customer ${duplicateCustomer.id}`);
+          }
+
+          // Allow editing the composition
+          const shouldEdit = await promptService.promptConfirm(
+            "Would you like to edit the order composition?",
+            false,
+          );
+
+          let duplicateComposition: OrderComposition;
+          if (shouldEdit) {
+            // Rebuild from template or custom
+            const editCompositionType = await promptService.promptOrderComposition(variants, templates);
+            if (editCompositionType === "template") {
+              const template = await promptService.promptTemplateSelection(templates);
+              duplicateComposition = await compositionBuilder.buildFromTemplate(template, variants);
+            } else {
+              duplicateComposition = await compositionBuilder.buildCustom(variants);
+            }
+          } else {
+            // Use same composition
+            duplicateComposition = { ...firstComposition };
+          }
+
+          if (options.modifyInventory) {
+            inventoryChecks.push({
+              orderIndex: orders.length,
+              composition: duplicateComposition,
+              customer: duplicateCustomer,
+              locationId: duplicateCustomer.locationId,
+            });
+          }
+
+          orders.push({
+            customer: duplicateCustomer,
+            composition: duplicateComposition,
+            locationId: duplicateCustomer.locationId,
+          });
+
+          console.log(`✅ Duplicated order (${orders.length} total)\n`);
+        }
+      }
+
+      // Batch inventory checks at the end (if enabled)
+      if (options.modifyInventory && inventoryChecks.length > 0) {
+        const inventoryCheckStart = Date.now();
+        console.log("\n🔍 Checking inventory for all orders...");
+        for (const check of inventoryChecks) {
+          const compositionSkus = check.composition.lineItems.map((item) => item.sku);
+          const compositionVariants = variants.filter((v) => compositionSkus.includes(v.sku));
+
+          const variantQuantities = new Map<string, number>();
+          for (const item of check.composition.lineItems) {
+            const existingQuantity = variantQuantities.get(item.sku) || 0;
+            variantQuantities.set(item.sku, existingQuantity + item.quantity);
+          }
+
+          const inventoryCheck = await inventoryService.checkInventoryAvailability(
+            compositionVariants,
+            check.locationId,
+            region,
+            variantQuantities,
+          );
+
+          if (!inventoryCheck.sufficient) {
+            console.log(`\n⚠️  Order ${check.orderIndex + 1} has inventory shortages:`);
+            const shouldModify = await promptService.promptInventoryModification(inventoryCheck);
+            if (shouldModify) {
+              await inventoryService.ensureInventoryForOrder(
+                check.composition,
+                check.locationId,
+                region,
+              );
+              console.log(`✅ Inventory updated for order ${check.orderIndex + 1}`);
+            }
+          }
+        }
+        const inventoryCheckTime = Date.now() - inventoryCheckStart;
+        console.log(`✅ Inventory checks complete (${inventoryCheckTime}ms for ${inventoryChecks.length} orders)\n`);
+      }
+
+      // Order review step
+      let reviewComplete = false;
+      while (!reviewComplete) {
+        const reviewAction = await promptService.promptOrderReviewAction(orders);
+
+        if (reviewAction === "continue") {
+          reviewComplete = true;
+        } else if (reviewAction === "add-more") {
+          // Add more orders using the same creation mode
+          console.log("\n📦 Adding more orders...");
+          // Reuse the creation mode logic (simplified - just add one more order)
+          const customer = await promptService.promptCustomerSelection(customers);
+          const location = locationsCache.get(customer.id);
+          if (!location) {
+            throw new Error(`Location not found for customer ${customer.id}`);
+          }
+
+          const compositionType = await promptService.promptOrderComposition(variants, templates);
+          let composition: OrderComposition;
+          if (compositionType === "template") {
+            const template = await promptService.promptTemplateSelection(templates);
+            composition = await compositionBuilder.buildFromTemplate(template, variants);
+          } else {
+            composition = await compositionBuilder.buildCustom(variants);
+          }
+
+          if (options.modifyInventory) {
+            inventoryChecks.push({
+              orderIndex: orders.length,
+              composition,
+              customer,
+              locationId: customer.locationId,
+            });
+          }
+
+          orders.push({
+            customer,
+            composition,
+            locationId: customer.locationId,
+          });
+          console.log(`✅ Added order ${orders.length}\n`);
+        } else if (reviewAction === "edit") {
+          if (orders.length === 0) {
+            console.log("⚠️  No orders to edit.\n");
+            continue;
+          }
+          const orderIndex = await promptService.promptOrderToEdit(orders.length);
+          console.log(`\n📝 Editing Order ${orderIndex + 1}...`);
+
+          // Rebuild the order
+          const customer = await promptService.promptCustomerSelection(customers);
+          const location = locationsCache.get(customer.id);
+          if (!location) {
+            throw new Error(`Location not found for customer ${customer.id}`);
+          }
+
+          const compositionType = await promptService.promptOrderComposition(variants, templates);
+          let composition: OrderComposition;
+          if (compositionType === "template") {
+            const template = await promptService.promptTemplateSelection(templates);
+            composition = await compositionBuilder.buildFromTemplate(template, variants);
+          } else {
+            composition = await compositionBuilder.buildCustom(variants);
+          }
+
+          // Update inventory check if needed
+          if (options.modifyInventory) {
+            // Remove old check, add new one
+            inventoryChecks = inventoryChecks.filter((check) => check.orderIndex !== orderIndex);
+            inventoryChecks.push({
+              orderIndex,
+              composition,
+              customer,
+              locationId: customer.locationId,
+            });
+          }
+
+          orders[orderIndex] = {
+            customer,
+            composition,
+            locationId: customer.locationId,
+          };
+          console.log(`✅ Updated order ${orderIndex + 1}\n`);
+        } else if (reviewAction === "delete") {
+          if (orders.length === 0) {
+            console.log("⚠️  No orders to delete.\n");
+            continue;
+          }
+          if (orders.length === 1) {
+            console.log("⚠️  Cannot delete the last order. Please add more orders first.\n");
+            continue;
+          }
+          const orderIndex = await promptService.promptOrderToDelete(orders.length);
+          const confirmDelete = await promptService.promptConfirm(
+            `Are you sure you want to delete Order ${orderIndex + 1}?`,
+            false,
+          );
+
+          if (confirmDelete) {
+            orders.splice(orderIndex, 1);
+            // Update inventory check indices
+            if (options.modifyInventory) {
+              inventoryChecks = inventoryChecks
+                .filter((check) => check.orderIndex !== orderIndex)
+                .map((check) => ({
+                  ...check,
+                  orderIndex: check.orderIndex > orderIndex ? check.orderIndex - 1 : check.orderIndex,
+                }));
+            }
+            console.log(`✅ Deleted order ${orderIndex + 1}\n`);
+          }
+        } else if (reviewAction === "start-over") {
+          const confirmStartOver = await promptService.promptConfirm(
+            "Are you sure you want to start over? All current orders will be lost.",
+            false,
+          );
+
+          if (confirmStartOver) {
+            orders.length = 0;
+            inventoryChecks.length = 0;
+            console.log("🔄 Starting over...\n");
+            // Exit and let user restart manually
+            console.log("Please run the command again to start over.");
+            process.exit(0);
+          }
+        }
       }
 
       // Prompt for collection prep
       console.log("\n📋 Collection Prep Configuration");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      const collectionPrepCount = await promptService.promptCollectionPrepCount(orderCount, carriers.length > 0);
-      
-      // Only require carriers if collection prep is requested
-      if (collectionPrepCount > 0 && carriers.length === 0) {
-        throw new Error(
-          `Cannot create collection prep: No carriers found for region ${region}.\n` +
-            `Please add carriers to the database or set collection prep count to 0 to skip collection prep.`,
-        );
-      }
 
+      let collectionPreps: Array<{
+        carrier: Carrier;
+        locationId: string;
+        prepDate: Date;
+        testTag?: string;
+        orderIndices?: number[];
+      }> | undefined;
+      let collectionPrepCount: number | undefined;
       let carrier: Carrier | undefined;
       let prepDate: Date | undefined;
       let testTag: string | undefined;
-      if (collectionPrepCount > 0) {
-        carrier = await promptService.promptCarrierSelection(carriers);
-        prepDate = new Date();
-        testTag = await promptService.promptTestTag();
+
+      if (carriers.length === 0) {
+        console.warn("⚠️  No carriers available. Skipping collection prep configuration.\n");
+      } else {
+        const builderMode = await promptService.promptCollectionPrepBuilderMode();
+
+        if (builderMode === "bulk") {
+          // Bulk collection prep creation mode
+          const bulkConfig = await promptService.promptBulkCollectionPrepConfig(
+            carriers,
+            orders.length,
+          );
+
+          // Get locationId from orders (validate all orders have same location)
+          const locationIds = new Set(orders.map((o) => o.locationId).filter(Boolean));
+          if (locationIds.size > 1) {
+            throw new Error(
+              `Cannot create collection prep: orders have different locationIds: ${Array.from(locationIds).join(", ")}. ` +
+                `All orders must have the same locationId for collection prep.`,
+            );
+          }
+          const locationId = orders[0]?.locationId || "";
+          if (!locationId) {
+            throw new Error("Cannot create collection prep: no locationId found in orders");
+          }
+
+          // Create collection preps with auto-allocated orders
+          collectionPreps = [];
+          for (let i = 0; i < bulkConfig.count; i++) {
+            // Round-robin order allocation
+            const orderIndices: number[] = [];
+            for (let j = i; j < orders.length; j += bulkConfig.count) {
+              orderIndices.push(j);
+            }
+
+            collectionPreps.push({
+              carrier: bulkConfig.carriers[i],
+              locationId,
+              prepDate: new Date(),
+              testTag: bulkConfig.baseTestTag,
+              orderIndices,
+            });
+          }
+
+          // Show allocation summary
+          console.log("\n📊 Bulk Collection Prep Summary:");
+          console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+          for (let i = 0; i < collectionPreps.length; i++) {
+            const prep = collectionPreps[i];
+            const orderList = prep.orderIndices
+              ? prep.orderIndices.map((idx) => idx + 1).join(", ")
+              : "None";
+            console.log(
+              `   Prep ${i + 1}: ${prep.carrier.name} - Orders: ${orderList} (${prep.orderIndices?.length || 0} orders)`,
+            );
+          }
+          console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        } else if (builderMode === "multiple") {
+          // Collection prep builder: configure multiple preps
+          collectionPreps = [];
+          let addMore = true;
+          let prepNumber = 1;
+
+          // Get locationId from orders (validate all orders have same location for now)
+          const locationIds = new Set(orders.map((o) => o.locationId).filter(Boolean));
+          if (locationIds.size > 1) {
+            throw new Error(
+              `Cannot create collection prep: orders have different locationIds: ${Array.from(locationIds).join(", ")}. ` +
+                `All orders must have the same locationId for collection prep.`,
+            );
+          }
+          const locationId = orders[0]?.locationId || "";
+          if (!locationId) {
+            throw new Error("Cannot create collection prep: no locationId found in orders");
+          }
+
+          while (addMore) {
+            const prepConfig = await promptService.promptCollectionPrepConfig(
+              prepNumber,
+              collectionPreps.length + 1,
+              carriers,
+              orders.length,
+            );
+
+            collectionPreps.push({
+              carrier: prepConfig.carrier,
+              locationId,
+              prepDate: new Date(),
+              testTag: prepConfig.testTag,
+              orderIndices: prepConfig.orderIndices,
+            });
+
+            prepNumber++;
+            addMore = await promptService.promptAddAnotherCollectionPrep();
+          }
+
+          // Show allocation summary
+          console.log("\n📊 Collection Prep Allocation Summary:");
+          console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+          for (let i = 0; i < collectionPreps.length; i++) {
+            const prep = collectionPreps[i];
+            const orderList = prep.orderIndices
+              ? prep.orderIndices.map((idx) => idx + 1).join(", ")
+              : "None";
+            console.log(
+              `   Prep ${i + 1}: ${prep.carrier.name} - Orders: ${orderList} (${prep.orderIndices?.length || 0} orders)`,
+            );
+          }
+          console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        } else {
+          // Legacy single collection prep mode
+          collectionPrepCount = await promptService.promptCollectionPrepCount(orders.length, carriers.length > 0);
+
+          if (collectionPrepCount > 0) {
+            carrier = await promptService.promptCarrierSelection(carriers);
+            prepDate = new Date();
+            testTag = await promptService.promptTestTag();
+          }
+        }
       }
 
+      performanceMetrics.orderCount = orders.length;
+      performanceMetrics.orderCreationTime = Date.now() - orderCreationStart;
+
       // Generate config
+      const configGenStart = Date.now();
       console.log("\n⚙️  Generating configuration...");
       const config = await generatorService.generateConfig({
         orders,
+        collectionPreps,
         collectionPrepCount,
         carrier,
         prepDate,
@@ -406,9 +874,18 @@ async function main(): Promise<void> {
         testTag,
       });
 
+      performanceMetrics.collectionPrepCount = config.collectionPreps?.length || (config.collectionPrep ? 1 : 0);
+      if (config.collectionPreps && config.collectionPreps.length > 1) {
+        performanceMetrics.parallelOperations = config.collectionPreps.length;
+      }
+      const configGenTime = Date.now() - configGenStart;
+      performanceMetrics.collectionPrepTime = configGenTime;
+
       // Validate config
+      const validationStart = Date.now();
       console.log("✅ Validating configuration...");
       const validationResult = await validationService.validateFull(config);
+      performanceMetrics.validationTime = Date.now() - validationStart;
 
       if (!validationResult.valid) {
         console.error("\n❌ Validation failed:");
@@ -445,14 +922,36 @@ async function main(): Promise<void> {
         console.log(`\n✅ Configuration saved to: ${outputPath}`);
       }
 
-      // Display summary
-      console.log("\n✅ Config Generation Complete!");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log(`📦 Orders: ${config.orders.length}`);
-      if (config.collectionPrep) {
-        console.log(`📋 Collection Prep: ${config.collectionPrep.carrier} at ${config.collectionPrep.locationId}`);
+      // Display summary (only if generation completed successfully)
+      if (config && config.orders.length > 0) {
+        performanceMetrics.totalTime = Date.now() - startTime;
+        console.log("\n✅ Config Generation Complete!");
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log(`📦 Orders: ${config.orders.length}`);
+        if (config.collectionPreps && config.collectionPreps.length > 0) {
+          console.log(`📋 Collection Preps: ${config.collectionPreps.length}`);
+          for (let i = 0; i < config.collectionPreps.length; i++) {
+            const prep = config.collectionPreps[i];
+            console.log(`   Prep ${i + 1}: ${prep.carrier} at ${prep.locationId}`);
+          }
+        } else if (config.collectionPrep) {
+          console.log(`📋 Collection Prep: ${config.collectionPrep.carrier} at ${config.collectionPrep.locationId}`);
+        }
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log("\n📊 Performance Summary:");
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log(`   Total Time: ${performanceMetrics.totalTime}ms (${(performanceMetrics.totalTime / 1000).toFixed(2)}s)`);
+        console.log(`   Reference Data Load: ${performanceMetrics.referenceDataLoadTime}ms`);
+        console.log(`   Order Creation: ${performanceMetrics.orderCreationTime}ms (${performanceMetrics.orderCount} orders)`);
+        if (performanceMetrics.collectionPrepCount > 0) {
+          console.log(`   Collection Prep Generation: ${performanceMetrics.collectionPrepTime}ms (${performanceMetrics.collectionPrepCount} preps)`);
+          if (performanceMetrics.parallelOperations > 0) {
+            console.log(`   Parallel Operations: ${performanceMetrics.parallelOperations} collection preps generated in parallel`);
+          }
+        }
+        console.log(`   Validation: ${performanceMetrics.validationTime}ms`);
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
       }
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
     } finally {
       await prisma.$disconnect();
     }

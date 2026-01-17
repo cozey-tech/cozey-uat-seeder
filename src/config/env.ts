@@ -2,6 +2,16 @@ import { z } from "zod";
 import { AwsSecretsService } from "../services/AwsSecretsService";
 import { Logger } from "../utils/logger";
 
+// Schema for raw env vars (before processing)
+const rawEnvSchema = z.object({
+  DATABASE_URL: z.string().url(),
+  SHOPIFY_STORE_DOMAIN: z.string().min(1),
+  SHOPIFY_ACCESS_TOKEN: z.string().min(1),
+  SHOPIFY_API_VERSION: z.string().optional().default("2024-01"),
+  DATABASE_CONNECTION_LIMIT: z.string().optional(), // Optional connection pool limit (parsed as string from env)
+});
+
+// Schema for processed config (after connection limit applied)
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   SHOPIFY_STORE_DOMAIN: z.string().min(1),
@@ -141,8 +151,65 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
     ...(awsSecrets as Partial<EnvConfig>),
   };
 
-  // Validate the merged config
-  const result = envSchema.safeParse(merged);
+  // Validate raw config first (before processing connection limit)
+  const rawResult = rawEnvSchema.safeParse(merged);
+  if (!rawResult.success) {
+    const missingVars = rawResult.error.errors.map((err) => err.path.join(".")).join(", ");
+    const sources = awsSecrets ? "AWS Secrets Manager and .env files" : ".env files";
+    throw new Error(
+      `Missing or invalid required environment variables: ${missingVars}. ` +
+        `Please check your ${sources}.`,
+    );
+  }
+
+  const rawConfig = rawResult.data;
+
+  // Apply connection pool limit to DATABASE_URL if specified
+  let processedDatabaseUrl = rawConfig.DATABASE_URL;
+  try {
+    let connectionLimit: number | null = null;
+
+    if (rawConfig.DATABASE_CONNECTION_LIMIT) {
+      const parsedLimit = parseInt(rawConfig.DATABASE_CONNECTION_LIMIT, 10);
+      if (!isNaN(parsedLimit) && parsedLimit > 0) {
+        connectionLimit = parsedLimit;
+      } else {
+        // Invalid value provided - log warning and fall back to default
+        Logger.warn("Invalid DATABASE_CONNECTION_LIMIT value, using default", {
+          providedValue: rawConfig.DATABASE_CONNECTION_LIMIT,
+          defaultValue: 10,
+        });
+        connectionLimit = 10; // Fall back to default
+      }
+    } else {
+      // No value provided - use default
+      connectionLimit = 10;
+    }
+
+    // Apply connection limit if URL doesn't already have one
+    const url = new URL(rawConfig.DATABASE_URL);
+    if (!url.searchParams.has("connection_limit")) {
+      url.searchParams.set("connection_limit", connectionLimit.toString());
+      processedDatabaseUrl = url.toString();
+    }
+  } catch (error) {
+    Logger.warn("Failed to parse DATABASE_URL for connection limit configuration, using original URL", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // Continue with original DATABASE_URL
+    processedDatabaseUrl = rawConfig.DATABASE_URL;
+  }
+
+  // Build final config with processed DATABASE_URL
+  const finalConfig: Partial<EnvConfig> = {
+    DATABASE_URL: processedDatabaseUrl,
+    SHOPIFY_STORE_DOMAIN: rawConfig.SHOPIFY_STORE_DOMAIN,
+    SHOPIFY_ACCESS_TOKEN: rawConfig.SHOPIFY_ACCESS_TOKEN,
+    SHOPIFY_API_VERSION: rawConfig.SHOPIFY_API_VERSION,
+  };
+
+  // Validate the final processed config
+  const result = envSchema.safeParse(finalConfig);
 
   if (!result.success) {
     const missingVars = result.error.errors.map((err) => err.path.join(".")).join(", ");

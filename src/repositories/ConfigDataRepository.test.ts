@@ -298,6 +298,194 @@ describe("ConfigDataRepository", () => {
     });
   });
 
+  describe("getLocationsForCustomers", () => {
+    it("should batch fetch locations for multiple customers", async () => {
+      const customers: Customer[] = [
+        {
+          id: "customer-1",
+          name: "Test 1",
+          email: "test1@example.com",
+          region: "CA",
+          locationId: "langley",
+        },
+        {
+          id: "customer-2",
+          name: "Test 2",
+          email: "test2@example.com",
+          region: "CA",
+          locationId: "windsor",
+        },
+        {
+          id: "customer-3",
+          name: "Test 3",
+          email: "test3@example.com",
+          region: "CA",
+          locationId: "langley", // Same location as customer-1
+        },
+      ];
+
+      const mockLocations = [
+        {
+          id: "langley",
+          name: "Langley",
+          region: "CA",
+          provinces: ["BC"],
+        },
+        {
+          id: "windsor",
+          name: "Windsor",
+          region: "CA",
+          provinces: ["ON"],
+        },
+      ];
+
+      mockPrisma.location.findMany.mockResolvedValue(mockLocations);
+
+      const result = await repository.getLocationsForCustomers(customers);
+
+      expect(result.size).toBe(3);
+      expect(result.get("customer-1")?.id).toBe("langley");
+      expect(result.get("customer-2")?.id).toBe("windsor");
+      expect(result.get("customer-3")?.id).toBe("langley");
+
+      // Should use single batched query
+      expect(mockPrisma.location.findMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.location.findMany).toHaveBeenCalledWith({
+        where: {
+          region: "CA",
+          id: { in: ["langley", "windsor"] }, // Unique location IDs
+        },
+        select: {
+          id: true,
+          name: true,
+          region: true,
+          provinces: true,
+        },
+      });
+    });
+
+    it("should handle customers from different regions", async () => {
+      const customers: Customer[] = [
+        {
+          id: "customer-1",
+          name: "Test 1",
+          email: "test1@example.com",
+          region: "CA",
+          locationId: "langley",
+        },
+        {
+          id: "customer-2",
+          name: "Test 2",
+          email: "test2@example.com",
+          region: "US",
+          locationId: "newyork",
+        },
+      ];
+
+      mockPrisma.location.findMany
+        .mockResolvedValueOnce([
+          {
+            id: "langley",
+            name: "Langley",
+            region: "CA",
+            provinces: ["BC"],
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: "newyork",
+            name: "New York",
+            region: "US",
+            provinces: ["NY"],
+          },
+        ]);
+
+      const result = await repository.getLocationsForCustomers(customers);
+
+      expect(result.size).toBe(2);
+      expect(result.get("customer-1")?.id).toBe("langley");
+      expect(result.get("customer-2")?.id).toBe("newyork");
+
+      // Should query once per region
+      expect(mockPrisma.location.findMany).toHaveBeenCalledTimes(2);
+    });
+
+    it("should handle empty customers array", async () => {
+      const result = await repository.getLocationsForCustomers([]);
+
+      expect(result.size).toBe(0);
+      expect(mockPrisma.location.findMany).not.toHaveBeenCalled();
+    });
+
+    it("should handle customers without locationId", async () => {
+      const customers: Customer[] = [
+        {
+          id: "customer-1",
+          name: "Test 1",
+          email: "test1@example.com",
+          region: "CA",
+          locationId: "langley",
+        },
+        {
+          id: "customer-2",
+          name: "Test 2",
+          email: "test2@example.com",
+          region: "CA",
+          locationId: "", // No locationId
+        },
+      ];
+
+      mockPrisma.location.findMany.mockResolvedValue([
+        {
+          id: "langley",
+          name: "Langley",
+          region: "CA",
+          provinces: ["BC"],
+        },
+      ]);
+
+      const result = await repository.getLocationsForCustomers(customers);
+
+      expect(result.size).toBe(1);
+      expect(result.get("customer-1")?.id).toBe("langley");
+      expect(result.get("customer-2")).toBeUndefined();
+    });
+
+    it("should handle missing locations gracefully", async () => {
+      const customers: Customer[] = [
+        {
+          id: "customer-1",
+          name: "Test 1",
+          email: "test1@example.com",
+          region: "CA",
+          locationId: "langley",
+        },
+        {
+          id: "customer-2",
+          name: "Test 2",
+          email: "test2@example.com",
+          region: "CA",
+          locationId: "invalid", // Location doesn't exist
+        },
+      ];
+
+      mockPrisma.location.findMany.mockResolvedValue([
+        {
+          id: "langley",
+          name: "Langley",
+          region: "CA",
+          provinces: ["BC"],
+        },
+      ]);
+
+      const result = await repository.getLocationsForCustomers(customers);
+
+      expect(result.size).toBe(1);
+      expect(result.get("customer-1")?.id).toBe("langley");
+      expect(result.get("customer-2")).toBeUndefined();
+    });
+  });
+
   describe("getLocationForCustomer", () => {
     it("should return location for customer", async () => {
       const customer: Customer = {

@@ -18,6 +18,7 @@ describe("InventoryService", () => {
     };
     inventory: {
       findFirst: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
       create: ReturnType<typeof vi.fn>;
       updateMany: ReturnType<typeof vi.fn>;
     };
@@ -33,6 +34,7 @@ describe("InventoryService", () => {
       },
       inventory: {
         findFirst: vi.fn(),
+        findMany: vi.fn(),
         create: vi.fn(),
         updateMany: vi.fn(),
       },
@@ -82,15 +84,18 @@ describe("InventoryService", () => {
         },
       ]);
 
-      mockPrisma.inventory.findFirst.mockResolvedValue({
-        id: "inv-1",
-        partId: "part-1",
-        locationId: "langley",
-        region: "CA",
-        onHand: 10,
-        openOrders: 2,
-        onHandCommitted: 1,
-      });
+      // Mock batched inventory query
+      mockPrisma.inventory.findMany.mockResolvedValue([
+        {
+          id: "inv-1",
+          partId: "part-1",
+          locationId: "langley",
+          region: "CA",
+          onHand: 10,
+          openOrders: 2,
+          onHandCommitted: 1,
+        },
+      ]);
 
       // Create quantity map (defaults to 1 if not provided)
       const variantQuantities = new Map([["SOFA-001-BLK", 1]]);
@@ -104,6 +109,14 @@ describe("InventoryService", () => {
 
       expect(result.sufficient).toBe(true);
       expect(result.shortages).toHaveLength(0);
+      // Verify batched query was used
+      expect(mockPrisma.inventory.findMany).toHaveBeenCalledWith({
+        where: {
+          partId: { in: ["part-1"] },
+          locationId: "langley",
+          region: "CA",
+        },
+      });
     });
 
     it("should detect shortages", async () => {
@@ -136,15 +149,18 @@ describe("InventoryService", () => {
         },
       ]);
 
-      mockPrisma.inventory.findFirst.mockResolvedValue({
-        id: "inv-1",
-        partId: "part-1",
-        locationId: "langley",
-        region: "CA",
-        onHand: 2,
-        openOrders: 1,
-        onHandCommitted: 1,
-      });
+      // Mock batched inventory query
+      mockPrisma.inventory.findMany.mockResolvedValue([
+        {
+          id: "inv-1",
+          partId: "part-1",
+          locationId: "langley",
+          region: "CA",
+          onHand: 2,
+          openOrders: 1,
+          onHandCommitted: 1,
+        },
+      ]);
 
       const variantQuantities = new Map([["SOFA-001-BLK", 1]]);
 
@@ -190,7 +206,8 @@ describe("InventoryService", () => {
         },
       ]);
 
-      mockPrisma.inventory.findFirst.mockResolvedValue(null);
+      // Mock batched inventory query - no inventory found
+      mockPrisma.inventory.findMany.mockResolvedValue([]);
 
       const variantQuantities = new Map([["SOFA-001-BLK", 1]]);
 
@@ -235,15 +252,18 @@ describe("InventoryService", () => {
         },
       ]);
 
-      mockPrisma.inventory.findFirst.mockResolvedValue({
-        id: "inv-1",
-        partId: "part-1",
-        locationId: "langley",
-        region: "CA",
-        onHand: 5, // 5 parts available
-        openOrders: 0,
-        onHandCommitted: 0,
-      });
+      // Mock batched inventory query
+      mockPrisma.inventory.findMany.mockResolvedValue([
+        {
+          id: "inv-1",
+          partId: "part-1",
+          locationId: "langley",
+          region: "CA",
+          onHand: 5, // 5 parts available
+          openOrders: 0,
+          onHandCommitted: 0,
+        },
+      ]);
 
       // Order quantity is 3, so need 2 parts * 3 quantity = 6 parts
       const variantQuantities = new Map([["SOFA-001-BLK", 3]]);
@@ -366,15 +386,18 @@ describe("InventoryService", () => {
         },
       ]);
 
-      mockPrisma.inventory.findFirst.mockResolvedValue({
-        id: "inv-1",
-        partId: "part-1",
-        locationId: "langley",
-        region: "CA",
-        onHand: 10,
-        openOrders: 0,
-        onHandCommitted: 0,
-      });
+      // Mock batched inventory query
+      mockPrisma.inventory.findMany.mockResolvedValue([
+        {
+          id: "inv-1",
+          partId: "part-1",
+          locationId: "langley",
+          region: "CA",
+          onHand: 10,
+          openOrders: 0,
+          onHandCommitted: 0,
+        },
+      ]);
 
       const result = await service.ensureInventoryForOrder(order, "langley", "CA");
 
@@ -382,8 +405,14 @@ describe("InventoryService", () => {
       // Have 10, so sufficient
       expect(result.sufficient).toBe(true);
       
-      // Verify that variantPart.findMany was called (indicating inventory check ran)
-      expect(mockPrisma.variantPart.findMany).toHaveBeenCalled();
+      // Verify that variantPart.findMany was called with batched query (for pickType lookup)
+      expect(mockPrisma.variantPart.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            variantId: { in: ["variant-1"] },
+          },
+        }),
+      );
     });
 
     it("should ensure inventory is available", async () => {
@@ -430,33 +459,37 @@ describe("InventoryService", () => {
         },
       ];
 
-      // Setup mocks: first for pickType lookup, then two for inventory checks
+      // Setup mocks: first for pickType lookup (batched), then two for inventory checks (batched)
       mockPrisma.variantPart.findMany
-        .mockResolvedValueOnce(variantPartData) // PickType lookup in ensureInventoryForOrder
+        .mockResolvedValueOnce(variantPartData) // PickType lookup in ensureInventoryForOrder (batched)
         .mockResolvedValueOnce(variantPartData) // First checkInventoryAvailability
         .mockResolvedValueOnce(variantPartData); // Re-check after modification
 
-      // First check - insufficient inventory
-      mockPrisma.inventory.findFirst
-        .mockResolvedValueOnce({
-          id: "inv-1",
-          partId: "part-1",
-          locationId: "langley",
-          region: "CA",
-          onHand: 0,
-          openOrders: 0,
-          onHandCommitted: 0,
-        })
-        // After modification - sufficient inventory
-        .mockResolvedValueOnce({
-          id: "inv-1",
-          partId: "part-1",
-          locationId: "langley",
-          region: "CA",
-          onHand: 10,
-          openOrders: 0,
-          onHandCommitted: 0,
-        });
+      // First check - insufficient inventory (batched query)
+      mockPrisma.inventory.findMany
+        .mockResolvedValueOnce([
+          {
+            id: "inv-1",
+            partId: "part-1",
+            locationId: "langley",
+            region: "CA",
+            onHand: 0,
+            openOrders: 0,
+            onHandCommitted: 0,
+          },
+        ])
+        // After modification - sufficient inventory (batched query)
+        .mockResolvedValueOnce([
+          {
+            id: "inv-1",
+            partId: "part-1",
+            locationId: "langley",
+            region: "CA",
+            onHand: 10,
+            openOrders: 0,
+            onHandCommitted: 0,
+          },
+        ]);
 
       // Mock inventory.findFirst for modifyInventory call
       mockPrisma.inventory.findFirst.mockResolvedValueOnce({

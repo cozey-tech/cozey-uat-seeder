@@ -1,6 +1,7 @@
 import inquirer from "inquirer";
 import { search } from "@inquirer/prompts";
 import type { Customer, Variant, Carrier } from "../repositories/ConfigDataRepository";
+import type { OrderComposition } from "./OrderCompositionBuilder";
 
 export interface OrderTemplate {
   id: string;
@@ -30,6 +31,27 @@ export interface InventoryCheckResult {
  * Provides type-safe wrappers around inquirer prompts for config generation
  */
 export class InteractivePromptService {
+  /**
+   * Prompt for order creation mode
+   */
+  async promptOrderCreationMode(): Promise<"individual" | "bulk-template" | "quick-duplicate"> {
+    const { mode } = await inquirer.prompt<{ mode: "individual" | "bulk-template" | "quick-duplicate" }>([
+      {
+        type: "list",
+        name: "mode",
+        message: "How would you like to create orders?",
+        choices: [
+          { name: "Individual (one at a time)", value: "individual" },
+          { name: "Bulk from template (create many from a template)", value: "bulk-template" },
+          { name: "Quick duplicate (create one, then duplicate with edits)", value: "quick-duplicate" },
+        ],
+        default: "individual",
+      },
+    ]);
+
+    return mode;
+  }
+
   /**
    * Prompt for number of orders to create
    */
@@ -630,5 +652,317 @@ export class InteractivePromptService {
     ]);
 
     return id;
+  }
+
+  /**
+   * Prompt for bulk order count
+   */
+  async promptBulkOrderCount(max?: number): Promise<number> {
+    const { count } = await inquirer.prompt<{ count: string }>([
+      {
+        type: "input",
+        name: "count",
+        message: `How many orders would you like to create?${max ? ` (max ${max})` : ""}`,
+        default: "10",
+        validate: (input: string): boolean | string => {
+          const num = parseInt(input, 10);
+          if (isNaN(num) || !Number.isInteger(num) || num < 1) {
+            return "Please enter a positive integer (minimum 1)";
+          }
+          if (max !== undefined && num > max) {
+            return `Maximum ${max} orders allowed`;
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    return parseInt(count, 10);
+  }
+
+  /**
+   * Prompt for customer selection for bulk orders (with option to use same customer)
+   */
+  async promptBulkCustomerSelection(
+    customers: Customer[],
+    allowSame: boolean = true,
+  ): Promise<{ customer: Customer; useSameForAll: boolean }> {
+    if (allowSame) {
+      const { useSame } = await inquirer.prompt<{ useSame: boolean }>([
+        {
+          type: "confirm",
+          name: "useSame",
+          message: "Use the same customer for all orders?",
+          default: true,
+        },
+      ]);
+
+      if (useSame) {
+        const customer = await this.promptCustomerSelection(customers);
+        return { customer, useSameForAll: true };
+      }
+    }
+
+    const customer = await this.promptCustomerSelection(customers);
+    return { customer, useSameForAll: false };
+  }
+
+  /**
+   * Prompt for collection prep builder mode
+   */
+  async promptCollectionPrepBuilderMode(): Promise<"single" | "multiple" | "bulk"> {
+    const { mode } = await inquirer.prompt<{ mode: "single" | "multiple" | "bulk" }>([
+      {
+        type: "list",
+        name: "mode",
+        message: "How would you like to configure collection preps?",
+        choices: [
+          { name: "Single collection prep (simple)", value: "single" },
+          { name: "Multiple collection preps with different carriers (builder)", value: "multiple" },
+          { name: "Bulk create multiple preps (same config, vary carriers)", value: "bulk" },
+        ],
+        default: "single",
+      },
+    ]);
+
+    return mode;
+  }
+
+  /**
+   * Prompt for bulk collection prep configuration
+   */
+  async promptBulkCollectionPrepConfig(
+    carriers: Carrier[],
+    orderCount: number,
+  ): Promise<{
+    count: number;
+    baseTestTag: string;
+    carrierMode: "same" | "different";
+    carriers: Carrier[];
+  }> {
+    const { count } = await inquirer.prompt<{ count: string }>([
+      {
+        type: "input",
+        name: "count",
+        message: "How many collection preps would you like to create?",
+        default: "3",
+        validate: (input: string): boolean | string => {
+          const num = parseInt(input, 10);
+          if (isNaN(num) || !Number.isInteger(num) || num < 1) {
+            return "Please enter a positive integer (minimum 1)";
+          }
+          if (num > orderCount) {
+            return `Cannot have more collection preps than orders (${orderCount})`;
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    const prepCount = parseInt(count, 10);
+    const baseTestTag = await this.promptTestTag();
+
+    const { carrierMode } = await inquirer.prompt<{ carrierMode: "same" | "different" }>([
+      {
+        type: "list",
+        name: "carrierMode",
+        message: "How should carriers be assigned?",
+        choices: [
+          { name: "Same carrier for all preps", value: "same" },
+          { name: "Different carrier per prep", value: "different" },
+        ],
+        default: "same",
+      },
+    ]);
+
+    let selectedCarriers: Carrier[];
+    if (carrierMode === "same") {
+      const carrier = await this.promptCarrierSelection(carriers);
+      selectedCarriers = Array(prepCount).fill(carrier);
+    } else {
+      // Select carriers for each prep
+      selectedCarriers = [];
+      for (let i = 0; i < prepCount; i++) {
+        console.log(`\nSelect carrier for Prep ${i + 1} of ${prepCount}:`);
+        const carrier = await this.promptCarrierSelection(carriers);
+        selectedCarriers.push(carrier);
+      }
+    }
+
+    return {
+      count: prepCount,
+      baseTestTag,
+      carrierMode,
+      carriers: selectedCarriers,
+    };
+  }
+
+  /**
+   * Prompt for collection prep configuration (for builder)
+   */
+  async promptCollectionPrepConfig(
+    prepNumber: number,
+    totalPreps: number,
+    carriers: Carrier[],
+    orderCount: number,
+  ): Promise<{
+    carrier: Carrier;
+    testTag: string;
+    orderIndices: number[];
+  }> {
+    console.log(`\n📋 Configuring Collection Prep ${prepNumber} of ${totalPreps}`);
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    const carrier = await this.promptCarrierSelection(carriers);
+    const testTag = await this.promptTestTag();
+
+    // Show order allocation options
+    const { allocationType } = await inquirer.prompt<{ allocationType: "auto" | "manual" }>([
+      {
+        type: "list",
+        name: "allocationType",
+        message: "How should orders be allocated to this collection prep?",
+        choices: [
+          { name: "Auto (round-robin)", value: "auto" },
+          { name: "Manual (select specific orders)", value: "manual" },
+        ],
+        default: "auto",
+      },
+    ]);
+
+    let orderIndices: number[];
+    if (allocationType === "auto") {
+      // Round-robin allocation
+      orderIndices = [];
+      for (let i = prepNumber - 1; i < orderCount; i += totalPreps) {
+        orderIndices.push(i);
+      }
+      console.log(`   ✓ Auto-allocated orders: ${orderIndices.map((i) => i + 1).join(", ")}`);
+    } else {
+      // Manual selection
+      const result = await inquirer.prompt<{ selectedOrders: number[] }>([
+        {
+          type: "checkbox",
+          name: "selectedOrders",
+          message: "Select orders for this collection prep:",
+          choices: Array.from({ length: orderCount }, (_, i) => ({
+            name: `Order ${i + 1}`,
+            value: i,
+          })),
+          validate: (input: unknown): boolean | string => {
+            if (!Array.isArray(input) || input.length === 0) {
+              return "Please select at least one order";
+            }
+            return true;
+          },
+        },
+      ]);
+      orderIndices = result.selectedOrders;
+      console.log(`   ✓ Selected orders: ${orderIndices.map((i) => i + 1).join(", ")}`);
+    }
+
+    return {
+      carrier,
+      testTag,
+      orderIndices,
+    };
+  }
+
+  /**
+   * Prompt to add another collection prep
+   */
+  async promptAddAnotherCollectionPrep(): Promise<boolean> {
+    const { addMore } = await inquirer.prompt<{ addMore: boolean }>([
+      {
+        type: "confirm",
+        name: "addMore",
+        message: "Would you like to add another collection prep?",
+        default: false,
+      },
+    ]);
+
+    return addMore;
+  }
+
+  /**
+   * Display order review summary and prompt for action
+   */
+  async promptOrderReviewAction(orders: Array<{ customer: Customer; composition: OrderComposition }>): Promise<"continue" | "add-more" | "edit" | "delete" | "start-over"> {
+    // Display summary
+    console.log("\n📋 Order Review");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log(`Total Orders: ${orders.length}\n`);
+
+    for (let i = 0; i < orders.length; i++) {
+      const order = orders[i];
+      const itemCount = order.composition.lineItems.length;
+      const totalItems = order.composition.lineItems.reduce(
+        (sum: number, item: { quantity: number }) => sum + item.quantity,
+        0,
+      );
+      console.log(`   Order ${i + 1}: ${order.customer.name} (${order.customer.email})`);
+      console.log(`            Location: ${order.customer.locationId}`);
+      console.log(`            Items: ${itemCount} line items, ${totalItems} total quantity`);
+      console.log("");
+    }
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+    const { action } = await inquirer.prompt<{ action: "continue" | "add-more" | "edit" | "delete" | "start-over" }>([
+      {
+        type: "list",
+        name: "action",
+        message: "What would you like to do?",
+        choices: [
+          { name: "Continue to collection prep configuration", value: "continue" },
+          { name: "Add more orders", value: "add-more" },
+          { name: "Edit an order", value: "edit" },
+          { name: "Delete an order", value: "delete" },
+          { name: "Start over", value: "start-over" },
+        ],
+        default: "continue",
+      },
+    ]);
+
+    return action;
+  }
+
+  /**
+   * Prompt for which order to edit
+   */
+  async promptOrderToEdit(orderCount: number): Promise<number> {
+    const { orderIndex } = await inquirer.prompt<{ orderIndex: number }>([
+      {
+        type: "list",
+        name: "orderIndex",
+        message: "Which order would you like to edit?",
+        choices: Array.from({ length: orderCount }, (_, i) => ({
+          name: `Order ${i + 1}`,
+          value: i,
+        })),
+      },
+    ]);
+
+    return orderIndex;
+  }
+
+  /**
+   * Prompt for which order to delete
+   */
+  async promptOrderToDelete(orderCount: number): Promise<number> {
+    const { orderIndex } = await inquirer.prompt<{ orderIndex: number }>([
+      {
+        type: "list",
+        name: "orderIndex",
+        message: "Which order would you like to delete?",
+        choices: Array.from({ length: orderCount }, (_, i) => ({
+          name: `Order ${i + 1}`,
+          value: i,
+        })),
+      },
+    ]);
+
+    return orderIndex;
   }
 }

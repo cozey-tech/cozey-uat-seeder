@@ -295,6 +295,73 @@ export class ConfigDataRepository {
   }
 
   /**
+   * Get locations for multiple customers in a single batched query
+   * Returns a Map keyed by customer ID for O(1) lookup
+   */
+  async getLocationsForCustomers(customers: Customer[]): Promise<Map<string, Location>> {
+    if (customers.length === 0) {
+      return new Map();
+    }
+
+    // Group customers by region to batch queries efficiently
+    const customersByRegion = new Map<string, Customer[]>();
+    for (const customer of customers) {
+      if (!customer.locationId) {
+        continue; // Skip customers without locationId
+      }
+      const regionCustomers = customersByRegion.get(customer.region) || [];
+      regionCustomers.push(customer);
+      customersByRegion.set(customer.region, regionCustomers);
+    }
+
+    const locationMap = new Map<string, Location>();
+
+    // Batch fetch locations for each region
+    for (const [region, regionCustomers] of customersByRegion.entries()) {
+      // Get unique location IDs for this region
+      const locationIds = Array.from(new Set(regionCustomers.map((c) => c.locationId).filter(Boolean)));
+
+      if (locationIds.length === 0) {
+        continue;
+      }
+
+      // Single batched query for all locations in this region
+      const locations = await this.prisma.location.findMany({
+        where: {
+          region,
+          id: { in: locationIds },
+        },
+        select: {
+          id: true,
+          name: true,
+          region: true,
+          provinces: true,
+        },
+      });
+
+      // Map locations by ID
+      const locationsById = new Map(locations.map((l) => [l.id, l]));
+
+      // Map to customers by locationId
+      for (const customer of regionCustomers) {
+        if (customer.locationId) {
+          const location = locationsById.get(customer.locationId);
+          if (location) {
+            locationMap.set(customer.id, {
+              id: location.id,
+              name: location.name,
+              region: location.region,
+              provinces: location.provinces,
+            });
+          }
+        }
+      }
+    }
+
+    return locationMap;
+  }
+
+  /**
    * Get location for a customer (direct mapping from customer.locationId)
    */
   async getLocationForCustomer(customer: Customer): Promise<Location | null> {

@@ -29,7 +29,8 @@ describe("env config", () => {
       const { initializeEnvConfig } = await import("./env");
       const config = await initializeEnvConfig();
 
-      expect(config.DATABASE_URL).toBe("postgresql://user:pass@localhost:5432/db");
+      // Default connection_limit should be applied
+      expect(config.DATABASE_URL).toBe("postgresql://user:pass@localhost:5432/db?connection_limit=10");
       expect(config.SHOPIFY_STORE_DOMAIN).toBe("test-store.myshopify.com");
       expect(config.SHOPIFY_ACCESS_TOKEN).toBe("test-token");
       expect(config.SHOPIFY_API_VERSION).toBe("2024-01");
@@ -103,7 +104,8 @@ describe("env config", () => {
       const config = await initializeEnvConfig();
 
       // Verify plain string secrets were transformed to correct env var names
-      expect(config.DATABASE_URL).toBe("postgresql://user:pass@aws-db.example.com:5432/db");
+      // Default connection_limit should be applied
+      expect(config.DATABASE_URL).toBe("postgresql://user:pass@aws-db.example.com:5432/db?connection_limit=10");
       expect(config.SHOPIFY_ACCESS_TOKEN).toBe("aws-token-12345");
       expect(config.SHOPIFY_STORE_DOMAIN).toBe("test-store.myshopify.com");
     });
@@ -127,7 +129,8 @@ describe("env config", () => {
       const config = await initializeEnvConfig();
 
       // Verify JSON secrets are used as-is (already have correct keys)
-      expect(config.DATABASE_URL).toBe("postgresql://user:pass@aws-db.example.com:5432/db");
+      // Default connection_limit should be applied
+      expect(config.DATABASE_URL).toBe("postgresql://user:pass@aws-db.example.com:5432/db?connection_limit=10");
       expect(config.SHOPIFY_ACCESS_TOKEN).toBe("aws-token-12345");
       expect(config.SHOPIFY_STORE_DOMAIN).toBe("aws-store.myshopify.com");
     });
@@ -153,7 +156,8 @@ describe("env config", () => {
       const config = await initializeEnvConfig();
 
       // Verify plain string secret was transformed, JSON secrets used as-is
-      expect(config.DATABASE_URL).toBe("postgresql://user:pass@aws-db.example.com:5432/db");
+      // Default connection_limit should be applied
+      expect(config.DATABASE_URL).toBe("postgresql://user:pass@aws-db.example.com:5432/db?connection_limit=10");
       expect(config.SHOPIFY_ACCESS_TOKEN).toBe("aws-token-12345");
       expect(config.SHOPIFY_STORE_DOMAIN).toBe("aws-store.myshopify.com");
     });
@@ -174,7 +178,8 @@ describe("env config", () => {
       await initializeEnvConfig();
       const config = getEnvConfig();
 
-      expect(config.DATABASE_URL).toBe("postgresql://user:pass@localhost:5432/db");
+      // Default connection_limit should be applied
+      expect(config.DATABASE_URL).toBe("postgresql://user:pass@localhost:5432/db?connection_limit=10");
       expect(config.SHOPIFY_STORE_DOMAIN).toBe("test-store.myshopify.com");
       expect(config.SHOPIFY_ACCESS_TOKEN).toBe("test-token");
     });
