@@ -166,20 +166,28 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
 
   // Apply connection pool limit to DATABASE_URL if specified
   let processedDatabaseUrl = rawConfig.DATABASE_URL;
-  if (rawConfig.DATABASE_CONNECTION_LIMIT) {
-    const connectionLimit = parseInt(rawConfig.DATABASE_CONNECTION_LIMIT, 10);
-    if (!isNaN(connectionLimit) && connectionLimit > 0) {
+  try {
+    if (rawConfig.DATABASE_CONNECTION_LIMIT) {
+      const connectionLimit = parseInt(rawConfig.DATABASE_CONNECTION_LIMIT, 10);
+      if (!isNaN(connectionLimit) && connectionLimit > 0) {
+        const url = new URL(rawConfig.DATABASE_URL);
+        url.searchParams.set("connection_limit", connectionLimit.toString());
+        processedDatabaseUrl = url.toString();
+      }
+    } else {
+      // Default connection limit of 10 if not specified
       const url = new URL(rawConfig.DATABASE_URL);
-      url.searchParams.set("connection_limit", connectionLimit.toString());
-      processedDatabaseUrl = url.toString();
+      if (!url.searchParams.has("connection_limit")) {
+        url.searchParams.set("connection_limit", "10");
+        processedDatabaseUrl = url.toString();
+      }
     }
-  } else {
-    // Default connection limit of 10 if not specified
-    const url = new URL(rawConfig.DATABASE_URL);
-    if (!url.searchParams.has("connection_limit")) {
-      url.searchParams.set("connection_limit", "10");
-      processedDatabaseUrl = url.toString();
-    }
+  } catch (error) {
+    Logger.warn("Failed to parse DATABASE_URL for connection limit configuration, using original URL", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // Continue with original DATABASE_URL
+    processedDatabaseUrl = rawConfig.DATABASE_URL;
   }
 
   // Build final config with processed DATABASE_URL

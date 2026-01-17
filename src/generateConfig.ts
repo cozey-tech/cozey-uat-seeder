@@ -908,34 +908,36 @@ async function main(): Promise<void> {
         console.log(`\n✅ Configuration saved to: ${outputPath}`);
       }
 
-      // Display summary
-      performanceMetrics.totalTime = Date.now() - startTime;
-      console.log("\n✅ Config Generation Complete!");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log(`📦 Orders: ${config.orders.length}`);
-      if (config.collectionPreps && config.collectionPreps.length > 0) {
-        console.log(`📋 Collection Preps: ${config.collectionPreps.length}`);
-        for (let i = 0; i < config.collectionPreps.length; i++) {
-          const prep = config.collectionPreps[i];
-          console.log(`   Prep ${i + 1}: ${prep.carrier} at ${prep.locationId}`);
+      // Display summary (only if generation completed successfully)
+      if (config && config.orders.length > 0) {
+        performanceMetrics.totalTime = Date.now() - startTime;
+        console.log("\n✅ Config Generation Complete!");
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log(`📦 Orders: ${config.orders.length}`);
+        if (config.collectionPreps && config.collectionPreps.length > 0) {
+          console.log(`📋 Collection Preps: ${config.collectionPreps.length}`);
+          for (let i = 0; i < config.collectionPreps.length; i++) {
+            const prep = config.collectionPreps[i];
+            console.log(`   Prep ${i + 1}: ${prep.carrier} at ${prep.locationId}`);
+          }
+        } else if (config.collectionPrep) {
+          console.log(`📋 Collection Prep: ${config.collectionPrep.carrier} at ${config.collectionPrep.locationId}`);
         }
-      } else if (config.collectionPrep) {
-        console.log(`📋 Collection Prep: ${config.collectionPrep.carrier} at ${config.collectionPrep.locationId}`);
-      }
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("\n📊 Performance Summary:");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log(`   Total Time: ${performanceMetrics.totalTime}ms (${(performanceMetrics.totalTime / 1000).toFixed(2)}s)`);
-      console.log(`   Reference Data Load: ${performanceMetrics.referenceDataLoadTime}ms`);
-      console.log(`   Order Creation: ${performanceMetrics.orderCreationTime}ms (${performanceMetrics.orderCount} orders)`);
-      if (performanceMetrics.collectionPrepCount > 0) {
-        console.log(`   Collection Prep Generation: ${performanceMetrics.collectionPrepTime}ms (${performanceMetrics.collectionPrepCount} preps)`);
-        if (performanceMetrics.parallelOperations > 0) {
-          console.log(`   Parallel Operations: ${performanceMetrics.parallelOperations} collection preps generated in parallel`);
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log("\n📊 Performance Summary:");
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log(`   Total Time: ${performanceMetrics.totalTime}ms (${(performanceMetrics.totalTime / 1000).toFixed(2)}s)`);
+        console.log(`   Reference Data Load: ${performanceMetrics.referenceDataLoadTime}ms`);
+        console.log(`   Order Creation: ${performanceMetrics.orderCreationTime}ms (${performanceMetrics.orderCount} orders)`);
+        if (performanceMetrics.collectionPrepCount > 0) {
+          console.log(`   Collection Prep Generation: ${performanceMetrics.collectionPrepTime}ms (${performanceMetrics.collectionPrepCount} preps)`);
+          if (performanceMetrics.parallelOperations > 0) {
+            console.log(`   Parallel Operations: ${performanceMetrics.parallelOperations} collection preps generated in parallel`);
+          }
         }
+        console.log(`   Validation: ${performanceMetrics.validationTime}ms`);
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
       }
-      console.log(`   Validation: ${performanceMetrics.validationTime}ms`);
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
     } finally {
       await prisma.$disconnect();
     }

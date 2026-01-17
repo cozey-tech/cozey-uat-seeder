@@ -266,6 +266,8 @@ export class ConfigGeneratorService {
    * - Adding retry logic with exponential backoff
    * - Using a distributed lock (e.g., Redis) for ID generation
    * - Generating IDs at seeding time instead of config generation time
+   *
+   * @param retryCount - Internal parameter for retry logic (do not set manually)
    */
   async generateCollectionPrepIds(
     count: number,
@@ -273,77 +275,105 @@ export class ConfigGeneratorService {
     locationId: string,
     prepDate: Date,
     region: string,
+    retryCount: number = 0,
   ): Promise<string[]> {
-    // Get location name to extract first and last letter
-    const location = await this.prisma.location.findUnique({
-      where: {
-        id_region: {
-          id: locationId,
+    try {
+      // Get location name to extract first and last letter
+      const location = await this.prisma.location.findUnique({
+        where: {
+          id_region: {
+            id: locationId,
+            region,
+          },
+        },
+        select: {
+          name: true,
+        },
+      });
+
+      if (!location) {
+        throw new Error(`Location ${locationId} not found for region ${region}`);
+      }
+
+      // Extract first and last letter from location name
+      const locationAbbrev = this.getLocationAbbreviation(location.name);
+
+      // Format date as MMDDYY
+      const month = String(prepDate.getMonth() + 1).padStart(2, "0");
+      const day = String(prepDate.getDate()).padStart(2, "0");
+      const year = String(prepDate.getFullYear()).slice(-2);
+      const dateStr = `${month}${day}${year}`;
+
+      // Check existing collection preps to determine count
+      // Note: This query is not atomic with ID generation, creating a race condition window.
+      // For staging/UAT use, this is acceptable, but be aware of the limitation.
+      const existingPreps = await this.prisma.collectionPrep.findMany({
+        where: {
           region,
+          locationId,
+          carrier,
+          prepDate: {
+            gte: new Date(prepDate.getFullYear(), prepDate.getMonth(), prepDate.getDate()),
+            lt: new Date(
+              prepDate.getFullYear(),
+              prepDate.getMonth(),
+              prepDate.getDate() + 1,
+            ),
+          },
         },
-      },
-      select: {
-        name: true,
-      },
-    });
-
-    if (!location) {
-      throw new Error(`Location ${locationId} not found for region ${region}`);
-    }
-
-    // Extract first and last letter from location name
-    const locationAbbrev = this.getLocationAbbreviation(location.name);
-
-    // Format date as MMDDYY
-    const month = String(prepDate.getMonth() + 1).padStart(2, "0");
-    const day = String(prepDate.getDate()).padStart(2, "0");
-    const year = String(prepDate.getFullYear()).slice(-2);
-    const dateStr = `${month}${day}${year}`;
-
-    // Check existing collection preps to determine count
-    // Note: This query is not atomic with ID generation, creating a race condition window.
-    // For staging/UAT use, this is acceptable, but be aware of the limitation.
-    const existingPreps = await this.prisma.collectionPrep.findMany({
-      where: {
-        region,
-        locationId,
-        carrier,
-        prepDate: {
-          gte: new Date(prepDate.getFullYear(), prepDate.getMonth(), prepDate.getDate()),
-          lt: new Date(
-            prepDate.getFullYear(),
-            prepDate.getMonth(),
-            prepDate.getDate() + 1,
-          ),
+        select: {
+          id: true,
         },
-      },
-      select: {
-        id: true,
-      },
-      orderBy: {
-        id: "asc",
-      },
-    });
+        orderBy: {
+          id: "asc",
+        },
+      });
 
-    // Extract count from existing IDs to determine next count
-    const existingCounts = existingPreps
-      .map((prep) => {
-        const match = prep.id.match(/\d+$/);
-        return match ? parseInt(match[0], 10) : 0;
-      })
-      .filter((c) => c > 0);
+      // Extract count from existing IDs to determine next count
+      const existingCounts = existingPreps
+        .map((prep) => {
+          const match = prep.id.match(/\d+$/);
+          return match ? parseInt(match[0], 10) : 0;
+        })
+        .filter((c) => c > 0);
 
-    const startCount = existingCounts.length > 0 ? Math.max(...existingCounts) + 1 : 1;
+      const startCount = existingCounts.length > 0 ? Math.max(...existingCounts) + 1 : 1;
 
-    // Generate IDs
-    const ids: string[] = [];
-    for (let i = 0; i < count; i++) {
-      const currentCount = startCount + i;
-      const id = `${dateStr}${locationAbbrev}${carrier}${currentCount}`;
-      ids.push(id);
+      // Generate IDs
+      const ids: string[] = [];
+      for (let i = 0; i < count; i++) {
+        const currentCount = startCount + i;
+        const id = `${dateStr}${locationAbbrev}${carrier}${currentCount}`;
+        ids.push(id);
+      }
+
+      return ids;
+    } catch (error: unknown) {
+      // Handle race condition: if unique constraint violation and retries left, retry with exponential backoff
+      // Prisma error code P2002 indicates unique constraint violation
+      // Note: This catch handles errors from the entire try block, including DB operations
+      const isUniqueConstraintError =
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "P2002";
+      
+      if (isUniqueConstraintError && retryCount < 3) {
+        const delayMs = 100 * Math.pow(2, retryCount); // Exponential backoff: 100ms, 200ms, 400ms
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        return this.generateCollectionPrepIds(
+          count,
+          carrier,
+          locationId,
+          prepDate,
+          region,
+          retryCount + 1,
+        );
+      }
+      
+      // Re-throw if not a unique constraint error or retries exhausted
+      throw error;
     }
-
-    return ids;
   }
 
   /**
