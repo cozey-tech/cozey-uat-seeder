@@ -464,6 +464,140 @@ describe("ConfigGeneratorService", () => {
         },
       });
     });
+
+    it("should handle collection preps with different locationIds", async () => {
+      const customer1: Customer = {
+        id: "customer-1",
+        name: "Test Customer 1",
+        email: "test1@example.com",
+        region: "CA",
+        locationId: "langley",
+      };
+
+      const customer2: Customer = {
+        id: "customer-2",
+        name: "Test Customer 2",
+        email: "test2@example.com",
+        region: "CA",
+        locationId: "windsor",
+      };
+
+      const customer3: Customer = {
+        id: "customer-3",
+        name: "Test Customer 3",
+        email: "test3@example.com",
+        region: "CA",
+        locationId: "royalmount",
+      };
+
+      const composition: OrderComposition = {
+        lineItems: [
+          {
+            sku: "SOFA-001-BLK",
+            quantity: 1,
+            pickType: "Regular",
+          },
+        ],
+      };
+
+      const carrier: Carrier = {
+        id: "CANPAR",
+        name: "Canpar",
+        region: "CA",
+      };
+
+      const options = {
+        orders: [
+          {
+            customer: customer1,
+            composition,
+            locationId: "langley",
+          },
+          {
+            customer: customer2,
+            composition,
+            locationId: "windsor",
+          },
+          {
+            customer: customer3,
+            composition,
+            locationId: "royalmount",
+          },
+        ],
+        collectionPreps: [
+          {
+            carrier,
+            locationId: "langley",
+            prepDate: new Date("2024-01-15"),
+            testTag: "Test1",
+            orderIndices: [0],
+          },
+          {
+            carrier,
+            locationId: "windsor",
+            prepDate: new Date("2024-01-15"),
+            testTag: "Test2",
+            orderIndices: [1],
+          },
+          {
+            carrier,
+            locationId: "royalmount",
+            prepDate: new Date("2024-01-15"),
+            testTag: "Test3",
+            orderIndices: [2],
+          },
+        ],
+        region: "CA",
+      };
+
+      // Mock batched location lookup for all three locations
+      mockPrisma.location.findMany.mockResolvedValue([
+        {
+          id: "langley",
+          name: "Langley",
+        },
+        {
+          id: "windsor",
+          name: "Windsor",
+        },
+        {
+          id: "royalmount",
+          name: "Royal Mount",
+        },
+      ]);
+
+      // Mock findUnique (used by generateCollectionPrepIds internally)
+      mockPrisma.location.findUnique
+        .mockResolvedValueOnce({ name: "Langley" })
+        .mockResolvedValueOnce({ name: "Windsor" })
+        .mockResolvedValueOnce({ name: "Royal Mount" });
+
+      // Mock collection prep queries
+      mockPrisma.collectionPrep.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.generateConfig(options);
+
+      expect(result.collectionPreps).toBeDefined();
+      expect(result.collectionPreps).toHaveLength(3);
+      expect(result.collectionPreps?.[0]?.locationId).toBe("langley");
+      expect(result.collectionPreps?.[1]?.locationId).toBe("windsor");
+      expect(result.collectionPreps?.[2]?.locationId).toBe("royalmount");
+
+      // Verify batch location lookup was used with all unique location IDs
+      expect(mockPrisma.location.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ["langley", "windsor", "royalmount"] }, // All unique location IDs
+          region: "CA",
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+    });
   });
 
   describe("allocateOrdersToCollectionPreps", () => {
