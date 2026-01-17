@@ -706,4 +706,111 @@ export class InteractivePromptService {
     const customer = await this.promptCustomerSelection(customers);
     return { customer, useSameForAll: false };
   }
+
+  /**
+   * Prompt for collection prep builder mode
+   */
+  async promptCollectionPrepBuilderMode(): Promise<"single" | "multiple"> {
+    const { mode } = await inquirer.prompt<{ mode: "single" | "multiple" }>([
+      {
+        type: "list",
+        name: "mode",
+        message: "How would you like to configure collection preps?",
+        choices: [
+          { name: "Single collection prep (simple)", value: "single" },
+          { name: "Multiple collection preps with different carriers (builder)", value: "multiple" },
+        ],
+        default: "single",
+      },
+    ]);
+
+    return mode;
+  }
+
+  /**
+   * Prompt for collection prep configuration (for builder)
+   */
+  async promptCollectionPrepConfig(
+    prepNumber: number,
+    totalPreps: number,
+    carriers: Carrier[],
+    orderCount: number,
+  ): Promise<{
+    carrier: Carrier;
+    testTag: string;
+    orderIndices: number[];
+  }> {
+    console.log(`\n📋 Configuring Collection Prep ${prepNumber} of ${totalPreps}`);
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    const carrier = await this.promptCarrierSelection(carriers);
+    const testTag = await this.promptTestTag();
+
+    // Show order allocation options
+    const { allocationType } = await inquirer.prompt<{ allocationType: "auto" | "manual" }>([
+      {
+        type: "list",
+        name: "allocationType",
+        message: "How should orders be allocated to this collection prep?",
+        choices: [
+          { name: "Auto (round-robin)", value: "auto" },
+          { name: "Manual (select specific orders)", value: "manual" },
+        ],
+        default: "auto",
+      },
+    ]);
+
+    let orderIndices: number[];
+    if (allocationType === "auto") {
+      // Round-robin allocation
+      orderIndices = [];
+      for (let i = prepNumber - 1; i < orderCount; i += totalPreps) {
+        orderIndices.push(i);
+      }
+      console.log(`   ✓ Auto-allocated orders: ${orderIndices.map((i) => i + 1).join(", ")}`);
+    } else {
+      // Manual selection
+      const result = await inquirer.prompt<{ selectedOrders: number[] }>([
+        {
+          type: "checkbox",
+          name: "selectedOrders",
+          message: "Select orders for this collection prep:",
+          choices: Array.from({ length: orderCount }, (_, i) => ({
+            name: `Order ${i + 1}`,
+            value: i,
+          })),
+          validate: (input: unknown): boolean | string => {
+            if (!Array.isArray(input) || input.length === 0) {
+              return "Please select at least one order";
+            }
+            return true;
+          },
+        },
+      ]);
+      orderIndices = result.selectedOrders;
+      console.log(`   ✓ Selected orders: ${orderIndices.map((i) => i + 1).join(", ")}`);
+    }
+
+    return {
+      carrier,
+      testTag,
+      orderIndices,
+    };
+  }
+
+  /**
+   * Prompt to add another collection prep
+   */
+  async promptAddAnotherCollectionPrep(): Promise<boolean> {
+    const { addMore } = await inquirer.prompt<{ addMore: boolean }>([
+      {
+        type: "confirm",
+        name: "addMore",
+        message: "Would you like to add another collection prep?",
+        default: false,
+      },
+    ]);
+
+    return addMore;
+  }
 }

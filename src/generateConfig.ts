@@ -558,29 +558,93 @@ async function main(): Promise<void> {
       // Prompt for collection prep
       console.log("\n📋 Collection Prep Configuration");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      const collectionPrepCount = await promptService.promptCollectionPrepCount(orders.length, carriers.length > 0);
-      
-      // Only require carriers if collection prep is requested
-      if (collectionPrepCount > 0 && carriers.length === 0) {
-        throw new Error(
-          `Cannot create collection prep: No carriers found for region ${region}.\n` +
-            `Please add carriers to the database or set collection prep count to 0 to skip collection prep.`,
-        );
-      }
 
+      let collectionPreps: Array<{
+        carrier: Carrier;
+        locationId: string;
+        prepDate: Date;
+        testTag?: string;
+        orderIndices?: number[];
+      }> | undefined;
+      let collectionPrepCount: number | undefined;
       let carrier: Carrier | undefined;
       let prepDate: Date | undefined;
       let testTag: string | undefined;
-      if (collectionPrepCount > 0) {
-        carrier = await promptService.promptCarrierSelection(carriers);
-        prepDate = new Date();
-        testTag = await promptService.promptTestTag();
+
+      if (carriers.length === 0) {
+        console.warn("⚠️  No carriers available. Skipping collection prep configuration.\n");
+      } else {
+        const builderMode = await promptService.promptCollectionPrepBuilderMode();
+
+        if (builderMode === "multiple") {
+          // Collection prep builder: configure multiple preps
+          collectionPreps = [];
+          let addMore = true;
+          let prepNumber = 1;
+
+          // Get locationId from orders (validate all orders have same location for now)
+          const locationIds = new Set(orders.map((o) => o.locationId).filter(Boolean));
+          if (locationIds.size > 1) {
+            throw new Error(
+              `Cannot create collection prep: orders have different locationIds: ${Array.from(locationIds).join(", ")}. ` +
+                `All orders must have the same locationId for collection prep.`,
+            );
+          }
+          const locationId = orders[0]?.locationId || "";
+          if (!locationId) {
+            throw new Error("Cannot create collection prep: no locationId found in orders");
+          }
+
+          while (addMore) {
+            const prepConfig = await promptService.promptCollectionPrepConfig(
+              prepNumber,
+              collectionPreps.length + 1,
+              carriers,
+              orders.length,
+            );
+
+            collectionPreps.push({
+              carrier: prepConfig.carrier,
+              locationId,
+              prepDate: new Date(),
+              testTag: prepConfig.testTag,
+              orderIndices: prepConfig.orderIndices,
+            });
+
+            prepNumber++;
+            addMore = await promptService.promptAddAnotherCollectionPrep();
+          }
+
+          // Show allocation summary
+          console.log("\n📊 Collection Prep Allocation Summary:");
+          console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+          for (let i = 0; i < collectionPreps.length; i++) {
+            const prep = collectionPreps[i];
+            const orderList = prep.orderIndices
+              ? prep.orderIndices.map((idx) => idx + 1).join(", ")
+              : "None";
+            console.log(
+              `   Prep ${i + 1}: ${prep.carrier.name} - Orders: ${orderList} (${prep.orderIndices?.length || 0} orders)`,
+            );
+          }
+          console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        } else {
+          // Legacy single collection prep mode
+          collectionPrepCount = await promptService.promptCollectionPrepCount(orders.length, carriers.length > 0);
+
+          if (collectionPrepCount > 0) {
+            carrier = await promptService.promptCarrierSelection(carriers);
+            prepDate = new Date();
+            testTag = await promptService.promptTestTag();
+          }
+        }
       }
 
       // Generate config
       console.log("\n⚙️  Generating configuration...");
       const config = await generatorService.generateConfig({
         orders,
+        collectionPreps,
         collectionPrepCount,
         carrier,
         prepDate,
@@ -631,7 +695,13 @@ async function main(): Promise<void> {
       console.log("\n✅ Config Generation Complete!");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log(`📦 Orders: ${config.orders.length}`);
-      if (config.collectionPrep) {
+      if (config.collectionPreps && config.collectionPreps.length > 0) {
+        console.log(`📋 Collection Preps: ${config.collectionPreps.length}`);
+        for (let i = 0; i < config.collectionPreps.length; i++) {
+          const prep = config.collectionPreps[i];
+          console.log(`   Prep ${i + 1}: ${prep.carrier} at ${prep.locationId}`);
+        }
+      } else if (config.collectionPrep) {
         console.log(`📋 Collection Prep: ${config.collectionPrep.carrier} at ${config.collectionPrep.locationId}`);
       }
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
