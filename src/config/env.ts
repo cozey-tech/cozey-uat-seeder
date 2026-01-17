@@ -53,12 +53,13 @@ function getAwsConfig(): {
 /**
  * Load environment variables from .env files
  */
-function loadEnvVars(): Partial<EnvConfig> {
+function loadEnvVars(): Partial<z.infer<typeof rawEnvSchema>> {
   return {
     DATABASE_URL: process.env.DATABASE_URL,
     SHOPIFY_STORE_DOMAIN: process.env.SHOPIFY_STORE_DOMAIN,
     SHOPIFY_ACCESS_TOKEN: process.env.SHOPIFY_ACCESS_TOKEN,
     SHOPIFY_API_VERSION: process.env.SHOPIFY_API_VERSION,
+    DATABASE_CONNECTION_LIMIT: process.env.DATABASE_CONNECTION_LIMIT,
   };
 }
 
@@ -146,9 +147,9 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
   }
 
   // Merge AWS secrets with .env vars (AWS secrets override .env, but .env fills in missing values)
-  const merged: Partial<EnvConfig> = {
+  const merged: Partial<z.infer<typeof rawEnvSchema>> = {
     ...envVars,
-    ...(awsSecrets as Partial<EnvConfig>),
+    ...(awsSecrets as Partial<z.infer<typeof rawEnvSchema>>),
   };
 
   // Validate raw config first (before processing connection limit)
