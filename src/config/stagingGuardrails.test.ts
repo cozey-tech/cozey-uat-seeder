@@ -6,16 +6,31 @@ import { StagingGuardrailError } from "../shared/errors/StagingGuardrailError";
 // Mock the env module
 vi.mock("./env", () => ({
   getEnvConfig: vi.fn(),
+  areSecretsFromAws: vi.fn(),
 }));
 
-import { getEnvConfig } from "./env";
+import { getEnvConfig, areSecretsFromAws } from "./env";
 
 describe("stagingGuardrails", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default to secrets NOT from AWS (normal validation behavior)
+    vi.mocked(areSecretsFromAws).mockReturnValue(false);
   });
 
   describe("assertStagingEnvironment", () => {
+    it("should skip validation when secrets come from AWS", () => {
+      vi.mocked(areSecretsFromAws).mockReturnValue(true);
+      vi.mocked(getEnvConfig).mockReturnValue({
+        DATABASE_URL: "postgresql://user:pass@production-db.example.com:5432/db",
+        SHOPIFY_STORE_DOMAIN: "production-store.com",
+        SHOPIFY_ACCESS_TOKEN: "token",
+        SHOPIFY_API_VERSION: "2024-01",
+      });
+
+      expect(() => assertStagingEnvironment()).not.toThrow();
+    });
+
     it("should pass for staging DB URL with 'staging'", () => {
       vi.mocked(getEnvConfig).mockReturnValue({
         DATABASE_URL: "postgresql://user:pass@staging-db.example.com:5432/db",
@@ -64,6 +79,21 @@ describe("stagingGuardrails", () => {
   });
 
   describe("displayStagingEnvironment", () => {
+    it("should return isStaging true when secrets come from AWS", () => {
+      vi.mocked(areSecretsFromAws).mockReturnValue(true);
+      vi.mocked(getEnvConfig).mockReturnValue({
+        DATABASE_URL: "postgresql://user:password@production-db.example.com:5432/db",
+        SHOPIFY_STORE_DOMAIN: "production-store.com",
+        SHOPIFY_ACCESS_TOKEN: "token",
+        SHOPIFY_API_VERSION: "2024-01",
+      });
+
+      const result = displayStagingEnvironment();
+
+      expect(result.isStaging).toBe(true);
+      expect(result.databaseUrl).toContain("***");
+    });
+
     it("should return masked DB URL and Shopify domain", () => {
       vi.mocked(getEnvConfig).mockReturnValue({
         DATABASE_URL: "postgresql://user:password@staging-db.example.com:5432/db",
@@ -95,6 +125,18 @@ describe("stagingGuardrails", () => {
   });
 
   describe("requireExplicitStagingConfirmation", () => {
+    it("should skip validation when secrets come from AWS", async () => {
+      vi.mocked(areSecretsFromAws).mockReturnValue(true);
+      vi.mocked(getEnvConfig).mockReturnValue({
+        DATABASE_URL: "postgresql://user:pass@production-db.example.com:5432/db",
+        SHOPIFY_STORE_DOMAIN: "production-store.com",
+        SHOPIFY_ACCESS_TOKEN: "token",
+        SHOPIFY_API_VERSION: "2024-01",
+      });
+
+      await expect(requireExplicitStagingConfirmation(false)).resolves.not.toThrow();
+    });
+
     it("should not throw when skipConfirmation is true", async () => {
       await expect(requireExplicitStagingConfirmation(true)).resolves.not.toThrow();
     });

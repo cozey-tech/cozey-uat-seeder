@@ -27,3 +27,9 @@ logs/
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Generated output files
+output/
+
+# Generated config files (from generate-config)
+*-config.json

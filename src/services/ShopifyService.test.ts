@@ -217,10 +217,11 @@ describe("ShopifyService", () => {
           data: {
             order: {
               id: "gid://shopify/Order/456",
+              fulfillments: [],
               lineItems: {
                 edges: [
-                  { node: { id: "gid://shopify/LineItem/1", quantity: 2 } },
-                  { node: { id: "gid://shopify/LineItem/2", quantity: 1 } },
+                  { node: { id: "gid://shopify/LineItem/1", quantity: 2, fulfillableQuantity: 2 } },
+                  { node: { id: "gid://shopify/LineItem/2", quantity: 1, fulfillableQuantity: 1 } },
                 ],
               },
             },
@@ -248,6 +249,32 @@ describe("ShopifyService", () => {
       expect(result.status).toBe("SUCCESS");
     });
 
+    it("should return existing fulfillment if order already fulfilled", async () => {
+      mockClient.request.mockResolvedValueOnce({
+        data: {
+          order: {
+            id: "gid://shopify/Order/456",
+            fulfillments: [
+              { id: "gid://shopify/Fulfillment/789", status: "SUCCESS" },
+            ],
+            lineItems: {
+              edges: [
+                { node: { id: "gid://shopify/LineItem/1", quantity: 2, fulfillableQuantity: 0 } },
+              ],
+            },
+          },
+        },
+        errors: undefined,
+        extensions: undefined,
+      });
+
+      const result = await service.fulfillOrder("gid://shopify/Order/456");
+
+      expect(result.fulfillmentId).toBe("gid://shopify/Fulfillment/789");
+      expect(result.status).toBe("SUCCESS");
+      expect(mockClient.request).toHaveBeenCalledTimes(1); // Should not create new fulfillment
+    });
+
     it("should throw error if order not found", async () => {
       mockClient.request.mockResolvedValue({
         data: {
@@ -260,6 +287,51 @@ describe("ShopifyService", () => {
       const error = await service.fulfillOrder("invalid-id").catch((e) => e);
       expect(error).toBeInstanceOf(ShopifyServiceError);
       expect(error.message).toContain("not found");
+    });
+
+    it("should throw error if no fulfillable line items", async () => {
+      mockClient.request.mockResolvedValueOnce({
+        data: {
+          order: {
+            id: "gid://shopify/Order/456",
+            fulfillments: [],
+            lineItems: {
+              edges: [
+                { node: { id: "gid://shopify/LineItem/1", quantity: 2, fulfillableQuantity: 0 } },
+              ],
+            },
+          },
+        },
+        errors: undefined,
+        extensions: undefined,
+      });
+
+      const error = await service.fulfillOrder("gid://shopify/Order/456").catch((e) => e);
+      expect(error).toBeInstanceOf(ShopifyServiceError);
+      expect(error.message).toContain("No fulfillable line items");
+    });
+  });
+
+  describe("formatBatchTag", () => {
+    it("should format short batch IDs correctly", () => {
+      const tag = service.formatBatchTag("batch-123");
+      expect(tag).toBe("seed_batch_id:batch-123");
+      expect(tag.length).toBeLessThanOrEqual(40);
+    });
+
+    it("should truncate long batch IDs to fit 40 character limit", () => {
+      const longBatchId = "d7ce8ef2-712d-40b8-ba0e-994ea84e25e8"; // 36 char UUID
+      const tag = service.formatBatchTag(longBatchId);
+      // Prefix is 14 chars, so batchId gets 26 chars: "d7ce8ef2-712d-40b8-ba0e-99"
+      expect(tag).toBe("seed_batch_id:d7ce8ef2-712d-40b8-ba0e-99");
+      expect(tag.length).toBe(40);
+    });
+
+    it("should handle batch IDs exactly at the limit", () => {
+      const batchId = "a".repeat(26); // 26 chars (prefix is 14, total = 40)
+      const tag = service.formatBatchTag(batchId);
+      expect(tag).toBe(`seed_batch_id:${batchId}`);
+      expect(tag.length).toBe(40);
     });
   });
 

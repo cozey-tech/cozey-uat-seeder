@@ -21,6 +21,7 @@ describe("WmsService", () => {
       createPrepPartItem: vi.fn(),
       findPartBySku: vi.fn(),
       findPartsBySkus: vi.fn(),
+      findPartsByVariantIds: vi.fn(),
       findVariantBySku: vi.fn(),
       findVariantsBySkus: vi.fn(),
       findCustomerById: vi.fn(),
@@ -162,12 +163,12 @@ describe("WmsService", () => {
   });
 
   describe("createPrepPartsAndItems", () => {
-    it("should batch lookup parts and create prepParts", async () => {
-      const partMap = new Map([
-        ["SKU-001", { id: "part-1", sku: "SKU-001" }],
+    it("should batch lookup parts by variant IDs and create prepParts", async () => {
+      const partsByVariantId = new Map([
+        ["variant-1", [{ id: "part-1", sku: "PART-SKU-001", quantity: 1 }]],
       ]);
 
-      vi.mocked(mockRepository.findPartsBySkus).mockResolvedValue(partMap);
+      vi.mocked(mockRepository.findPartsByVariantIds).mockResolvedValue(partsByVariantId);
       vi.mocked(mockRepository.createPrepPart).mockResolvedValue({ id: "prepPart-1" } as never);
       vi.mocked(mockRepository.createPrepPartItem).mockResolvedValue({ id: "prepPartItem-1" } as never);
 
@@ -178,7 +179,13 @@ describe("WmsService", () => {
       );
 
       expect(result).toHaveLength(1);
-      expect(mockRepository.findPartsBySkus).toHaveBeenCalledWith(["SKU-001"], "CA");
+      expect(mockRepository.findPartsByVariantIds).toHaveBeenCalledWith(["variant-1"], "CA");
+      expect(mockRepository.createPrepPart).toHaveBeenCalledWith({
+        prepId: "prep-1",
+        partId: "part-1",
+        quantity: 2, // variantPart.quantity (1) * lineItem.quantity (2)
+        region: "CA",
+      });
     });
   });
 });

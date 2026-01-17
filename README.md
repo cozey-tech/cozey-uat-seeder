@@ -14,9 +14,36 @@ The seeder is **staging-only** and includes hard-coded guardrails to prevent exe
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
+- Node.js 20.13.0 (use nvm to manage versions - see below)
 - Access to staging WMS database
 - Access to staging Shopify store with Admin API credentials
+
+#### Node Version Management
+
+This project requires Node.js 20.13.0. We recommend using [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager) to manage Node versions.
+
+**Install nvm** (if not already installed):
+```bash
+# macOS/Linux
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+
+# Or using Homebrew on macOS
+brew install nvm
+```
+
+**Use the correct Node version:**
+```bash
+# Install Node 20.13.0 (if not already installed)
+nvm install 20.13.0
+
+# Use Node 20.13.0 for this project
+nvm use
+
+# Or set it as default
+nvm alias default 20.13.0
+```
+
+The project includes an `.nvmrc` file, so running `nvm use` in the project directory will automatically switch to the correct version.
 
 ### Installation
 
@@ -25,6 +52,39 @@ npm install
 ```
 
 ### Configuration
+
+The seeder supports two methods for loading configuration:
+
+#### Option 1: AWS Secrets Manager (Recommended for AWS environments)
+
+By default, the seeder attempts to fetch secrets from AWS Secrets Manager with automatic fallback to `.env` files. This is ideal when running in AWS environments (EC2, ECS, Lambda, etc.).
+
+**AWS Secrets:**
+- `dev/uat-database-url`: Contains `DATABASE_URL`
+- `dev/shopify-access-token`: Contains `SHOPIFY_ACCESS_TOKEN`, `SHOPIFY_STORE_DOMAIN`, and optionally `SHOPIFY_API_VERSION`
+
+**Configuration options:**
+- `USE_AWS_SECRETS`: Enable/disable AWS secrets (default: `true`)
+- `AWS_REGION`: AWS region (default: `us-east-1`). **Important:** Check your secret ARNs in AWS Secrets Manager to determine the correct region (e.g., if ARN contains `us-east-2`, set `AWS_REGION=us-east-2`)
+- `AWS_PROFILE`: AWS profile name from `~/.aws/credentials` (optional, defaults to "default" profile)
+- `AWS_DATABASE_SECRET_NAME`: Custom database secret name (default: `dev/uat-database-url`)
+- `AWS_SHOPIFY_SECRET_NAME`: Custom Shopify secret name (default: `dev/shopify-access-token`)
+
+**AWS Credentials:** The seeder automatically detects AWS credentials from:
+1. Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+2. AWS IAM role (when running in AWS)
+3. AWS credentials file (`~/.aws/credentials`) - specify profile via `AWS_PROFILE`
+4. Default credential provider chain
+
+**Multiple AWS Profiles:** If you have multiple profiles in `~/.aws/credentials`, set `AWS_PROFILE` to select which profile to use:
+```bash
+# Use the "dev" profile from ~/.aws/credentials
+AWS_PROFILE=dev npm run seed config.json
+```
+
+#### Option 2: Environment Variables (.env files)
+
+For local development or when AWS is unavailable, use `.env` files:
 
 1. Copy `.env.example` to `.env`:
    ```bash
@@ -36,6 +96,10 @@ npm install
    - `SHOPIFY_STORE_DOMAIN`: Shopify store domain (must match staging patterns)
    - `SHOPIFY_ACCESS_TOKEN`: Shopify Admin API access token
    - `SHOPIFY_API_VERSION`: API version (optional, defaults to 2024-01)
+
+**Hybrid Mode:** The seeder merges values from both sources - AWS secrets override `.env` values, but missing AWS values fallback to `.env`. This provides flexibility and resilience.
+
+**Disable AWS Secrets:** Set `USE_AWS_SECRETS=false` in your `.env` file to use environment variables only.
 
 ### Usage
 
@@ -217,11 +281,47 @@ src/
 
 ## Troubleshooting
 
+### "Environment configuration not initialized" Error
+
+This error occurs if `getEnvConfig()` is called before `initializeEnvConfig()`. This should not happen in normal usage, but if you're writing custom code, ensure you call `initializeEnvConfig()` first.
+
 ### "Staging Guardrail Violation" Error
 
 The tool detected a production environment. Check:
 - `DATABASE_URL` contains staging patterns (staging, stage, test, dev, uat)
 - `SHOPIFY_STORE_DOMAIN` contains staging patterns or ends with `.myshopify.com`
+
+### AWS Secrets Manager Issues
+
+If you're experiencing issues with AWS Secrets Manager:
+
+1. **"Failed to fetch secret from AWS" warnings:**
+   - Verify AWS credentials are configured correctly
+   - Check that the secret names match your AWS Secrets Manager secrets
+   - Ensure your IAM role/user has `secretsmanager:GetSecretValue` permission
+   - The seeder will automatically fallback to `.env` files, so this is non-fatal
+
+2. **"AWS credentials error" or expired credentials:**
+   - If using temporary credentials (STS), they may have expired - refresh them
+   - If using `~/.aws/credentials`, verify the credentials are valid and not expired
+   - Check that `AWS_PROFILE` matches a valid profile in `~/.aws/credentials`
+   - For IAM roles, ensure the role session hasn't expired
+
+3. **Multiple AWS profiles:**
+   - If you have multiple profiles in `~/.aws/credentials`, set `AWS_PROFILE` to select which one to use
+   - Example: `AWS_PROFILE=dev` to use the `[dev]` profile
+   - If `AWS_PROFILE` is not set, the `[default]` profile will be used
+
+4. **To disable AWS secrets entirely:**
+   - Set `USE_AWS_SECRETS=false` in your `.env` file
+   - The seeder will use `.env` files only
+
+5. **Custom secret names:**
+   - Set `AWS_DATABASE_SECRET_NAME` and `AWS_SHOPIFY_SECRET_NAME` in `.env`
+   - Defaults: `dev/uat-database-url` and `dev/shopify-access-token`
+
+6. **Wrong AWS region:**
+   - Set `AWS_REGION` in `.env` (default: `us-east-1`)
 
 ### "Missing SKUs in WMS" Error
 

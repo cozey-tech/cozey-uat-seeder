@@ -24,6 +24,7 @@ describe("CollectionPrepService", () => {
       createPrepPartItem: vi.fn(),
       findPartBySku: vi.fn(),
       findPartsBySkus: vi.fn(),
+      findPartsByVariantIds: vi.fn(),
       findVariantBySku: vi.fn(),
       findVariantsBySkus: vi.fn(),
       findCustomerById: vi.fn(),

@@ -9,7 +9,7 @@ export interface OrderTemplate {
   lineItems: Array<{
     sku: string;
     quantity: number;
-    pickType: "Regular" | "Pick and Pack";
+    pickType: "Regular" | "Pick and Pack"; // Informational only - variant's pickType from database will be used when building orders
   }>;
 }
 
@@ -406,19 +406,19 @@ export class InteractivePromptService {
   /**
    * Prompt for collection prep count with suggestion
    */
-  async promptCollectionPrepCount(orderCount: number): Promise<number> {
+  async promptCollectionPrepCount(orderCount: number, hasCarriers: boolean = true): Promise<number> {
     const suggested = Math.max(1, Math.ceil(orderCount / 5)); // Suggest 1 prep per 5 orders
 
     const { count } = await inquirer.prompt<{ count: string }>([
       {
         type: "input",
         name: "count",
-        message: `How many collection preps would you like to create?`,
-        default: suggested.toString(),
+        message: `How many collection preps would you like to create?${!hasCarriers ? " (Enter 0 to skip - no carriers available)" : ""}`,
+        default: hasCarriers ? suggested.toString() : "0",
         validate: (input: string): boolean | string => {
           const num = parseInt(input, 10);
-          if (isNaN(num) || !Number.isInteger(num) || num < 1) {
-            return "Please enter a positive integer (minimum 1)";
+          if (isNaN(num) || !Number.isInteger(num) || num < 0) {
+            return "Please enter a non-negative integer (minimum 0)";
           }
           if (num > orderCount) {
             return `Cannot have more collection preps than orders (${orderCount})`;
@@ -457,9 +457,37 @@ export class InteractivePromptService {
   }
 
   /**
+   * Prompt for test tag for collection prep naming
+   */
+  async promptTestTag(): Promise<string> {
+    const { testTag } = await inquirer.prompt<{ testTag: string }>([
+      {
+        type: "input",
+        name: "testTag",
+        message: "Enter test tag for collection prep name (e.g., 'Outbound_Compliance'):",
+        default: "Outbound_Compliance",
+        validate: (input: string): boolean | string => {
+          const trimmed = input.trim();
+          if (!trimmed) {
+            return "Test tag cannot be empty";
+          }
+          // Allow alphanumeric, underscores, and hyphens
+          if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+            return "Test tag can only contain letters, numbers, underscores, and hyphens";
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    return testTag;
+  }
+
+  /**
    * Prompt for save file location
    */
-  async promptSaveLocation(defaultPath: string = "seed-config.json"): Promise<string> {
+  async promptSaveLocation(defaultPath: string = "output/seed-config.json"): Promise<string> {
     const { filePath } = await inquirer.prompt<{ filePath: string }>([
       {
         type: "input",
@@ -522,5 +550,85 @@ export class InteractivePromptService {
     ]);
 
     return confirmed;
+  }
+
+  /**
+   * Prompt for template name
+   */
+  async promptTemplateName(): Promise<string> {
+    const { name } = await inquirer.prompt<{ name: string }>([
+      {
+        type: "input",
+        name: "name",
+        message: "Enter template name:",
+        validate: (input: string): boolean | string => {
+          const trimmed = input.trim();
+          if (!trimmed) {
+            return "Template name cannot be empty";
+          }
+          if (trimmed.length > 100) {
+            return "Template name must be 100 characters or less";
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    return name;
+  }
+
+  /**
+   * Prompt for template description
+   */
+  async promptTemplateDescription(): Promise<string> {
+    const { description } = await inquirer.prompt<{ description: string }>([
+      {
+        type: "input",
+        name: "description",
+        message: "Enter template description:",
+        default: "",
+        validate: (input: string): boolean | string => {
+          if (input.length > 200) {
+            return "Template description must be 200 characters or less";
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    return description;
+  }
+
+  /**
+   * Prompt for template ID
+   */
+  async promptTemplateId(suggestedId?: string): Promise<string> {
+    const { id } = await inquirer.prompt<{ id: string }>([
+      {
+        type: "input",
+        name: "id",
+        message: "Enter template ID (used for identification, e.g., 'my-custom-order'):",
+        default: suggestedId || "",
+        validate: (input: string): boolean | string => {
+          const trimmed = input.trim();
+          if (!trimmed) {
+            return "Template ID cannot be empty";
+          }
+          // Allow alphanumeric, hyphens, and underscores
+          if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+            return "Template ID can only contain letters, numbers, underscores, and hyphens";
+          }
+          if (trimmed.length > 50) {
+            return "Template ID must be 50 characters or less";
+          }
+          return true;
+        },
+        filter: (input: string): string => input.trim(),
+      },
+    ]);
+
+    return id;
   }
 }

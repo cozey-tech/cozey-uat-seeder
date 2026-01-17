@@ -28,17 +28,30 @@ export class OrderCompositionBuilder {
   /**
    * Build order composition from a template
    * Allows user to modify quantities or add/remove items
+   * Uses pickType from the variant (database) rather than template to ensure consistency
    */
   async buildFromTemplate(
     template: OrderTemplate,
     variants: Variant[],
   ): Promise<OrderComposition> {
-    // Start with template line items
-    const lineItems: LineItem[] = template.lineItems.map((item) => ({
-      sku: item.sku,
-      quantity: item.quantity,
-      pickType: item.pickType,
-    }));
+    // Create a map of SKU to variant for quick lookup
+    const variantMap = new Map<string, Variant>();
+    for (const variant of variants) {
+      variantMap.set(variant.sku, variant);
+    }
+
+    // Start with template line items, but use pickType from variant (database) instead of template
+    const lineItems: LineItem[] = template.lineItems.map((item) => {
+      const variant = variantMap.get(item.sku);
+      if (!variant) {
+        throw new Error(`Variant not found for SKU ${item.sku} in template`);
+      }
+      return {
+        sku: item.sku,
+        quantity: item.quantity,
+        pickType: variant.pickType, // Use pickType from database, not template
+      };
+    });
 
     // Allow user to modify
     let done = false;

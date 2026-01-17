@@ -246,6 +246,36 @@ export class WmsPrismaRepository implements WmsRepository {
     return partMap;
   }
 
+  async findPartsByVariantIds(variantIds: string[], region: string): Promise<Map<string, Array<{ id: string; sku: string; quantity: number }>>> {
+    const variantParts = await this.prisma.variantPart.findMany({
+      where: {
+        variantId: { in: variantIds },
+        region: region,
+      },
+      include: {
+        part: {
+          select: {
+            id: true,
+            sku: true,
+          },
+        },
+      },
+    });
+
+    // Group parts by variantId
+    const partsByVariantId = new Map<string, Array<{ id: string; sku: string; quantity: number }>>();
+    for (const variantPart of variantParts) {
+      const existing = partsByVariantId.get(variantPart.variantId) || [];
+      existing.push({
+        id: variantPart.part.id,
+        sku: variantPart.part.sku,
+        quantity: Number(variantPart.quantity),
+      });
+      partsByVariantId.set(variantPart.variantId, existing);
+    }
+    return partsByVariantId;
+  }
+
   async createPrepPart(prepPart: CreatePrepPartRequest): Promise<unknown> {
     return await this.prisma.prepPart.create({
       data: {

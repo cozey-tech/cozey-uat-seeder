@@ -22,6 +22,7 @@ describe("SeedWmsEntitiesUseCase", () => {
         createShipment: vi.fn(),
         findVariantsBySkus: vi.fn(),
         findPartsBySkus: vi.fn(),
+        findPartsByVariantIds: vi.fn(),
       } as unknown as WmsService["repository"],
       createOrderWithCustomer: vi.fn(),
       createVariantOrdersForOrder: vi.fn(),

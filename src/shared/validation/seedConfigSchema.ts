@@ -8,6 +8,7 @@ export const seedConfigSchema = z.object({
       locationId: z.string(),
       region: z.string(),
       prepDate: z.string().datetime(),
+      testTag: z.string().optional(), // Optional test tag for collection prep naming
     })
     .optional(), // Optional - seeder can create orders without collection prep
   orders: z.array(
@@ -16,6 +17,10 @@ export const seedConfigSchema = z.object({
       customer: z.object({
         name: z.string(),
         email: z.string().email(),
+        address: z.string().optional(),
+        city: z.string().optional(),
+        province: z.string().optional(),
+        postalCode: z.string().optional(),
       }),
       lineItems: z.array(
         z.object({

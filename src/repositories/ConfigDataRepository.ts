@@ -203,8 +203,9 @@ export class ConfigDataRepository {
   /**
    * Load customers from config/customers.json file
    * Customers are pre-created for each FC location
+   * @param region Optional region filter. If provided, only returns customers matching that region.
    */
-  async getCustomers(): Promise<Customer[]> {
+  async getCustomers(region?: string): Promise<Customer[]> {
     try {
       const configPath = join(process.cwd(), "config", "customers.json");
       const fileContent = readFileSync(configPath, "utf-8");
@@ -217,7 +218,15 @@ export class ConfigDataRepository {
         }
       }
 
-      return config.customers;
+      // Filter by region if provided
+      let customers = config.customers;
+      if (region) {
+        customers = config.customers.filter(
+          (customer) => customer.region === region,
+        );
+      }
+
+      return customers;
     } catch (error) {
       if (error instanceof Error && error.message.includes("ENOENT")) {
         throw new Error(
@@ -257,29 +266,32 @@ export class ConfigDataRepository {
 
   /**
    * Get all carriers for a region
-   * Only returns carriers that exist in the database for the specified region
-   * No fallback to hardcoded carriers to ensure data integrity
+   * Carriers are defined as code constants (enum) rather than database records.
+   * Returns carriers that match the specified region or have region: null (available for all regions)
    */
   async getCarriers(region: string): Promise<Carrier[]> {
-    const carriers = await this.prisma.carriers.findMany({
-      where: {
-        region,
-      },
-      select: {
-        id: true,
-        name: true,
-        region: true,
-      },
-      orderBy: {
-        name: "asc",
-      },
-    });
+    // Import carriers from the enum definition
+    const { carriers: carrierDefinitions } = await import("../shared/carriers");
 
-    return carriers.map((c) => ({
-      id: c.id,
-      name: c.name,
-      region: c.region,
+    // Filter carriers by region:
+    // - Include carriers with region === null (available for all regions)
+    // - Include carriers with region matching the requested region
+    const matchingCarriers = carrierDefinitions.filter(
+      (carrier) => carrier.region === null || carrier.region === region,
+    );
+
+    // Map to the Carrier interface format (id, name, region)
+    // Use code as id, and set region to the requested region (or the carrier's specific region if not null)
+    const result: Carrier[] = matchingCarriers.map((carrier) => ({
+      id: carrier.code,
+      name: carrier.name,
+      region: carrier.region || region, // Use carrier's region if specified, otherwise use requested region
     }));
+
+    // Sort by name for consistency
+    result.sort((a, b) => a.name.localeCompare(b.name));
+
+    return result;
   }
 
   /**

@@ -15,11 +15,12 @@ describe("SeedShopifyOrdersUseCase", () => {
       fulfillOrder: vi.fn(),
       queryOrdersByTag: vi.fn(),
       findVariantIdsBySkus: vi.fn(),
+      formatBatchTag: vi.fn((batchId: string) => `seed_batch_id:${batchId.substring(0, 26)}`),
     } as unknown as ShopifyService;
     useCase = new SeedShopifyOrdersUseCase(mockShopifyService);
   });
 
-  it("should create, complete, and fulfill orders", async () => {
+  it("should create and complete orders (without fulfillment)", async () => {
     const request: SeedShopifyOrdersRequest = {
       batchId: "batch-123",
       orders: [
@@ -44,11 +45,6 @@ describe("SeedShopifyOrdersUseCase", () => {
       orderNumber: "#1001",
     });
 
-    vi.mocked(mockShopifyService.fulfillOrder).mockResolvedValue({
-      fulfillmentId: "gid://shopify/Fulfillment/789",
-      status: "SUCCESS",
-    });
-
     vi.mocked(mockShopifyService.queryOrdersByTag).mockResolvedValue([
       {
         orderId: "gid://shopify/Order/456",
@@ -68,7 +64,7 @@ describe("SeedShopifyOrdersUseCase", () => {
     expect(result.shopifyOrders).toHaveLength(1);
     expect(result.shopifyOrders[0].shopifyOrderId).toBe("gid://shopify/Order/456");
     expect(result.shopifyOrders[0].shopifyOrderNumber).toBe("#1001");
-    expect(result.shopifyOrders[0].fulfillmentStatus).toBe("SUCCESS");
+    expect(result.shopifyOrders[0].fulfillmentStatus).toBe("UNFULFILLED");
     expect(result.shopifyOrders[0].lineItems).toHaveLength(1);
     expect(result.shopifyOrders[0].lineItems[0].sku).toBe("SKU-001");
   });
@@ -102,10 +98,6 @@ describe("SeedShopifyOrdersUseCase", () => {
       .mockResolvedValueOnce({ orderId: "gid://shopify/Order/1", orderNumber: "#1001" })
       .mockResolvedValueOnce({ orderId: "gid://shopify/Order/2", orderNumber: "#1002" });
 
-    vi.mocked(mockShopifyService.fulfillOrder)
-      .mockResolvedValueOnce({ fulfillmentId: "fulfillment-1", status: "SUCCESS" })
-      .mockResolvedValueOnce({ fulfillmentId: "fulfillment-2", status: "SUCCESS" });
-
     vi.mocked(mockShopifyService.queryOrdersByTag)
       .mockResolvedValueOnce([
         {
@@ -127,7 +119,7 @@ describe("SeedShopifyOrdersUseCase", () => {
     expect(result.shopifyOrders).toHaveLength(2);
     expect(mockShopifyService.createDraftOrder).toHaveBeenCalledTimes(2);
     expect(mockShopifyService.completeDraftOrder).toHaveBeenCalledTimes(2);
-    expect(mockShopifyService.fulfillOrder).toHaveBeenCalledTimes(2);
+    expect(mockShopifyService.fulfillOrder).not.toHaveBeenCalled();
   });
 
   it("should construct line items from input if order query returns empty (dry-run scenario)", async () => {
@@ -153,11 +145,6 @@ describe("SeedShopifyOrdersUseCase", () => {
       orderNumber: "#1001",
     });
 
-    vi.mocked(mockShopifyService.fulfillOrder).mockResolvedValue({
-      fulfillmentId: "fulfillment-1",
-      status: "SUCCESS",
-    });
-
     vi.mocked(mockShopifyService.queryOrdersByTag).mockResolvedValue([]); // Empty (e.g., dry-run mode)
 
     const result = await useCase.execute(request);
@@ -170,4 +157,5 @@ describe("SeedShopifyOrdersUseCase", () => {
     // Line item ID should be a mock ID (gid://shopify/LineItem/...)
     expect(result.shopifyOrders[0].lineItems[0].lineItemId).toMatch(/^gid:\/\/shopify\/LineItem\//);
   });
+
 });

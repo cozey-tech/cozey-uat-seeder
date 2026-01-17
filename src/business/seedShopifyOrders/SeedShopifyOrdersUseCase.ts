@@ -20,16 +20,19 @@ export class SeedShopifyOrdersUseCase {
             lineItems: orderInput.lineItems,
           },
           request.batchId,
+          request.region,
         );
 
         // Complete draft order
         const orderResult = await this.shopifyService.completeDraftOrder(draftOrderResult.draftOrderId);
 
-        // Fulfill order
-        const fulfillmentResult = await this.shopifyService.fulfillOrder(orderResult.orderId);
+        // Note: Orders are created and marked as paid, but NOT fulfilled
+        // Fulfillment is not part of the seeding process
 
         // Query order to get line item IDs
-        const orderQueryResults = await this.shopifyService.queryOrdersByTag(`seed_batch_id:${request.batchId}`);
+        // Use the same tag format as when creating the order (truncated to 40 chars)
+        const batchTag = this.shopifyService.formatBatchTag(request.batchId);
+        const orderQueryResults = await this.shopifyService.queryOrdersByTag(batchTag);
         const createdOrder = orderQueryResults.find((o) => o.orderId === orderResult.orderId);
 
         // In dry-run mode, queryOrdersByTag returns empty array, so construct from input
@@ -56,7 +59,7 @@ export class SeedShopifyOrdersUseCase {
           shopifyOrderId: orderResult.orderId,
           shopifyOrderNumber: orderResult.orderNumber,
           lineItems,
-          fulfillmentStatus: fulfillmentResult.status,
+          fulfillmentStatus: "UNFULFILLED", // Orders are not fulfilled during seeding
         });
       } catch (error) {
         // Log error with structured logging

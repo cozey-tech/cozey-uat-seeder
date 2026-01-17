@@ -19,7 +19,7 @@ config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
 import { PrismaClient } from "@prisma/client";
 import { writeFileSync, existsSync, accessSync, constants } from "fs";
-import { ConfigDataRepository } from "./repositories/ConfigDataRepository";
+import { ConfigDataRepository, type Carrier } from "./repositories/ConfigDataRepository";
 import { InteractivePromptService } from "./services/InteractivePromptService";
 import { OrderCompositionBuilder } from "./services/OrderCompositionBuilder";
 import { ConfigGeneratorService } from "./services/ConfigGeneratorService";
@@ -35,6 +35,7 @@ interface CliOptions {
   output?: string;
   region?: "CA" | "US";
   modifyInventory: boolean;
+  skipSaveTemplate: boolean;
 }
 
 /**
@@ -46,6 +47,7 @@ function parseArgs(): CliOptions {
   const options: CliOptions = {
     dryRun: args.includes("--dry-run"),
     modifyInventory: args.includes("--modify-inventory"),
+    skipSaveTemplate: args.includes("--skip-save-template"),
   };
 
   // Parse --output
@@ -105,24 +107,87 @@ function loadOrderTemplates(): OrderTemplate[] {
 }
 
 /**
+ * Save a new template to the order templates file
+ * Creates the file structure if it doesn't exist
+ */
+function saveTemplate(template: OrderTemplate): void {
+  try {
+    const configPath = join(process.cwd(), "config", "orderTemplates.json");
+    
+    // Read existing config or create new structure
+    let config: { templates: OrderTemplate[] };
+    try {
+      const fileContent = readFileSync(configPath, "utf-8");
+      config = JSON.parse(fileContent);
+      // Ensure templates array exists
+      if (!config.templates || !Array.isArray(config.templates)) {
+        config.templates = [];
+      }
+    } catch {
+      // File doesn't exist or is invalid - create new structure
+      config = { templates: [] };
+    }
+    
+    // Check if template with same ID already exists
+    const existingIndex = config.templates.findIndex((t: OrderTemplate) => t.id === template.id);
+    if (existingIndex !== -1) {
+      // Update existing template
+      config.templates[existingIndex] = template;
+      console.log(`✅ Updated existing template: ${template.name} (${template.id})`);
+    } else {
+      // Add new template
+      config.templates.push(template);
+      console.log(`✅ Saved new template: ${template.name} (${template.id})`);
+    }
+    
+    // Write back to file
+    writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+  } catch (error) {
+    throw new Error(`Failed to save template: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
  * Filter templates to only include those with valid SKUs for the given variants
+ * Note: pickType in templates is informational only - the variant's pickType from the database will always be used
  */
 function filterValidTemplates(
   templates: OrderTemplate[],
-  variants: Array<{ sku: string }>,
+  variants: Array<{ sku: string; pickType: "Regular" | "Pick and Pack" }>,
 ): OrderTemplate[] {
+  // Create a set of valid SKUs for quick lookup
   const validSkus = new Set(variants.map((v) => v.sku));
   
-  const validTemplates = templates.filter((template) => {
-    // Check if all SKUs in template exist in available variants
-    return template.lineItems.every((item) => validSkus.has(item.sku));
-  });
+  const validTemplates: OrderTemplate[] = [];
+  const invalidTemplates: Array<{ template: OrderTemplate; reasons: string[] }> = [];
 
-  const invalidCount = templates.length - validTemplates.length;
-  if (invalidCount > 0) {
-    console.warn(
-      `⚠️  Filtered out ${invalidCount} template(s) with invalid SKUs for this region`,
-    );
+  for (const template of templates) {
+    const reasons: string[] = [];
+    
+    // Check each line item in the template
+    for (const item of template.lineItems) {
+      if (!validSkus.has(item.sku)) {
+        reasons.push(`SKU "${item.sku}" not found in database for this region`);
+      }
+    }
+
+    if (reasons.length === 0) {
+      validTemplates.push(template);
+    } else {
+      invalidTemplates.push({ template, reasons });
+    }
+  }
+
+  // Report invalid templates with detailed error messages
+  if (invalidTemplates.length > 0) {
+    console.warn(`\n⚠️  Filtered out ${invalidTemplates.length} invalid template(s):`);
+    for (const { template, reasons } of invalidTemplates) {
+      console.warn(`   ❌ Template "${template.name}" (${template.id}):`);
+      for (const reason of reasons) {
+        console.warn(`      - ${reason}`);
+      }
+    }
+    console.warn("");
   }
 
   return validTemplates;
@@ -165,15 +230,15 @@ async function main(): Promise<void> {
 
       // Load reference data
       console.log("📊 Loading reference data...");
-      const [variants, customers, carriers, allTemplates] = await Promise.all([
+      let [variants, customers, carriers, allTemplates] = await Promise.all([
         dataRepository.getAvailableVariants(region),
-        dataRepository.getCustomers(),
+        dataRepository.getCustomers(region),
         dataRepository.getCarriers(region),
         Promise.resolve(loadOrderTemplates()),
       ]);
 
       // Filter templates to only include those with valid SKUs for this region
-      const templates = filterValidTemplates(allTemplates, variants);
+      let templates = filterValidTemplates(allTemplates, variants);
 
       console.log(`   ✓ Found ${variants.length} variants`);
       console.log(`   ✓ Found ${customers.length} customers`);
@@ -190,7 +255,12 @@ async function main(): Promise<void> {
         );
       }
       if (carriers.length === 0) {
-        throw new Error(`No carriers found for region ${region}. Please check database or config.`);
+        console.warn(
+          `⚠️  No carriers found for region ${region}. Collection prep will be skipped.`,
+        );
+        console.warn(
+          `   To enable collection prep, add carriers to the database for region ${region}.\n`,
+        );
       }
 
       // Prompt for number of orders
@@ -219,6 +289,48 @@ async function main(): Promise<void> {
         } else {
           // Build custom order
           composition = await compositionBuilder.buildCustom(variants);
+          
+          // Offer to save custom order as template (unless skipped)
+          if (!options.skipSaveTemplate) {
+            const shouldSave = await promptService.promptConfirm(
+              "Would you like to save this order as a template for future use?",
+              false,
+            );
+            
+            if (shouldSave) {
+              console.log("\n💾 Saving order as template...");
+              const templateName = await promptService.promptTemplateName();
+              const templateDescription = await promptService.promptTemplateDescription();
+              
+              // Generate suggested ID from name
+              const suggestedId = templateName
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "");
+              
+              const templateId = await promptService.promptTemplateId(suggestedId);
+              
+              // Create template from composition
+              const newTemplate: OrderTemplate = {
+                id: templateId,
+                name: templateName,
+                description: templateDescription || `Custom order: ${templateName}`,
+                lineItems: composition.lineItems.map((item) => ({
+                  sku: item.sku,
+                  quantity: item.quantity,
+                  pickType: item.pickType, // Informational only - will use variant's pickType when used
+                })),
+              };
+              
+              saveTemplate(newTemplate);
+              
+              // Reload templates to include the new one
+              const updatedTemplates = loadOrderTemplates();
+              const validUpdatedTemplates = filterValidTemplates(updatedTemplates, variants);
+              templates = validUpdatedTemplates;
+              allTemplates = updatedTemplates;
+            }
+          }
         }
 
         // Check inventory if enabled
@@ -264,9 +376,24 @@ async function main(): Promise<void> {
       // Prompt for collection prep
       console.log("\n📋 Collection Prep Configuration");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      const collectionPrepCount = await promptService.promptCollectionPrepCount(orderCount);
-      const carrier = await promptService.promptCarrierSelection(carriers);
-      const prepDate = new Date();
+      const collectionPrepCount = await promptService.promptCollectionPrepCount(orderCount, carriers.length > 0);
+      
+      // Only require carriers if collection prep is requested
+      if (collectionPrepCount > 0 && carriers.length === 0) {
+        throw new Error(
+          `Cannot create collection prep: No carriers found for region ${region}.\n` +
+            `Please add carriers to the database or set collection prep count to 0 to skip collection prep.`,
+        );
+      }
+
+      let carrier: Carrier | undefined;
+      let prepDate: Date | undefined;
+      let testTag: string | undefined;
+      if (collectionPrepCount > 0) {
+        carrier = await promptService.promptCarrierSelection(carriers);
+        prepDate = new Date();
+        testTag = await promptService.promptTestTag();
+      }
 
       // Generate config
       console.log("\n⚙️  Generating configuration...");
@@ -276,6 +403,7 @@ async function main(): Promise<void> {
         carrier,
         prepDate,
         region,
+        testTag,
       });
 
       // Validate config
@@ -303,8 +431,16 @@ async function main(): Promise<void> {
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         console.log(JSON.stringify(config, null, 2));
       } else {
-        const outputPath =
-          options.output || (await promptService.promptSaveLocation("seed-config.json"));
+        const defaultPath = options.output || "output/seed-config.json";
+        const outputPath = options.output || (await promptService.promptSaveLocation(defaultPath));
+        
+        // Ensure output directory exists
+        const outputDir = dirname(outputPath);
+        if (!existsSync(outputDir)) {
+          const { mkdirSync } = await import("fs");
+          mkdirSync(outputDir, { recursive: true });
+        }
+        
         writeFileSync(outputPath, JSON.stringify(config, null, 2), "utf-8");
         console.log(`\n✅ Configuration saved to: ${outputPath}`);
       }

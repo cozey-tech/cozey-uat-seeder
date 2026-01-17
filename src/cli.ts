@@ -20,6 +20,7 @@ config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
 import { PrismaClient } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
+import { initializeEnvConfig } from "./config/env";
 import { assertStagingEnvironment, displayStagingEnvironment } from "./config/stagingGuardrails";
 import { InputParserService } from "./services/InputParserService";
 import { DataValidationService } from "./services/DataValidationService";
@@ -163,7 +164,7 @@ function initializeServices(dryRun: boolean): ServiceDependencies {
   const seedWmsEntitiesUseCase = new SeedWmsEntitiesUseCase(wmsService);
   const seedWmsEntitiesHandler = new SeedWmsEntitiesHandler(seedWmsEntitiesUseCase);
 
-  const createCollectionPrepUseCase = new CreateCollectionPrepUseCase(collectionPrepService);
+  const createCollectionPrepUseCase = new CreateCollectionPrepUseCase(collectionPrepService, prisma);
   const createCollectionPrepHandler = new CreateCollectionPrepHandler(createCollectionPrepUseCase);
 
   return {
@@ -244,6 +245,7 @@ async function executeSeedingFlow(
       })),
     })),
     batchId,
+    region: config.region || config.collectionPrep?.region || "CA",
   };
 
   const shopifyResult = await services.seedShopifyOrdersHandler.execute(shopifyRequest);
@@ -265,6 +267,7 @@ async function executeSeedingFlow(
       locationId: config.collectionPrep.locationId,
       region: config.collectionPrep.region,
       prepDate: config.collectionPrep.prepDate,
+      testTag: config.collectionPrep.testTag,
     };
 
     const collectionPrepResult = await services.createCollectionPrepHandler.execute(collectionPrepRequest);
@@ -288,7 +291,7 @@ async function executeSeedingFlow(
       return {
         shopifyOrderId: shopifyOrder.shopifyOrderId,
         shopifyOrderNumber: shopifyOrder.shopifyOrderNumber,
-        status: "fulfilled",
+        status: "paid", // Orders are paid but not fulfilled during seeding
         customerName: configOrder.customer.name,
         customerEmail: configOrder.customer.email,
         lineItems: lineItemsWithQuantity,
@@ -378,6 +381,7 @@ async function executeDryRun(configFilePath: string): Promise<void> {
   console.log("🔍 DRY RUN MODE - No changes will be made");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
+  // Config is already initialized in main(), so staging check can proceed
   checkStagingEnvironment();
 
   // Initialize services with dryRun=true
@@ -398,36 +402,21 @@ async function executeDryRun(configFilePath: string): Promise<void> {
       true,
     );
 
-    const shopifyResult = await seedShopifyOrdersHandler.execute(shopifyRequest);
-    console.log(`✅ Created ${shopifyResult.shopifyOrders.length} Shopify order(s)\n`);
-
-    // Step 2: Seed WMS entities
-    console.log("🗄️  Step 2: Seeding WMS entities...");
-    const region = config.region || config.collectionPrep?.region || "CA";
-    let collectionPrepId: string | undefined;
-
-    // Create collection prep first if configured (needed for linking)
-    if (config.collectionPrep) {
-      console.log("📋 Creating collection prep...");
-      const collectionPrepRequest = {
-        orderIds: shopifyResult.shopifyOrders.map((o) => o.shopifyOrderId),
-        carrier: config.collectionPrep.carrier,
-        locationId: config.collectionPrep.locationId,
-        region: config.collectionPrep.region,
-        prepDate: config.collectionPrep.prepDate,
-      };
-
-      const collectionPrepResult = await createCollectionPrepHandler.execute(collectionPrepRequest);
-      collectionPrepId = collectionPrepResult.collectionPrepId;
-      console.log(`✅ Created collection prep: ${collectionPrepId}\n`);
-    }
-
+    displaySummary(shopifyResult, wmsResult, collectionPrepResult, true);
+  } finally {
+    // Cleanup
+    await services.prisma.$disconnect();
+  }
+}
 
 /**
  * Main orchestrator function
  */
 async function main(): Promise<void> {
   try {
+    // Initialize environment configuration (load from AWS Secrets Manager or .env)
+    await initializeEnvConfig();
+
     // Parse CLI arguments
     const options = parseArgs();
 
