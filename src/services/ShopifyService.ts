@@ -108,7 +108,7 @@ export class ShopifyService {
    * @returns Draft order ID
    * @throws ShopifyServiceError if variant lookup fails or API returns errors
    */
-  async createDraftOrder(input: DraftOrderInput, batchId: string, region?: string): Promise<DraftOrderResult> {
+  async createDraftOrder(input: DraftOrderInput, batchId: string, region?: string, collectionPrepName?: string): Promise<DraftOrderResult> {
     if (this.dryRun) {
       const draftOrderId = `gid://shopify/DraftOrder/${uuidv4()}`;
       Logger.info("DRY RUN: Would create draft order", {
@@ -123,6 +123,7 @@ export class ShopifyService {
             }
           : undefined,
         batchId,
+        collectionPrepName,
         draftOrderId,
         lineItemCount: input.lineItems.length,
         lineItems: input.lineItems.map((item) => ({ sku: item.sku, quantity: item.quantity })),
@@ -182,10 +183,16 @@ export class ShopifyService {
           }
         : undefined;
 
+      // Build note with collection prep name if provided
+      let note = `WMS Seed Order - Batch: ${batchId}`;
+      if (collectionPrepName) {
+        note = `WMS Seed Order - Batch: ${batchId}\nCollection Prep: ${collectionPrepName}`;
+      }
+
       const variables = {
         input: {
           email: input.customer.email,
-          note: `WMS Seed Order - Batch: ${batchId}`,
+          note,
           tags: [`wms_seed`, this.formatBatchTag(batchId)],
           customAttributes: [
             {

@@ -1,0 +1,9 @@
+First Name,Last Name,Email,Phone,Company,Address1,Address2,City,Province,Country,Zip,Tags,Note,Tax Exempt,Accepts Marketing
+Test Customer,Ironlink US 1,test-ironlink-us-1@example.com,,,,123 Broadway,,New York,NY,United States,10001,,,,false
+Test Customer,Ironlink US 2,test-ironlink-us-2@example.com,,,,456 5th Avenue,,New York,NY,United States,10018,,,,false
+Test Customer,Ironlink US 3,test-ironlink-us-3@example.com,,,,789 Park Avenue,,New York,NY,United States,10021,,,,false
+Test Customer,Ironlink US 4,test-ironlink-us-4@example.com,,,,321 Madison Avenue,,New York,NY,United States,10010,,,,false
+Test Customer,Moreno 1,test-moreno-1@example.com,,,,123 Main Street,,Los Angeles,CA,United States,90001,,,,false
+Test Customer,Moreno 2,test-moreno-2@example.com,,,,456 Sunset Boulevard,,Los Angeles,CA,United States,90028,,,,false
+Test Customer,Moreno 3,test-moreno-3@example.com,,,,789 Hollywood Boulevard,,Los Angeles,CA,United States,90038,,,,false
+Test Customer,Moreno 4,test-moreno-4@example.com,,,,321 Santa Monica Boulevard,,Santa Monica,CA,United States,90401,,,,false

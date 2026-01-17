@@ -1,0 +1,14 @@
+First Name,Last Name,Email,Phone,Company,Address1,Address2,City,Province,Country,Zip,Tags,Note,Tax Exempt,Accepts Marketing,
+Test Customer,Langley 2,test-langley-2@example.com,,,,456 Main Avenue,,Surrey,BC,Canada,V3T 2B2,,,,false
+Test Customer,Langley 3,test-langley-3@example.com,,,,789 Oak Boulevard,,Burnaby,BC,Canada,V5A 1B2,,,,false
+Test Customer,Langley 4,test-langley-4@example.com,,,,321 Pine Street,,Richmond,BC,Canada,V6Y 2C3,,,,false
+Test Customer,Windsor 1,test-windsor-1@example.com,,,,789 Ontario Road,,Windsor,ON,Canada,N9A 1A1,,,,false
+Test Customer,Windsor 2,test-windsor-2@example.com,,,,321 Windsor Drive,,Windsor,ON,Canada,N9B 2B2,,,,false
+Test Customer,Toronto 1,test-toronto-1@example.com,,,,555 Queen Street,,Toronto,ON,Canada,M5H 2N2,,,,false
+Test Customer,Toronto 2,test-toronto-2@example.com,,,,123 Yonge Street,,Toronto,ON,Canada,M5B 1M8,,,,false
+Test Customer,Toronto 3,test-toronto-3@example.com,,,,456 Bay Street,,Toronto,ON,Canada,M5J 2N8,,,,false
+Test Customer,Royalmount 1,test-royalmount-1@example.com,,,,123 Saint-Laurent Boulevard,,Montreal,QC,Canada,H2Y 1A6,,,,false
+Test Customer,Royalmount 2,test-royalmount-2@example.com,,,,456 Sherbrooke Street,,Montreal,QC,Canada,H3A 1B7,,,,false
+Test Customer,Royalmount 3,test-royalmount-3@example.com,,,,789 Rue Sainte-Catherine,,Montreal,QC,Canada,H3B 2C8,,,,false
+Test Customer,Ironlink CA 1,test-ironlink-ca-1@example.com,,,,123 Main Street,,Calgary,AB,Canada,T2P 1A1,,,,false
+Test Customer,Ironlink CA 2,test-ironlink-ca-2@example.com,,,,456 8th Avenue,,Calgary,AB,Canada,T2P 2B2,,,,false

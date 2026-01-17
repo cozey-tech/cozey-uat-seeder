@@ -21,6 +21,7 @@ export class SeedShopifyOrdersUseCase {
           },
           request.batchId,
           request.region,
+          request.collectionPrepName,
         );
 
         // Complete draft order
