@@ -184,4 +184,55 @@ describe("env config", () => {
       expect(config.SHOPIFY_ACCESS_TOKEN).toBe("test-token");
     });
   });
+
+  describe("DATABASE_CONNECTION_LIMIT loading", () => {
+    it("should load DATABASE_CONNECTION_LIMIT from environment and apply it", async () => {
+      process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
+      process.env.SHOPIFY_STORE_DOMAIN = "test-store.myshopify.com";
+      process.env.SHOPIFY_ACCESS_TOKEN = "test-token";
+      process.env.DATABASE_CONNECTION_LIMIT = "20";
+
+      const { initializeEnvConfig } = await import("./env");
+      const config = await initializeEnvConfig();
+
+      // Custom connection_limit should be applied
+      expect(config.DATABASE_URL).toBe("postgresql://user:pass@localhost:5432/db?connection_limit=20");
+    });
+
+    it("should use default connection_limit when DATABASE_CONNECTION_LIMIT is not set", async () => {
+      process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
+      process.env.SHOPIFY_STORE_DOMAIN = "test-store.myshopify.com";
+      process.env.SHOPIFY_ACCESS_TOKEN = "test-token";
+      delete process.env.DATABASE_CONNECTION_LIMIT;
+
+      const { initializeEnvConfig } = await import("./env");
+      const config = await initializeEnvConfig();
+
+      // Default connection_limit should be applied
+      expect(config.DATABASE_URL).toBe("postgresql://user:pass@localhost:5432/db?connection_limit=10");
+    });
+
+    it("should load DATABASE_CONNECTION_LIMIT from AWS secrets when available", async () => {
+      // Enable AWS secrets
+      process.env.USE_AWS_SECRETS = "true";
+      process.env.AWS_REGION = "us-east-1";
+      process.env.AWS_DATABASE_SECRET_NAME = "dev/uat-database-url";
+      process.env.AWS_SHOPIFY_SECRET_NAME = "dev/shopify-access-token";
+      process.env.SHOPIFY_STORE_DOMAIN = "test-store.myshopify.com";
+
+      // Mock AWS service to return DATABASE_CONNECTION_LIMIT
+      mockFetchSecrets.mockResolvedValueOnce({
+        DATABASE_URL: "postgresql://user:pass@aws-db.example.com:5432/db",
+        SHOPIFY_ACCESS_TOKEN: "aws-token-12345",
+        DATABASE_CONNECTION_LIMIT: "25",
+      });
+
+      vi.resetModules();
+      const { initializeEnvConfig } = await import("./env");
+      const config = await initializeEnvConfig();
+
+      // Custom connection_limit from AWS should be applied
+      expect(config.DATABASE_URL).toBe("postgresql://user:pass@aws-db.example.com:5432/db?connection_limit=25");
+    });
+  });
 });
