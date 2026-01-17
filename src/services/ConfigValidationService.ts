@@ -204,6 +204,8 @@ export class ConfigValidationService {
         }
 
         // Validate carrier exists in enum and is available for region
+        // Note: prep.carrier contains Carrier.id, which is set to carrier.code in ConfigDataRepository.getCarriers()
+        // So prep.carrier should match carrier.code from the enum (case-insensitive comparison)
         const carrierCode = prep.carrier;
         const carrier = carriers.find(
           (c) => c.code.toLowerCase() === carrierCode.toLowerCase(),

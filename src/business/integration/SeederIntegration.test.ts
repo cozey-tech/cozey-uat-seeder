@@ -28,6 +28,7 @@ describe("Seeder Integration", () => {
       fulfillOrder: vi.fn(),
       queryOrdersByTag: vi.fn(),
       findVariantIdsBySkus: vi.fn(),
+      formatBatchTag: vi.fn((batchId: string) => `seed_batch_id:${batchId.substring(0, 26)}`),
     } as unknown as ShopifyService;
 
     mockWmsRepository = {

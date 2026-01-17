@@ -37,7 +37,18 @@ describe("OrderCompositionBuilder", () => {
         ],
       };
 
-      const variants: Variant[] = [];
+      const variants: Variant[] = [
+        {
+          id: "variant-1",
+          sku: "SOFA-001-BLK",
+          modelName: "Sofa",
+          colorId: "BLK",
+          shopifyIds: ["shopify-1"],
+          region: "CA",
+          description: "Sofa - Black",
+          pickType: "Regular",
+        },
+      ];
 
       mockPromptService.promptConfirm.mockResolvedValue(false); // Don't modify
 
@@ -65,10 +76,20 @@ describe("OrderCompositionBuilder", () => {
       const variants: Variant[] = [
         {
           id: "variant-1",
+          sku: "SOFA-001-BLK",
+          modelName: "Sofa",
+          colorId: "BLK",
+          shopifyIds: ["shopify-1"],
+          region: "CA",
+          description: "Sofa - Black",
+          pickType: "Regular",
+        },
+        {
+          id: "variant-2",
           sku: "CHAIR-001-WHT",
           modelName: "Chair",
           colorId: "WHT",
-          shopifyIds: ["shopify-1"],
+          shopifyIds: ["shopify-2"],
           region: "CA",
           description: "Chair - White",
           pickType: "Pick and Pack",
