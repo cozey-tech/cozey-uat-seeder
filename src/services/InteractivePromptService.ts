@@ -1,6 +1,7 @@
 import inquirer from "inquirer";
 import { search } from "@inquirer/prompts";
 import type { Customer, Variant, Carrier } from "../repositories/ConfigDataRepository";
+import type { OrderComposition } from "./OrderCompositionBuilder";
 
 export interface OrderTemplate {
   id: string;
@@ -812,5 +813,85 @@ export class InteractivePromptService {
     ]);
 
     return addMore;
+  }
+
+  /**
+   * Display order review summary and prompt for action
+   */
+  async promptOrderReviewAction(orders: Array<{ customer: Customer; composition: OrderComposition }>): Promise<"continue" | "add-more" | "edit" | "delete" | "start-over"> {
+    // Display summary
+    console.log("\n📋 Order Review");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log(`Total Orders: ${orders.length}\n`);
+
+    for (let i = 0; i < orders.length; i++) {
+      const order = orders[i];
+      const itemCount = order.composition.lineItems.length;
+      const totalItems = order.composition.lineItems.reduce(
+        (sum: number, item: { quantity: number }) => sum + item.quantity,
+        0,
+      );
+      console.log(`   Order ${i + 1}: ${order.customer.name} (${order.customer.email})`);
+      console.log(`            Location: ${order.customer.locationId}`);
+      console.log(`            Items: ${itemCount} line items, ${totalItems} total quantity`);
+      console.log("");
+    }
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+    const { action } = await inquirer.prompt<{ action: "continue" | "add-more" | "edit" | "delete" | "start-over" }>([
+      {
+        type: "list",
+        name: "action",
+        message: "What would you like to do?",
+        choices: [
+          { name: "Continue to collection prep configuration", value: "continue" },
+          { name: "Add more orders", value: "add-more" },
+          { name: "Edit an order", value: "edit" },
+          { name: "Delete an order", value: "delete" },
+          { name: "Start over", value: "start-over" },
+        ],
+        default: "continue",
+      },
+    ]);
+
+    return action;
+  }
+
+  /**
+   * Prompt for which order to edit
+   */
+  async promptOrderToEdit(orderCount: number): Promise<number> {
+    const { orderIndex } = await inquirer.prompt<{ orderIndex: number }>([
+      {
+        type: "list",
+        name: "orderIndex",
+        message: "Which order would you like to edit?",
+        choices: Array.from({ length: orderCount }, (_, i) => ({
+          name: `Order ${i + 1}`,
+          value: i,
+        })),
+      },
+    ]);
+
+    return orderIndex;
+  }
+
+  /**
+   * Prompt for which order to delete
+   */
+  async promptOrderToDelete(orderCount: number): Promise<number> {
+    const { orderIndex } = await inquirer.prompt<{ orderIndex: number }>([
+      {
+        type: "list",
+        name: "orderIndex",
+        message: "Which order would you like to delete?",
+        choices: Array.from({ length: orderCount }, (_, i) => ({
+          name: `Order ${i + 1}`,
+          value: i,
+        })),
+      },
+    ]);
+
+    return orderIndex;
   }
 }
