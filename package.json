@@ -15,6 +15,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "prisma:generate": "prisma generate",
     "seed": "tsx src/cli.ts",
     "generate-config": "tsx src/generateConfig.ts"
@@ -25,6 +26,7 @@
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "@vitest/eslint-plugin": "^1.4.0",
     "eslint": "^9.12.0",
     "eslint-config-prettier": "^9.1.0",
