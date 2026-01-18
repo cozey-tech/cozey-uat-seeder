@@ -1,8 +1,6 @@
 /**
  * Error formatting utility for standardized, actionable error messages
- *
- * Provides consistent error formatting with context, recovery suggestions,
- * and actionable guidance for all error types in the CLI tools.
+ * with context and recovery suggestions.
  */
 
 import { InputValidationError } from "../services/InputParserService";
@@ -21,32 +19,14 @@ export interface ErrorContext {
    * Order index (1-based) if error is order-specific
    */
   orderIndex?: number;
-  /**
-   * Customer email if error is customer-specific
-   */
   customerEmail?: string;
-  /**
-   * SKU if error is SKU-specific
-   */
   sku?: string;
-  /**
-   * Additional context data
-   */
   [key: string]: unknown;
 }
 
 export interface FormattedError {
-  /**
-   * User-friendly error message
-   */
   message: string;
-  /**
-   * Recovery suggestions
-   */
   suggestions: string[];
-  /**
-   * Additional context information
-   */
   context?: string;
 }
 
