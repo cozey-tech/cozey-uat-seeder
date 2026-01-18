@@ -8,7 +8,6 @@
 import type { OrderComposition } from "../../services/OrderCompositionBuilder";
 import type { Variant } from "../../repositories/ConfigDataRepository";
 import { OutputFormatter } from "../../utils/outputFormatter";
-import { Logger } from "../../utils/logger";
 
 export interface ValidationIssue {
   type: "error" | "warning";
