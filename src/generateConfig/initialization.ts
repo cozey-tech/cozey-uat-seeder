@@ -129,49 +129,40 @@ export async function loadReferenceData(
   region: "CA" | "US",
 ): Promise<{ data: ReferenceData; loadTime: number }> {
   const referenceDataStart = Date.now();
-  const loadingProgress = new ProgressTracker({ showSpinner: false });
+  const loadingProgress = new ProgressTracker({ showSpinner: true });
   loadingProgress.start("Loading reference data", 4);
   
-  console.log(OutputFormatter.info("Loading reference data..."));
-  
+  // Load variants
   loadingProgress.update(1, "Loading variants...");
-  const variantsPromise = dataRepository.getAvailableVariants(region);
+  const variants = await dataRepository.getAvailableVariants(region);
   
+  // Load customers
   loadingProgress.update(2, "Loading customers...");
-  const customersPromise = dataRepository.getCustomers(region);
+  const customers = await dataRepository.getCustomers(region);
   
+  // Load carriers
   loadingProgress.update(3, "Loading carriers...");
-  const carriersPromise = dataRepository.getCarriers(region);
+  const carriers = await dataRepository.getCarriers(region);
   
+  // Load templates
   loadingProgress.update(4, "Loading templates...");
-  const templatesPromise = Promise.resolve(loadOrderTemplates());
-  
-  let [variants, customers, carriers, allTemplates] = await Promise.all([
-    variantsPromise,
-    customersPromise,
-    carriersPromise,
-    templatesPromise,
-  ]);
+  const allTemplates = loadOrderTemplates();
   
   const referenceDataLoadTime = Date.now() - referenceDataStart;
-  loadingProgress.complete(`Loaded reference data (${OutputFormatter.duration(referenceDataLoadTime)})`);
+  loadingProgress.complete(`✓ Loaded reference data`);
 
   // Filter templates to only include those with valid SKUs for this region
-  console.log(OutputFormatter.info("Validating templates..."));
-  let templates = filterValidTemplates(allTemplates, variants);
+  const templates = filterValidTemplates(allTemplates, variants);
 
   // Batch fetch all locations for customers upfront (performance optimization)
   const locationLoadStart = Date.now();
-  const locationProgress = new ProgressTracker({ showSpinner: false });
-  locationProgress.start("Loading locations", customers.length);
+  const locationProgress = new ProgressTracker({ showSpinner: true });
+  locationProgress.start("Loading customer locations", customers.length);
   
-  console.log(OutputFormatter.info("Loading customer locations..."));
   const locationsCache = await dataRepository.getLocationsForCustomers(customers);
   const locationLoadTime = Date.now() - locationLoadStart;
   
-  locationProgress.update(customers.length);
-  locationProgress.complete(`Loaded ${locationsCache.size} location(s) (${OutputFormatter.duration(locationLoadTime)})`);
-  console.log();
+  locationProgress.complete(`✓ Loaded ${locationsCache.size} location(s)`);
 
   const referenceItems: Array<{ label: string; value: string | number }> = [
     { label: "Variants", value: variants.length },

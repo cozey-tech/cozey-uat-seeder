@@ -67,6 +67,7 @@ export class ProgressTracker {
       this.spinner = ora({
         text: this.getProgressText(),
         spinner: "dots",
+        color: "cyan",
       }).start();
     } else {
       console.log(`${operation} (0/${total})`);
@@ -152,19 +153,25 @@ export class ProgressTracker {
    * Get current progress text
    */
   private getProgressText(message?: string): string {
-    const progress = this.formatMessage(this.current, this.total, message);
     const percentage = this.total > 0 ? Math.round((this.current / this.total) * 100) : 0;
     const percentageText = `${percentage}%`;
+    
+    // Create a visual progress bar
+    const barLength = 20;
+    const filled = Math.round((this.current / this.total) * barLength);
+    const empty = barLength - filled;
+    const progressBar = `[${"█".repeat(filled)}${"░".repeat(empty)}]`;
 
     let timeEstimate = "";
     if (this.showTimeEstimate && this.current > 0 && this.total > this.current) {
       const remaining = this.estimateTimeRemaining();
       if (remaining) {
-        timeEstimate = ` (~${remaining} remaining)`;
+        timeEstimate = ` ~${remaining} remaining`;
       }
     }
 
-    return `${this.operation}: ${progress} (${percentageText})${timeEstimate}`;
+    const messagePart = message ? ` ${message}` : "";
+    return `${this.operation} ${progressBar} ${percentageText}${messagePart}${timeEstimate}`;
   }
 
   /**
