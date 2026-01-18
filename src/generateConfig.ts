@@ -176,12 +176,10 @@ async function main(): Promise<void> {
       if (incrementalValidation.errorCount > 0) {
         console.error();
         console.error(OutputFormatter.error("Incremental validation found errors:"));
-        incrementalValidation.issues
-          .filter((i) => i.type === "error")
-          .forEach((issue) => {
-            const prefix = issue.orderIndex !== undefined ? `Order ${issue.orderIndex + 1}: ` : "";
-            console.error(OutputFormatter.listItem(`${prefix}${issue.message}`));
-          });
+        for (const issue of incrementalValidation.issues.filter((i) => i.type === "error")) {
+          const prefix = issue.orderIndex !== undefined ? `Order ${issue.orderIndex + 1}: ` : "";
+          console.error(OutputFormatter.listItem(`${prefix}${issue.message}`));
+        }
         Logger.error("Config has validation errors from incremental validation", {
           errorCount: incrementalValidation.errorCount,
           warningCount: incrementalValidation.warningCount,
@@ -199,9 +197,9 @@ async function main(): Promise<void> {
       if (!validationResult.valid) {
         console.error();
         console.error(OutputFormatter.error("Final validation failed:"));
-        validationResult.errors.forEach((error) => {
+        for (const error of validationResult.errors) {
           console.error(OutputFormatter.listItem(error));
-        });
+        }
         Logger.error("Config validation failed", {
           errors: validationResult.errors,
           warnings: validationResult.warnings,
@@ -212,9 +210,9 @@ async function main(): Promise<void> {
       if (validationResult.warnings.length > 0) {
         console.warn();
         console.warn(OutputFormatter.warning("Validation warnings:"));
-        validationResult.warnings.forEach((warning) => {
+        for (const warning of validationResult.warnings) {
           console.warn(OutputFormatter.listItem(warning));
-        });
+        }
         Logger.warn("Config has validation warnings", {
           warningCount: validationResult.warnings.length,
         });

@@ -137,7 +137,7 @@ export class AwsSecretsService {
     const merged: Record<string, unknown> = {};
     let hasAnySuccess = false;
 
-    results.forEach((result, index) => {
+    for (const [index, result] of results.entries()) {
       const secretName = secretNames[index];
       if (result.status === "fulfilled" && result.value !== null) {
         Object.assign(merged, result.value);
@@ -149,7 +149,7 @@ export class AwsSecretsService {
           reason: result.status === "rejected" ? result.reason?.message : "returned null",
         });
       }
-    });
+    }
 
     if (!hasAnySuccess) {
       Logger.warn("All secrets failed to fetch from AWS", { secretNames });

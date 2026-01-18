@@ -80,9 +80,9 @@ export function displaySummary(
   // Show detailed order list if small number
   if (shopifyResult.shopifyOrders.length <= 10) {
     console.log(OutputFormatter.header("Shopify Orders", "📦"));
-    shopifyResult.shopifyOrders.forEach((order) => {
+    for (const order of shopifyResult.shopifyOrders) {
       console.log(OutputFormatter.listItem(`Order #${order.shopifyOrderNumber} (ID: ${order.shopifyOrderId})`));
-    });
+    }
     console.log();
   }
 

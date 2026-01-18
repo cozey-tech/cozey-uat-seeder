@@ -43,10 +43,10 @@ async function main(): Promise<void> {
         if (availableStates.length === 0) {
           console.log(OutputFormatter.info("   (none)"));
         } else {
-          availableStates.slice(0, 10).forEach((state) => {
+          for (const state of availableStates.slice(0, 10)) {
             const date = new Date(state.timestamp).toISOString();
             console.log(OutputFormatter.keyValue(state.batchId, date));
-          });
+          }
         }
         process.exit(1);
       }
