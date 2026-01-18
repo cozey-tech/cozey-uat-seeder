@@ -36,6 +36,12 @@ export class SeedShopifyOrdersUseCase {
       throw new Error("Cannot seed orders: orders array is empty");
     }
 
+    const operationId = Logger.startOperation("seedShopifyOrders", {
+      batchId: request.batchId,
+      orderCount: request.orders.length,
+      region: request.region,
+    });
+
     const shopifyOrders: SeedShopifyOrdersResponse["shopifyOrders"] = [];
     const orderMetrics: OrderMetrics[] = [];
     const batchStartTime = Date.now();
@@ -366,12 +372,25 @@ export class SeedShopifyOrdersUseCase {
       throttleStatus,
     };
 
+    Logger.performance({
+      operation: "seedShopifyOrders",
+      duration: totalDurationMs,
+      itemCount: request.orders.length,
+      successfulCount: shopifyOrders.length,
+      failedCount: errors.length,
+      totalApiCalls,
+      totalRequestedCost,
+      totalActualCost,
+      averageOrderDurationMs,
+    });
+
     Logger.info("Shopify order seeding performance metrics", {
       batchId: request.batchId,
       metrics: batchMetrics,
     });
 
-    return {
+    const batchDuration = Date.now() - batchStartTime;
+    const result = {
       shopifyOrders,
       failures: errors.length > 0
         ? errors.map((e) => ({
@@ -381,5 +400,25 @@ export class SeedShopifyOrdersUseCase {
           }))
         : undefined,
     };
+
+    // Log performance metrics
+    Logger.performance({
+      operation: "seedShopifyOrders",
+      duration: batchDuration,
+      itemCount: request.orders.length,
+      successfulCount: shopifyOrders.length,
+      failedCount: errors.length,
+      totalApiCalls,
+      totalRequestedCost,
+      totalActualCost,
+    });
+
+    Logger.endOperation(operationId, errors.length === 0, {
+      successfulOrders: shopifyOrders.length,
+      failedOrders: errors.length,
+      totalApiCalls,
+    });
+
+    return result;
   }
 }

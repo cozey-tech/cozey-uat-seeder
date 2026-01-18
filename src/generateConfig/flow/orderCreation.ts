@@ -9,7 +9,9 @@ import { InteractivePromptService } from "../../services/InteractivePromptServic
 import { OrderCompositionBuilder } from "../../services/OrderCompositionBuilder";
 import { InventoryService } from "../../services/InventoryService";
 import { OutputFormatter } from "../../utils/outputFormatter";
+import { Logger } from "../../utils/logger";
 import { loadOrderTemplates, saveTemplate, filterValidTemplates } from "../initialization";
+import { validateOrder, displayValidationIssues } from "./validation";
 
 export interface Order {
   customer: Customer;
@@ -97,7 +99,7 @@ export async function createOrders(
           );
           
           if (shouldSave) {
-            console.log("\n💾 Saving order as template...");
+            Logger.info("Saving order as template", { orderIndex: orders.length });
             const templateName = await promptService.promptTemplateName();
             const templateDescription = await promptService.promptTemplateDescription();
             
@@ -135,6 +137,20 @@ export async function createOrders(
             };
           }
         }
+      }
+
+      // Validate order before adding
+      const validation = validateOrder(orders.length, composition, variants, customer.email);
+      if (!validation.valid) {
+        displayValidationIssues(validation.issues);
+        Logger.warn("Order validation failed", {
+          orderIndex: orders.length,
+          customerEmail: customer.email,
+          issues: validation.issues,
+        });
+        // Continue anyway - user can fix in review step
+      } else if (validation.issues.length > 0) {
+        displayValidationIssues(validation.issues);
       }
 
       // Defer inventory check for bulk operations
@@ -224,16 +240,35 @@ export async function createOrders(
         locationId: customer.locationId,
       });
 
+      // Validate order before adding
+      const validation = validateOrder(orders.length, composition, variants, customer.email);
+      if (!validation.valid) {
+        displayValidationIssues(validation.issues);
+        Logger.warn("Order validation failed in bulk creation", {
+          orderIndex: orders.length,
+          customerEmail: customer.email,
+          issues: validation.issues,
+        });
+      } else if (validation.issues.length > 0) {
+        displayValidationIssues(validation.issues);
+      }
+
       if ((i + 1) % 10 === 0) {
-        console.log(`   ✓ Created ${i + 1} of ${bulkCount} orders...`);
+        Logger.info(`Bulk order creation progress`, {
+          current: i + 1,
+          total: bulkCount,
+          mode: "bulk-template",
+        });
       }
     }
 
-    console.log(`✅ Created ${bulkCount} orders from template\n`);
+    Logger.info(`Bulk order creation complete`, {
+      totalCreated: bulkCount,
+      mode: "bulk-template",
+    });
   } else if (creationMode === "quick-duplicate") {
     // Quick duplicate mode: create first order, then duplicate with edits
-    console.log("\n📦 Create your first order (this will be used as a template):");
-    console.log(OutputFormatter.separator());
+    Logger.info("Starting quick duplicate mode", { mode: "quick-duplicate" });
 
     // Create first order
     const firstCustomer = await promptService.promptCustomerSelection(customers);
@@ -260,13 +295,25 @@ export async function createOrders(
       });
     }
 
+    // Validate first order
+    const firstValidation = validateOrder(0, firstComposition, variants, firstCustomer.email);
+    if (!firstValidation.valid) {
+      displayValidationIssues(firstValidation.issues);
+      Logger.warn("First order validation failed", {
+        customerEmail: firstCustomer.email,
+        issues: firstValidation.issues,
+      });
+    } else if (firstValidation.issues.length > 0) {
+      displayValidationIssues(firstValidation.issues);
+    }
+
     orders.push({
       customer: firstCustomer,
       composition: firstComposition,
       locationId: firstCustomer.locationId,
     });
 
-    console.log(OutputFormatter.success("First order created\n"));
+    Logger.info("First order created", { mode: "quick-duplicate" });
 
     // Duplicate and edit
     let duplicateMore = true;
@@ -317,13 +364,29 @@ export async function createOrders(
         });
       }
 
+      // Validate duplicated order
+      const duplicateValidation = validateOrder(orders.length, duplicateComposition, variants, duplicateCustomer.email);
+      if (!duplicateValidation.valid) {
+        displayValidationIssues(duplicateValidation.issues);
+        Logger.warn("Duplicated order validation failed", {
+          orderIndex: orders.length,
+          customerEmail: duplicateCustomer.email,
+          issues: duplicateValidation.issues,
+        });
+      } else if (duplicateValidation.issues.length > 0) {
+        displayValidationIssues(duplicateValidation.issues);
+      }
+
       orders.push({
         customer: duplicateCustomer,
         composition: duplicateComposition,
         locationId: duplicateCustomer.locationId,
       });
 
-      console.log(OutputFormatter.success(`Duplicated order (${orders.length} total)\n`));
+      Logger.info("Order duplicated", {
+        totalOrders: orders.length,
+        mode: "quick-duplicate",
+      });
     }
   }
 

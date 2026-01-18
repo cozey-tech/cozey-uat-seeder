@@ -5,7 +5,9 @@
 import type { Carrier } from "../../repositories/ConfigDataRepository";
 import { InteractivePromptService } from "../../services/InteractivePromptService";
 import { OutputFormatter } from "../../utils/outputFormatter";
+import { Logger } from "../../utils/logger";
 import type { Order } from "./orderCreation";
+import { validateCollectionPrep, displayValidationIssues } from "./validation";
 
 export interface CollectionPrepConfig {
   carrier: Carrier;
@@ -35,6 +37,11 @@ export async function configureCollectionPreps(
 }> {
   const { carriers, orders, promptService } = context;
 
+  Logger.info("Starting collection prep configuration", {
+    orderCount: orders.length,
+    carrierCount: carriers.length,
+  });
+  
   console.log();
   console.log(OutputFormatter.header("Collection Prep Configuration", "📋"));
   console.log(OutputFormatter.separator());
@@ -46,8 +53,9 @@ export async function configureCollectionPreps(
   let testTag: string | undefined;
 
   if (carriers.length === 0) {
-    console.warn(OutputFormatter.warning("No carriers available. Skipping collection prep configuration."));
-    console.warn();
+    Logger.warn("No carriers available for collection prep", {
+      orderCount: orders.length,
+    });
     return {};
   }
 
@@ -107,6 +115,23 @@ export async function configureCollectionPreps(
       }
     }
 
+    // Validate collection preps
+    for (let i = 0; i < collectionPreps.length; i++) {
+      const prep = collectionPreps[i];
+      const prepOrders = prep.orderIndices
+        ? prep.orderIndices.map((idx) => orders[idx])
+        : [];
+      const validation = validateCollectionPrep(
+        i,
+        prep.orderIndices || [],
+        prepOrders.map((o) => ({ composition: o.composition })),
+        false, // PnP config validation would need to be passed in
+      );
+      if (validation.issues.length > 0) {
+        displayValidationIssues(validation.issues);
+      }
+    }
+    
     // Show allocation summary
     console.log();
     console.log(OutputFormatter.header("Bulk Collection Prep Summary", "📊"));
@@ -122,6 +147,11 @@ export async function configureCollectionPreps(
     }
     console.log(OutputFormatter.separator());
     console.log();
+    
+    Logger.info("Bulk collection prep configuration complete", {
+      prepCount: collectionPreps.length,
+      totalOrders: orders.length,
+    });
   } else if (builderMode === "multiple") {
     // Collection prep builder: configure multiple preps
     collectionPreps = [];
@@ -184,6 +214,23 @@ export async function configureCollectionPreps(
       addMore = await promptService.promptAddAnotherCollectionPrep();
     }
 
+    // Validate collection preps
+    for (let i = 0; i < collectionPreps.length; i++) {
+      const prep = collectionPreps[i];
+      const prepOrders = prep.orderIndices
+        ? prep.orderIndices.map((idx) => orders[idx])
+        : [];
+      const validation = validateCollectionPrep(
+        i,
+        prep.orderIndices || [],
+        prepOrders.map((o) => ({ composition: o.composition })),
+        false, // PnP config validation would need to be passed in
+      );
+      if (validation.issues.length > 0) {
+        displayValidationIssues(validation.issues);
+      }
+    }
+    
     // Show allocation summary
     console.log();
     console.log(OutputFormatter.header("Collection Prep Allocation Summary", "📊"));
@@ -199,6 +246,11 @@ export async function configureCollectionPreps(
     }
     console.log(OutputFormatter.separator());
     console.log();
+    
+    Logger.info("Multiple collection prep configuration complete", {
+      prepCount: collectionPreps.length,
+      totalOrders: orders.length,
+    });
   } else {
     // Legacy single collection prep mode
     collectionPrepCount = await promptService.promptCollectionPrepCount(orders.length, carriers.length > 0);

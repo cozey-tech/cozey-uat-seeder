@@ -33,6 +33,8 @@ import { DataValidationService } from "./services/DataValidationService";
 import { InventoryService } from "./services/InventoryService";
 import { OutputFormatter } from "./utils/outputFormatter";
 import { ErrorFormatter } from "./utils/errorFormatter";
+import { Logger } from "./utils/logger";
+import { getValidationSummary } from "./generateConfig/flow/validation";
 
 /**
  * Main orchestrator function
@@ -167,15 +169,51 @@ async function main(): Promise<void> {
 
       // Validate config
       const validationStart = Date.now();
+      const validationOperationId = Logger.startOperation("validateConfig", {
+        orderCount: seedConfig.orders.length,
+        hasCollectionPrep: !!seedConfig.collectionPrep || (seedConfig.collectionPreps?.length ?? 0) > 0,
+      });
+      
       console.log(OutputFormatter.info("Validating configuration..."));
+      
+      // Get incremental validation summary
+      const incrementalValidation = getValidationSummary(
+        orders.map((o) => ({ composition: o.composition })),
+        variants,
+      );
+      
+      if (incrementalValidation.errorCount > 0) {
+        console.error();
+        console.error(OutputFormatter.error("Incremental validation found errors:"));
+        incrementalValidation.issues
+          .filter((i) => i.type === "error")
+          .forEach((issue) => {
+            const prefix = issue.orderIndex !== undefined ? `Order ${issue.orderIndex + 1}: ` : "";
+            console.error(OutputFormatter.listItem(`${prefix}${issue.message}`));
+          });
+        Logger.error("Config has validation errors from incremental validation", {
+          errorCount: incrementalValidation.errorCount,
+          warningCount: incrementalValidation.warningCount,
+        });
+      }
+      
       const validationResult = await validationService.validateFull(seedConfig);
       performanceMetrics.validationTime = Date.now() - validationStart;
+      
+      Logger.endOperation(validationOperationId, validationResult.valid, {
+        errorCount: validationResult.errors.length,
+        warningCount: validationResult.warnings.length,
+      });
 
       if (!validationResult.valid) {
         console.error();
-        console.error(OutputFormatter.error("Validation failed:"));
+        console.error(OutputFormatter.error("Final validation failed:"));
         validationResult.errors.forEach((error) => {
           console.error(OutputFormatter.listItem(error));
+        });
+        Logger.error("Config validation failed", {
+          errors: validationResult.errors,
+          warnings: validationResult.warnings,
         });
         process.exit(1);
       }
@@ -186,6 +224,17 @@ async function main(): Promise<void> {
         validationResult.warnings.forEach((warning) => {
           console.warn(OutputFormatter.listItem(warning));
         });
+        Logger.warn("Config has validation warnings", {
+          warningCount: validationResult.warnings.length,
+        });
+      }
+      
+      // Prevent saving if there are critical errors from incremental validation
+      if (incrementalValidation.errorCount > 0 && !options.dryRun) {
+        console.error();
+        console.error(OutputFormatter.error("Cannot save config: critical validation errors exist"));
+        console.error(OutputFormatter.info("Please fix the errors above and try again"));
+        process.exit(1);
       }
 
       // Save or preview

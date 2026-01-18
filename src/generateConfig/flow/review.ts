@@ -8,7 +8,9 @@ import type { OrderTemplate } from "../../services/InteractivePromptService";
 import { InteractivePromptService } from "../../services/InteractivePromptService";
 import { OrderCompositionBuilder } from "../../services/OrderCompositionBuilder";
 import { OutputFormatter } from "../../utils/outputFormatter";
+import { Logger } from "../../utils/logger";
 import type { Order, InventoryCheck } from "./orderCreation";
+import { validateOrder, displayValidationIssues, getValidationSummary } from "./validation";
 
 export interface ReviewContext {
   variants: Variant[];
@@ -34,6 +36,29 @@ export async function reviewOrders(
 ): Promise<{ orders: Order[]; inventoryChecks: InventoryCheck[] }> {
   const { variants, customers, templates, locationsCache, promptService, compositionBuilder } = context;
   
+  // Show validation summary at start of review
+  const validationSummary = getValidationSummary(
+    orders.map((o) => ({ composition: o.composition })),
+    variants,
+  );
+  
+  if (validationSummary.errorCount > 0 || validationSummary.warningCount > 0) {
+    console.log();
+    console.log(OutputFormatter.header("Validation Summary", "🔍"));
+    console.log(OutputFormatter.separator());
+    console.log(OutputFormatter.keyValue("Errors", validationSummary.errorCount));
+    console.log(OutputFormatter.keyValue("Warnings", validationSummary.warningCount));
+    console.log();
+    
+    if (validationSummary.errorCount > 0) {
+      displayValidationIssues(validationSummary.issues);
+      Logger.warn("Config has validation errors", {
+        errorCount: validationSummary.errorCount,
+        warningCount: validationSummary.warningCount,
+      });
+    }
+  }
+  
   let reviewComplete = false;
   while (!reviewComplete) {
     const reviewAction = await promptService.promptOrderReviewAction(orders);
@@ -42,7 +67,7 @@ export async function reviewOrders(
       reviewComplete = true;
     } else if (reviewAction === "add-more") {
       // Add more orders using the same creation mode
-      console.log("\n📦 Adding more orders...");
+      Logger.info("Adding more orders", { currentOrderCount: orders.length });
       // Reuse the creation mode logic (simplified - just add one more order)
       const customer = await promptService.promptCustomerSelection(customers);
       const location = locationsCache.get(customer.id);
@@ -59,6 +84,19 @@ export async function reviewOrders(
         composition = await compositionBuilder.buildCustom(variants);
       }
 
+      // Validate order before adding
+      const validation = validateOrder(orders.length, composition, variants, customer.email);
+      if (!validation.valid) {
+        displayValidationIssues(validation.issues);
+        Logger.warn("Order validation failed when adding", {
+          orderIndex: orders.length,
+          customerEmail: customer.email,
+          issues: validation.issues,
+        });
+      } else if (validation.issues.length > 0) {
+        displayValidationIssues(validation.issues);
+      }
+
       if (options.modifyInventory) {
         inventoryChecks.push({
           orderIndex: orders.length,
@@ -73,17 +111,14 @@ export async function reviewOrders(
         composition,
         locationId: customer.locationId,
       });
-      console.log(OutputFormatter.success(`Added order ${orders.length}`));
-      console.log();
+      Logger.info("Order added", { totalOrders: orders.length });
     } else if (reviewAction === "edit") {
       if (orders.length === 0) {
-        console.log(OutputFormatter.warning("No orders to edit."));
-        console.log();
+        Logger.warn("No orders to edit", { orderCount: orders.length });
         continue;
       }
       const orderIndex = await promptService.promptOrderToEdit(orders.length);
-      console.log();
-      console.log(OutputFormatter.info(`Editing Order ${orderIndex + 1}...`));
+      Logger.info("Editing order", { orderIndex: orderIndex + 1, totalOrders: orders.length });
 
       // Rebuild the order
       const customer = await promptService.promptCustomerSelection(customers);
@@ -99,6 +134,19 @@ export async function reviewOrders(
         composition = await compositionBuilder.buildFromTemplate(template, variants);
       } else {
         composition = await compositionBuilder.buildCustom(variants);
+      }
+
+      // Validate edited order
+      const validation = validateOrder(orderIndex, composition, variants, customer.email);
+      if (!validation.valid) {
+        displayValidationIssues(validation.issues);
+        Logger.warn("Edited order validation failed", {
+          orderIndex,
+          customerEmail: customer.email,
+          issues: validation.issues,
+        });
+      } else if (validation.issues.length > 0) {
+        displayValidationIssues(validation.issues);
       }
 
       // Update inventory check if needed
@@ -118,7 +166,7 @@ export async function reviewOrders(
         composition,
         locationId: customer.locationId,
       };
-      console.log(OutputFormatter.success(`Updated order ${orderIndex + 1}\n`));
+      Logger.info("Order updated", { orderIndex: orderIndex + 1 });
     } else if (reviewAction === "delete") {
       if (orders.length === 0) {
         console.log(OutputFormatter.warning("No orders to delete."));

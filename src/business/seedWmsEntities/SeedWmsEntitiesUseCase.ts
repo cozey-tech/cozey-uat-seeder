@@ -7,6 +7,13 @@ export class SeedWmsEntitiesUseCase {
   constructor(private readonly wmsService: WmsService) {}
 
   async execute(request: SeedWmsEntitiesRequest): Promise<SeedWmsEntitiesResponse> {
+    const operationId = Logger.startOperation("seedWmsEntities", {
+      shopifyOrderCount: request.shopifyOrders.length,
+      region: request.region,
+      collectionPrepId: request.collectionPrepId,
+    });
+
+    const startTime = Date.now();
     const orders: SeedWmsEntitiesResponse["orders"] = [];
     const shipments: SeedWmsEntitiesResponse["shipments"] = [];
     const prepPartItems: SeedWmsEntitiesResponse["prepPartItems"] = [];
@@ -14,6 +21,10 @@ export class SeedWmsEntitiesUseCase {
 
     for (let orderIndex = 0; orderIndex < request.shopifyOrders.length; orderIndex++) {
       const shopifyOrder = request.shopifyOrders[orderIndex];
+      const orderOperationId = Logger.startOperation("createWmsEntitiesForOrder", {
+        orderIndex,
+        shopifyOrderId: shopifyOrder.shopifyOrderId,
+      });
       
       try {
       // Check if order already exists (idempotency)
@@ -105,6 +116,11 @@ export class SeedWmsEntitiesUseCase {
       if (request.onOrderProgress) {
         request.onOrderProgress(orderIndex + 1, request.shopifyOrders.length, shopifyOrder.shopifyOrderId, true);
       }
+      
+      Logger.endOperation(orderOperationId, true, {
+        orderId: orders[orders.length - 1]?.orderId,
+        shipmentId: shipments[shipments.length - 1]?.shipmentId,
+      });
       } catch (error) {
         // Continue-on-error strategy: collect errors, don't fail entire batch
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -125,6 +141,10 @@ export class SeedWmsEntitiesUseCase {
         if (request.onOrderProgress) {
           request.onOrderProgress(orderIndex + 1, request.shopifyOrders.length, shopifyOrder.shopifyOrderId, false);
         }
+        
+        Logger.endOperation(orderOperationId, false, {
+          error: errorMessage,
+        });
       }
     }
 
@@ -149,11 +169,33 @@ export class SeedWmsEntitiesUseCase {
       }
     }
 
-    return {
+    const totalDuration = Date.now() - startTime;
+    const result = {
       orders,
       shipments,
       prepPartItems,
       failures: failures.length > 0 ? failures : undefined,
     };
+
+    // Log performance metrics
+    Logger.performance({
+      operation: "seedWmsEntities",
+      duration: totalDuration,
+      itemCount: request.shopifyOrders.length,
+      successfulCount: orders.length,
+      failedCount: failures.length,
+      ordersCreated: orders.length,
+      shipmentsCreated: shipments.length,
+      prepPartItemsCreated: prepPartItems.length,
+    });
+
+    Logger.endOperation(operationId, failures.length === 0, {
+      successfulOrders: orders.length,
+      failedOrders: failures.length,
+      shipmentsCreated: shipments.length,
+      duration: totalDuration,
+    });
+
+    return result;
   }
 }

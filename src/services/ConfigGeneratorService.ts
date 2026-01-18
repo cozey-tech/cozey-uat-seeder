@@ -3,6 +3,7 @@ import type { Customer, Carrier } from "../repositories/ConfigDataRepository";
 import type { OrderComposition } from "./OrderCompositionBuilder";
 import { PrismaClient } from "@prisma/client";
 import { processWithConcurrency } from "../utils/concurrency";
+import { Logger } from "../utils/logger";
 
 export interface CollectionPrepConfig {
   carrier: Carrier;
@@ -92,9 +93,12 @@ export class ConfigGeneratorService {
       const duration = Date.now() - startTime;
       // Observability: Log parallel execution timing
       if (options.collectionPreps.length > 1) {
-        console.log(
-          `   ✓ Generated ${options.collectionPreps.length} collection prep IDs in parallel (${duration}ms)`,
-        );
+        Logger.performance({
+          operation: "generateCollectionPrepIdsBatch",
+          duration,
+          itemCount: options.collectionPreps.length,
+          parallel: true,
+        });
       }
 
       // Build collection prep configs
