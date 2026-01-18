@@ -167,17 +167,14 @@ export async function executeSeedingFlow(
 
   const shopifyResult = await services.seedShopifyOrdersHandler.execute(shopifyRequest);
   
-  // Merge results if resuming
   let finalShopifyResult = shopifyResult;
   if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
-    // Merge successful orders from previous run with new results
-    // Note: We need to fetch line items from Shopify for previous orders, but for now we'll use empty array
-    // In a production system, we'd store line items in progress state or fetch them
+    // Note: Line items not stored in progress state for previous orders
     const previousSuccessful = resumeState.shopifyOrders.successful.map((s) => ({
       shopifyOrderId: s.shopifyOrderId,
       shopifyOrderNumber: s.shopifyOrderNumber,
-      lineItems: [] as Array<{ lineItemId: string; sku: string }>, // Line items not stored in progress state
-      fulfillmentStatus: "unfulfilled" as string, // Default status
+      lineItems: [] as Array<{ lineItemId: string; sku: string }>,
+      fulfillmentStatus: "unfulfilled" as string,
     }));
     finalShopifyResult = {
       shopifyOrders: [...previousSuccessful, ...shopifyResult.shopifyOrders],
@@ -198,9 +195,7 @@ export async function executeSeedingFlow(
     console.log(OutputFormatter.success(`${createdLabel} ${successCount} Shopify order(s)\n`));
   }
 
-  // Save progress state after Shopify seeding
   if (!isDryRun) {
-    // Build successful orders array with correct orderIndex values
     const successfulOrders: Array<{
       orderIndex: number;
       shopifyOrderId: string;
@@ -208,27 +203,17 @@ export async function executeSeedingFlow(
       customerEmail: string;
     }> = [];
     
-    // Add previously successful orders (they already have correct orderIndex from resumeState)
     if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
       successfulOrders.push(...resumeState.shopifyOrders.successful);
     }
     
-    // Add newly successful orders, mapping their filtered indices back to original indices
-    // Note: shopifyResult.shopifyOrders only contains successful orders, so we need to
-    // determine which orders from ordersToProcess succeeded by reconstructing the mapping.
-    // We know which orders failed (from failures array with orderIndex relative to ordersToProcess),
-    // so successful orders are the ones that didn't fail.
-    
-    // Build set of failed indices (relative to ordersToProcess)
+    // Map filtered indices back to original config.orders indices
     const failedIndices = new Set((shopifyResult.failures || []).map(f => f.orderIndex));
     
-    // Build map of shopifyOrderId to index in ordersToProcess
-    // Since orders are processed sequentially, we can match successful orders by position
     const successfulOrderIdToProcessedIndex = new Map<string, number>();
     let successfulOrderIndex = 0;
     for (let processedIndex = 0; processedIndex < ordersToProcess.length; processedIndex++) {
       if (!failedIndices.has(processedIndex)) {
-        // This order succeeded - match it to the successful order at this position
         if (successfulOrderIndex < shopifyResult.shopifyOrders.length) {
           const successfulOrder = shopifyResult.shopifyOrders[successfulOrderIndex];
           successfulOrderIdToProcessedIndex.set(successfulOrder.shopifyOrderId, processedIndex);
@@ -280,7 +265,6 @@ export async function executeSeedingFlow(
     saveProgressState(progressState);
   }
 
-  // Handle partial failures from Shopify seeding
   if (finalShopifyResult.failures && finalShopifyResult.failures.length > 0) {
     console.log(OutputFormatter.section("Shopify Seeding Failures", [
       OutputFormatter.listItem(`Failed: ${finalShopifyResult.failures.length} of ${totalCount} orders`),
@@ -315,7 +299,6 @@ export async function executeSeedingFlow(
   const region = config.collectionPrep?.region || "CA";
   let collectionPrepId: string | undefined;
 
-  // Create collection prep if configured (using pre-generated name)
   if (config.collectionPrep) {
     const step2aNumber = 2;
     const creatingLabel = isDryRun ? "Would create" : "Creating";
@@ -352,13 +335,10 @@ export async function executeSeedingFlow(
     let filteredIndex = 0;
     for (const wmsOrder of finalShopifyResult.shopifyOrders) {
       if (!successfulShopifyIds.has(wmsOrder.shopifyOrderId)) {
-        // Find original index by looking up shopifyOrderId
-        // Check if it's in the previous successful orders (from resumeState)
         const prevSuccess = resumeState.shopifyOrders.successful.find((s) => s.shopifyOrderId === wmsOrder.shopifyOrderId);
         if (prevSuccess) {
           wmsFilteredToOriginalIndexMap.set(filteredIndex, prevSuccess.orderIndex);
         } else {
-          // New order from current Shopify run - use the mapping we created earlier
           const shopifyIndex = shopifyResult.shopifyOrders.findIndex((shopifyOrder) => shopifyOrder.shopifyOrderId === wmsOrder.shopifyOrderId);
           if (shopifyIndex !== -1) {
             const mappedOriginalIndex = filteredToOriginalIndexMap.get(shopifyIndex);
@@ -372,43 +352,33 @@ export async function executeSeedingFlow(
     }
     console.log(OutputFormatter.info(`Resuming WMS: ${wmsOrdersToProcess.length} orders to retry, ${resumeState.wmsEntities.successful.length} already successful`));
   } else {
-    // Normal flow: filtered array is same as original, so indices map 1:1
-    // For normal flow, finalShopifyResult order positions should match config.orders
     for (let i = 0; i < finalShopifyResult.shopifyOrders.length; i++) {
-      // In normal flow (no resume), positions match 1:1
       wmsFilteredToOriginalIndexMap.set(i, i < config.orders.length ? i : i);
     }
   }
   
   const wmsRequest = {
     shopifyOrders: wmsOrdersToProcess.map((shopifyOrder, filteredIndex) => {
-      // Find the corresponding config order by matching shopifyOrderId
-      // For resumed orders, we need to find the original config order by index
-      let configOrder = config.orders[0]; // Default fallback
+      let configOrder = config.orders[0];
       
       if (resumeState) {
-        // Try to find by matching shopifyOrderId in previous successful orders
         const prevSuccess = resumeState.shopifyOrders.successful.find(
           (s) => s.shopifyOrderId === shopifyOrder.shopifyOrderId,
         );
         if (prevSuccess) {
-          // Use the stored orderIndex from progress state, not the array index
           configOrder = config.orders[prevSuccess.orderIndex];
         } else {
-          // New order from current run - use the mapping we built earlier
           const originalIndex = wmsFilteredToOriginalIndexMap.get(filteredIndex);
           if (originalIndex !== undefined && originalIndex < config.orders.length) {
             configOrder = config.orders[originalIndex];
           }
         }
       } else {
-        // Normal flow: use the mapping we built (1:1 in normal flow)
         const originalIndex = wmsFilteredToOriginalIndexMap.get(filteredIndex);
         if (originalIndex !== undefined && originalIndex < config.orders.length) {
           configOrder = config.orders[originalIndex];
         }
       }
-      // For resumed orders, lineItems might be empty, so use config order line items
       const lineItemsWithQuantity = shopifyOrder.lineItems.length > 0
         ? shopifyOrder.lineItems.map((shopifyItem) => {
             const configItem = configOrder.lineItems.find((item) => item.sku === shopifyItem.sku);
@@ -419,7 +389,7 @@ export async function executeSeedingFlow(
             };
           })
         : configOrder.lineItems.map((item) => ({
-            lineItemId: `resumed-${item.sku}`, // Placeholder ID for resumed orders
+            lineItemId: `resumed-${item.sku}`,
             sku: item.sku,
             quantity: item.quantity,
           }));
@@ -427,7 +397,7 @@ export async function executeSeedingFlow(
       return {
         shopifyOrderId: shopifyOrder.shopifyOrderId,
         shopifyOrderNumber: shopifyOrder.shopifyOrderNumber,
-        status: "paid", // Orders are paid but not fulfilled during seeding
+        status: "paid",
         customerName: configOrder.customer.name,
         customerEmail: configOrder.customer.email,
         lineItems: lineItemsWithQuantity,
