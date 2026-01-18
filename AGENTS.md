@@ -2,6 +2,10 @@
 
 Project status: active development. Core seeder functionality is implemented and tested. Documentation and tooling are established.
 
+## Changelog
+
+**2025-01-17:** Added section 3.5 "AI-Generated Documents & Agent Reference Information" with universal rule requiring all AI-generated reports to be saved to `ai-docs/` folder with plan name prefixes. This ensures proper separation between human-facing documentation (`docs/`) and AI-generated working notes (`ai-docs/`).
+
 ## 1) Purpose
 - This repository will hold a TypeScript-based seeder that creates coordinated Shopify staging orders and WMS staging entities for outbound compliance testing (collection prep + pick and pack).
 - Primary users: engineers and agents working on seeding and staging validation workflows.
@@ -19,7 +23,9 @@ Project status: active development. Core seeder functionality is implemented and
 - Test (watch): `npm run test:watch`
 - Test (coverage): `npm run test:coverage`
 - Lint: `npm run lint`
+- Lint (fix): `npm run lint:fix`
 - Format: `npm run format`
+- Format (check): `npm run format:check`
 - Typecheck: `npm run typecheck`
 - DB/schema/migrations: `npm run prisma:generate`
 - Seed: `npm run seed <config-file.json>`
@@ -53,6 +59,36 @@ Project status: active development. Core seeder functionality is implemented and
 **Scripts:**
 - `scripts/` - Utility scripts
 
+## 3.5) AI-Generated Documents & Agent Reference Information
+
+**Universal Rule:** ALL AI-generated project files MUST be saved to the `ai-docs/` folder in the project root.
+
+**Documentation Separation:**
+- `docs/` → Human-facing documentation (for engineers, users, stakeholders)
+- `ai-docs/` → AI-generated files + AI reference information (gitignored, not in codebase)
+
+**Purpose of `ai-docs/`:**
+1. **AI-generated reports, review documents, and transient working notes** - All reports from review commands, audit commands, and analysis tools
+2. **Agent reference information** - Helpful information for AI agents to read and review that shouldn't be in the codebase
+
+**Naming Convention:**
+- Format: `{PLAN_NAME}_{TYPE}_REPORT.md` (e.g., `ai-docs-report-routing_CODE_REVIEW_REPORT.md`)
+- **Plan name is REQUIRED** in all report filenames to avoid conflicts when working on multiple plans
+- Plan name detection method:
+  1. Extract from current plan file path (remove `.plan.md` extension and hash suffix)
+     - Example: `ai-docs-report-routing_a9514947.plan.md` → `ai-docs-report-routing`
+  2. If plan file not available, fallback to project name from `package.json` `name` field
+  3. If `package.json` not available, use git repo basename: `git rev-parse --show-toplevel | xargs basename`
+- Report type: UPPERCASE with underscores (e.g., `CODE_REVIEW`, `PLAN_REVIEW`, `SECURITY_SWEEP`)
+- Include date/timestamp in filename if multiple versions are needed (e.g., `ai-docs-report-routing_CODE_REVIEW_REPORT_2025-01-17.md`)
+
+**Never save AI-generated files to:**
+- Repo root (except `AGENTS.md`)
+- `docs/` folder (reserved for human-facing documentation)
+- Any location that would be committed to git
+
+**If `ai-docs/` doesn't exist, create it first** before saving any reports.
+
 ## 4) Architecture & Data
 - Orchestrator job runs end-to-end: seed Shopify orders first, then seed WMS entities using those orders.
 - Seed records must be tagged and safe to re-run; staging-only guardrails are required.
@@ -82,11 +118,11 @@ Project status: active development. Core seeder functionality is implemented and
 - **Run Tests:** `npm run test` (run once), `npm run test:watch` (watch mode), `npm run test:coverage` (with coverage)
 
 ## 7) Tooling & Quality Gates
-- Lint: ESLint with `@cozey-tech/eslint-config` (`npm run lint`)
-- Format: Prettier (`npm run format`)
+- Lint: ESLint with `@cozey-tech/eslint-config` (`npm run lint`, `npm run lint:fix`)
+- Format: Prettier (`npm run format`, `npm run format:check`)
 - Typecheck: `tsc` (`npm run typecheck`)
-- Tests: Vitest (`npm run test`)
-- Coverage: Vitest with v8 provider (`npm run test:coverage`)
+- Tests: Vitest (`npm run test`, `npm run test:watch`, `npm run test:coverage`)
+- Coverage: Vitest with v8 provider, thresholds: 50% lines, 60% functions, 40% branches, 50% statements
 - Local verification checklist: lint, typecheck, test, and a smoke run of the seeder in staging-safe mode
 - CI checks: To be added when CI workflows are configured
 
@@ -106,4 +142,4 @@ Project status: active development. Core seeder functionality is implemented and
 - Update `AGENTS.md` whenever tooling, scripts, architecture, or conventions change.
 - Replace TODOs with verified commands and links to source-of-truth files.
 
-Last updated: January 2025
+Last updated: January 2025 (2025-01-17: Added AI-Generated Documents section)
