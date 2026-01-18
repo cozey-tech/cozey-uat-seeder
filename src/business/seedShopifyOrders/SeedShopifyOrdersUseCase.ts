@@ -50,7 +50,6 @@ export class SeedShopifyOrdersUseCase {
     let totalActualCost = 0;
     const throttleStatuses: Array<{ currentlyAvailable: number; maximumAvailable: number }> = [];
 
-    // Phase 2: Batch variant lookup - extract all unique SKUs upfront
     const allSkus = new Set<string>();
     for (const orderInput of request.orders) {
       for (const lineItem of orderInput.lineItems) {
@@ -81,10 +80,8 @@ export class SeedShopifyOrdersUseCase {
       );
     }
 
-    // Track variant lookup cost if available (from service logging)
     totalApiCalls += variantLookupMetrics.apiCallCount;
 
-    // Phase 4: Process orders in parallel with controlled concurrency
     // Start with 10 concurrent orders (adjust based on GraphQL cost limits)
     // Cost-aware: Monitor throttle status and adjust if needed
     const CONCURRENT_ORDERS = 10;

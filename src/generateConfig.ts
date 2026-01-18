@@ -3,17 +3,13 @@
 /**
  * CLI Entry Point for Interactive Config Generator
  *
- * Guides users through creating seed configuration JSON files by:
- * 1. Asking interactive questions
- * 2. Fetching data from database/API
- * 3. Generating properly structured config files
- * 4. Validating output before saving
+ * Guides users through creating seed configuration JSON files via
+ * interactive prompts, database queries, and validation before saving.
  */
 
 import { config } from "dotenv";
 import { resolve } from "path";
 
-// Load .env first, then .env.local (which will override .env values)
 config({ path: resolve(process.cwd(), ".env") });
 config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
@@ -53,7 +49,6 @@ async function main(): Promise<void> {
   };
 
   try {
-    // Parse CLI arguments
     const options = parseArgs();
 
     console.log(OutputFormatter.header("Interactive Config Generator", "🚀"));
@@ -65,7 +60,6 @@ async function main(): Promise<void> {
       console.log();
     }
 
-    // Initialize Prisma
     const prisma = new PrismaClient();
 
     try {

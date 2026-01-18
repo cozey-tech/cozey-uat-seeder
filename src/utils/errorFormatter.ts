@@ -82,15 +82,12 @@ export class ErrorFormatter {
     const formatted = this.format(error, context);
     const parts: string[] = [];
 
-    // Add context if present
     if (formatted.context) {
       parts.push(formatted.context);
     }
 
-    // Add main message
     parts.push(`❌ ${formatted.message}`);
 
-    // Add suggestions
     if (formatted.suggestions.length > 0) {
       parts.push("\n💡 Suggestions:");
       formatted.suggestions.forEach((suggestion) => {
@@ -107,17 +104,14 @@ export class ErrorFormatter {
   private static getBaseMessage(error: Error, context?: ErrorContext): string {
     let message = error.message;
 
-    // Add step context if provided
     if (context?.step) {
       message = `${context.step}: ${message}`;
     }
 
-    // Add order context if provided
     if (context?.orderIndex) {
       message = `Order ${context.orderIndex}: ${message}`;
     }
 
-    // Handle specific error types
     if (error instanceof InputValidationError) {
       return this.formatInputValidationError(error);
     }

@@ -110,7 +110,6 @@ export async function executeSeedingFlow(
     );
   }
 
-  // Step 1: Seed Shopify orders
   const step1Label = isDryRun ? "Would seed" : resumeState ? "Resuming" : "Seeding";
   const step1Name = `${step1Label} Shopify orders`;
   const totalSteps = config.collectionPrep ? 3 : 2;
@@ -314,7 +313,6 @@ export async function executeSeedingFlow(
     console.log();
   }
 
-  // Step 2: Seed WMS entities
   const step2Number = config.collectionPrep ? 3 : 2;
   const step2Name = `${step1Label} WMS entities`;
   console.log(OutputFormatter.step(step2Number, config.collectionPrep ? 3 : 2, step2Name));

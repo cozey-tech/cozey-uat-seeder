@@ -32,7 +32,6 @@ export function validateOrder(
   const issues: ValidationIssue[] = [];
   const variantMap = new Map(variants.map((v) => [v.sku, v]));
 
-  // Check for required fields
   if (composition.lineItems.length === 0) {
     issues.push({
       type: "error",
@@ -41,12 +40,10 @@ export function validateOrder(
     });
   }
 
-  // Validate each line item
   for (let i = 0; i < composition.lineItems.length; i++) {
     const item = composition.lineItems[i];
     const itemPrefix = `Line item ${i + 1}`;
 
-    // Check SKU exists in variants
     if (!variantMap.has(item.sku)) {
       issues.push({
         type: "error",
@@ -55,7 +52,6 @@ export function validateOrder(
       });
     }
 
-    // Check quantity
     if (item.quantity < 1) {
       issues.push({
         type: "error",
@@ -64,7 +60,6 @@ export function validateOrder(
       });
     }
 
-    // Check pickType matches variant
     const variant = variantMap.get(item.sku);
     if (variant && item.pickType !== variant.pickType) {
       issues.push({
@@ -75,7 +70,6 @@ export function validateOrder(
     }
   }
 
-  // Validate customer email format
   if (customerEmail && !customerEmail.includes("@")) {
     issues.push({
       type: "error",

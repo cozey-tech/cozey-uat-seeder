@@ -130,16 +130,13 @@ export class OutputFormatter {
   static summary(options: SummaryOptions): string {
     const lines: string[] = [];
 
-    // Title
     lines.push(options.title);
     lines.push(this.separator());
 
-    // Items
     options.items.forEach((item) => {
       lines.push(`   ${item.label}: ${item.value}`);
     });
 
-    // Optional separator after
     if (options.showSeparator !== false) {
       lines.push(this.separator());
     }
