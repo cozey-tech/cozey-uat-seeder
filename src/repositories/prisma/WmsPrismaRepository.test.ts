@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 
 import { WmsPrismaRepository } from "./WmsPrismaRepository";
 import type { CreateOrderRequest, CreateCollectionPrepRequest } from "../interface/WmsRepository";
+import { WmsRepositoryError, WmsRepositoryErrorType } from "../errors/WmsRepositoryError";
 
 describe("WmsPrismaRepository", () => {
   let mockPrisma: PrismaClient;
@@ -117,7 +118,7 @@ describe("WmsPrismaRepository", () => {
       );
     });
 
-    it("should re-throw non-P2002 errors", async () => {
+    it("should wrap non-Prisma errors as UNKNOWN_DATABASE_ERROR", async () => {
       const request: CreateOrderRequest = {
         shopifyOrderId: "gid://shopify/Order/123",
         shopifyOrderNumber: "#1001",
@@ -128,7 +129,13 @@ describe("WmsPrismaRepository", () => {
       const prismaError = new Error("Database connection failed");
       vi.mocked(mockPrisma.order.create).mockRejectedValue(prismaError);
 
-      await expect(repository.createOrder(request)).rejects.toThrow("Database connection failed");
+      await expect(repository.createOrder(request)).rejects.toThrow(WmsRepositoryError);
+      await expect(repository.createOrder(request)).rejects.toThrow(
+        "Database error for Order with shopifyOrderId gid://shopify/Order/123",
+      );
+      await expect(repository.createOrder(request)).rejects.toMatchObject({
+        type: WmsRepositoryErrorType.UNKNOWN_DATABASE_ERROR,
+      });
     });
   });
 
@@ -202,7 +209,7 @@ describe("WmsPrismaRepository", () => {
         length: 10,
         width: 8,
         height: 6,
-        region: "CA",
+        region: "CA" as const,
         lengthUnit: "IN" as const,
         widthUnit: "IN" as const,
         heightUnit: "IN" as const,
@@ -433,15 +440,20 @@ describe("WmsPrismaRepository", () => {
 
       vi.mocked(mockPrisma.variantOrder.create).mockRejectedValue(prismaError);
 
-      await expect(
-        repository.createVariantOrder({
-          orderId: "order-123",
-          lineItemId: "line-1",
-          variantId: "variant-1",
-          quantity: 1,
-          region: "CA",
-        }),
-      ).rejects.toThrow("VariantOrder with lineItemId line-1 already exists");
+      const promise = repository.createVariantOrder({
+        orderId: "order-123",
+        lineItemId: "line-1",
+        variantId: "variant-1",
+        quantity: 1,
+        region: "CA",
+      });
+
+      await expect(promise).rejects.toThrow(WmsRepositoryError);
+      await expect(promise).rejects.toThrow("VariantOrder with lineItemId line-1 already exists");
+      await expect(promise).rejects.toMatchObject({
+        type: WmsRepositoryErrorType.DUPLICATE_RECORD,
+        constraintFields: ["lineItemId"],
+      });
     });
 
     it("should handle Prisma P2002 error for createPrep", async () => {
@@ -454,16 +466,20 @@ describe("WmsPrismaRepository", () => {
 
       vi.mocked(mockPrisma.prep.create).mockRejectedValue(prismaError);
 
-      await expect(
-        repository.createPrep({
-          orderId: "order-123",
-          prep: "prep-1",
-          collectionPrepId: "cp-1",
-          region: "CA",
-          variantId: "variant-1",
-          lineItemId: "line-1",
-        }),
-      ).rejects.toThrow("Prep with id prep-1 and region CA already exists");
+      const promise = repository.createPrep({
+        orderId: "order-123",
+        prep: "prep-1",
+        collectionPrepId: "cp-1",
+        region: "CA",
+        variantId: "variant-1",
+        lineItemId: "line-1",
+      });
+
+      await expect(promise).rejects.toThrow(WmsRepositoryError);
+      await expect(promise).rejects.toThrow("Prep with id prep-1 and region CA already exists");
+      await expect(promise).rejects.toMatchObject({
+        type: WmsRepositoryErrorType.DUPLICATE_RECORD,
+      });
     });
 
     it("should handle Prisma P2002 error for createShipment", async () => {
@@ -476,14 +492,18 @@ describe("WmsPrismaRepository", () => {
 
       vi.mocked(mockPrisma.shipment.create).mockRejectedValue(prismaError);
 
-      await expect(
-        repository.createShipment({
-          collectionPrepId: "cp-1",
-          orderId: "order-123",
-          region: "CA",
-          status: "ACTIVE",
-        }),
-      ).rejects.toThrow("Shipment for order order-123 and collectionPrep cp-1 already exists");
+      const promise = repository.createShipment({
+        collectionPrepId: "cp-1",
+        orderId: "order-123",
+        region: "CA",
+        status: "ACTIVE",
+      });
+
+      await expect(promise).rejects.toThrow(WmsRepositoryError);
+      await expect(promise).rejects.toThrow("Shipment for order order-123 and collectionPrep cp-1 already exists");
+      await expect(promise).rejects.toMatchObject({
+        type: WmsRepositoryErrorType.DUPLICATE_RECORD,
+      });
     });
 
     it("should handle Prisma P2002 error for createCustomer", async () => {

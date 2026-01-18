@@ -15,21 +15,19 @@ import type {
   ICollectionPrep,
   IShipment,
 } from "../interface/WmsRepository";
+import { WmsRepositoryError } from "../errors/WmsRepositoryError";
 
 export class WmsPrismaRepository implements WmsRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   /**
-   * Handle Prisma unique constraint violation errors (P2002)
-   * @param error - The error to check
+   * Handle Prisma errors and convert them to typed WmsRepositoryError
+   * @param error - The Prisma error
    * @param context - Context message for the error (e.g., "Order with shopifyOrderId X")
-   * @throws Error with context message if P2002 error, otherwise re-throws original error
+   * @throws WmsRepositoryError with appropriate type and metadata
    */
   private handlePrismaError(error: unknown, context: string): never {
-    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
-      throw new Error(`${context} already exists`);
-    }
-    throw error;
+    throw WmsRepositoryError.fromPrismaError(error, context);
   }
 
   async createOrder(order: CreateOrderRequest): Promise<IOrder> {
