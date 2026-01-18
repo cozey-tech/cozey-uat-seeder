@@ -22,7 +22,7 @@ import { OutputFormatter } from "../utils/outputFormatter";
 import { InteractivePromptService } from "../services/InteractivePromptService";
 import { parseAndValidateConfig, validateData } from "./validation";
 import { displaySummary } from "./output";
-import { saveProgressState, loadProgressState, deleteProgressState, type ProgressState } from "../utils/progressState";
+import { saveProgressState, deleteProgressState, type ProgressState } from "../utils/progressState";
 
 /**
  * Service dependencies container

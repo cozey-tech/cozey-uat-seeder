@@ -5,7 +5,7 @@
  * Uses file-based storage for simplicity (can be migrated to database later).
  */
 
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
+import { writeFileSync, readFileSync, existsSync, mkdirSync, unlinkSync, readdirSync } from "fs";
 import { join } from "path";
 
 export interface ProgressState {
@@ -99,7 +99,6 @@ export function deleteProgressState(batchId: string): void {
   const filePath = getProgressStatePath(batchId);
   
   if (existsSync(filePath)) {
-    const { unlinkSync } = require("fs");
     try {
       unlinkSync(filePath);
     } catch (error) {
@@ -119,7 +118,6 @@ export function listProgressStates(): Array<{ batchId: string; timestamp: number
     return [];
   }
   
-  const { readdirSync } = require("fs");
   const files = readdirSync(stateDir).filter((f: string) => f.endsWith(".json"));
   
   return files
