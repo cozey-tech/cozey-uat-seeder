@@ -19,6 +19,6 @@ export class SeedShopifyOrdersHandler extends BaseHandler<SeedShopifyOrdersReque
         : {}),
     };
 
-    return await this.useCase.execute(requestWithCallback);
+    return this.useCase.execute(requestWithCallback);
   }
 }

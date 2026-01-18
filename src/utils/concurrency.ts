@@ -30,5 +30,5 @@ export async function processWithConcurrency<T, R>(
   const limiter = pLimit(limit);
   const promises = items.map((item) => limiter(() => handler(item)));
 
-  return await Promise.all(promises);
+  return Promise.all(promises);
 }

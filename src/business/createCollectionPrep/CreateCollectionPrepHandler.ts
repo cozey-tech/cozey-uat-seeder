@@ -15,6 +15,6 @@ export class CreateCollectionPrepHandler extends BaseHandler<
   async execute(request: unknown): Promise<CreateCollectionPrepResponse> {
     const validatedRequest = this.validateRequest(request, createCollectionPrepRequestSchema, "CreateCollectionPrep");
 
-    return await this.useCase.execute(validatedRequest);
+    return this.useCase.execute(validatedRequest);
   }
 }

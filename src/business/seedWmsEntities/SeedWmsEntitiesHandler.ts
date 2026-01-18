@@ -19,6 +19,6 @@ export class SeedWmsEntitiesHandler extends BaseHandler<SeedWmsEntitiesRequest, 
         : {}),
     };
 
-    return await this.useCase.execute(requestWithCallback);
+    return this.useCase.execute(requestWithCallback);
   }
 }

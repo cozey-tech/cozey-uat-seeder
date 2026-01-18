@@ -555,7 +555,7 @@ describe("WmsPrismaRepository", () => {
       };
 
       vi.mocked(mockPrisma.$transaction).mockImplementation(async (callback) => {
-        return await callback(mockTx as never);
+        return callback(mockTx as never);
       });
 
       const result = await repository.createOrderEntitiesTransaction(
@@ -613,7 +613,7 @@ describe("WmsPrismaRepository", () => {
       };
 
       vi.mocked(mockPrisma.$transaction).mockImplementation(async (callback) => {
-        return await callback(mockTx as never);
+        return callback(mockTx as never);
       });
 
       await expect(
