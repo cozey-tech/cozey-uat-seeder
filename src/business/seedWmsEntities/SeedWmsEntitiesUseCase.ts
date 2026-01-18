@@ -146,7 +146,7 @@ export class SeedWmsEntitiesUseCase {
       if (request.collectionPrepId) {
         const shipmentId = await this.wmsService.createShipmentForOrder(
           request.collectionPrepId,
-          shopifyOrder.shopifyOrderId,
+          orderDbId, // Use WMS database order ID, not Shopify order ID
           request.region,
         );
 

@@ -27,7 +27,7 @@ export function parseArgs(): CliOptions {
     .option("--validate", "Validate config file schema only (no DB/API calls)")
     .option("--dry-run", "Simulate seeding without making changes")
     .option("--skip-confirmation", "Skip staging confirmation prompt")
-    .option("--resume <batch-id>", "Resume a failed seeding operation from batch ID")
+    .option("--resume <batch-id>", "Resume a failed seeding operation from batch ID (requires config-file)")
     .addHelpText(
       "after",
       `
@@ -53,9 +53,9 @@ For more information, see README.md
     process.exit(1);
   }
 
-  // --resume and config-file are mutually exclusive
-  if (options.resume && configFile) {
-    console.error("Error: --resume and config-file cannot be used together\n");
+  // --resume requires config-file (needed to reconstruct order data)
+  if (options.resume && !configFile) {
+    console.error("Error: --resume requires a config-file to reconstruct order data\n");
     program.help();
     process.exit(1);
   }
