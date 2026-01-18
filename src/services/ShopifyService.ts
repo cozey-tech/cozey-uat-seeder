@@ -76,7 +76,6 @@ export class ShopifyService {
   private orderNumberCounter: number;
 
   /**
-   * Initializes Shopify Admin API client with credentials from environment variables
    * @param dryRun - If true, skip actual API calls and return mock data
    */
   constructor(dryRun: boolean = false) {
@@ -159,7 +158,6 @@ export class ShopifyService {
   }
 
   /**
-   * Formats a batch tag for Shopify (ensures it doesn't exceed 40 character limit)
    * @param batchId - Unique batch ID
    * @returns Tag string truncated to 40 characters
    */
@@ -177,8 +175,6 @@ export class ShopifyService {
   }
 
   /**
-   * Creates a draft order in Shopify
-   *
    * @param input - Customer and line items for the draft order
    * @param batchId - Unique batch ID for tagging (format: wms_seed_<batchId>)
    * @param region - Optional region code (CA or US) for determining country code in shipping address
