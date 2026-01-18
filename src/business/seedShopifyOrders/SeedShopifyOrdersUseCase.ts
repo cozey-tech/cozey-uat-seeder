@@ -136,20 +136,18 @@ export class SeedShopifyOrdersUseCase {
             apiCallCount: 0, // Skipped
           };
         } else {
-          // Need to query for line items
-          const batchTag = this.shopifyService.formatBatchTag(request.batchId);
-          const { result: orderQueryResults, metrics: queryMetricsResult } = await this.measureOperation(
-            "queryOrdersByTag",
-            () => this.shopifyService.queryOrdersByTag(batchTag),
+          // Need to query for line items - use single order query (more efficient than querying all by tag)
+          const { result: createdOrder, metrics: queryMetricsResult } = await this.measureOperation(
+            "queryOrderById",
+            () => this.shopifyService.queryOrderById(orderResult.orderId),
           );
           queryMetrics = queryMetricsResult;
-          const createdOrder = orderQueryResults.find((o) => o.orderId === orderResult.orderId);
 
-          // In dry-run mode, queryOrdersByTag returns empty array, so construct from input
+          // In dry-run mode, queryOrderById returns null, so construct from input
           if (!createdOrder) {
             // This happens in dry-run mode - construct line items from input
             // In normal mode, this would indicate a problem (order not found after creation)
-            Logger.warn("Order not found in query results, constructing line items from input", {
+            Logger.warn("Order not found when querying by ID, constructing line items from input", {
               orderId: orderResult.orderId,
               batchId: request.batchId,
             });

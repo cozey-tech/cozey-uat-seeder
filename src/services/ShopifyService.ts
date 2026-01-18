@@ -576,6 +576,67 @@ export class ShopifyService {
     }
   }
 
+  /**
+   * Query a single order by ID to get line items
+   * More efficient than querying all orders by tag when we only need one order
+   */
+  async queryOrderById(orderId: string): Promise<OrderQueryResult | null> {
+    if (this.dryRun) {
+      Logger.info("DRY RUN: Would query order by ID", { orderId });
+      return null;
+    }
+
+    const query = `
+      query getOrder($id: ID!) {
+        order(id: $id) {
+          id
+          name
+          lineItems(first: 250) {
+            edges {
+              node {
+                id
+                sku
+                quantity
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      id: orderId,
+    };
+
+    try {
+      const response = await this.client.request(query, { variables });
+      const graphQLCost = this.extractGraphQLCost(response);
+      if (graphQLCost) {
+        Logger.debug("GraphQL cost for queryOrderById", {
+          orderId,
+          cost: graphQLCost,
+        });
+      }
+
+      if (!response.data?.order) {
+        return null;
+      }
+
+      const order = response.data.order;
+      return {
+        orderId: order.id,
+        orderNumber: order.name || "",
+        lineItems: order.lineItems.edges.map((itemEdge: { node: { id: string; sku: string; quantity: number } }) => ({
+          lineItemId: itemEdge.node.id,
+          sku: itemEdge.node.sku || "",
+          quantity: itemEdge.node.quantity,
+        })),
+      };
+    } catch (error) {
+      throw new ShopifyServiceError(`Failed to query order by ID: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   async queryOrdersByTag(tag: string): Promise<OrderQueryResult[]> {
     if (this.dryRun) {
       // In dry-run, return empty array - the use case will construct mock data
