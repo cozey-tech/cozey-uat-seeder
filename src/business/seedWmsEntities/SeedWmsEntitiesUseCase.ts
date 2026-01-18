@@ -100,6 +100,11 @@ export class SeedWmsEntitiesUseCase {
           orderId: shopifyOrder.shopifyOrderId,
         });
       }
+      
+      // Notify progress callback of success
+      if (request.onOrderProgress) {
+        request.onOrderProgress(orderIndex + 1, request.shopifyOrders.length, shopifyOrder.shopifyOrderId, true);
+      }
       } catch (error) {
         // Continue-on-error strategy: collect errors, don't fail entire batch
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -115,6 +120,11 @@ export class SeedWmsEntitiesUseCase {
           customerEmail: shopifyOrder.customerEmail,
           error: errorMessage,
         });
+        
+        // Notify progress callback of failure
+        if (request.onOrderProgress) {
+          request.onOrderProgress(orderIndex + 1, request.shopifyOrders.length, shopifyOrder.shopifyOrderId, false);
+        }
       }
     }
 

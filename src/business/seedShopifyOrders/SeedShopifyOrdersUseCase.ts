@@ -205,7 +205,12 @@ export class SeedShopifyOrdersUseCase {
           apiCallCount: orderIndex === 0 ? variantLookupMetrics.apiCallCount : 0, // Only count once for first order
         };
 
-        return {
+          // Notify progress callback of success
+          if (request.onOrderProgress) {
+            request.onOrderProgress(orderIndex + 1, request.orders.length, orderInput.customer.email, true);
+          }
+
+          return {
             success: true as const,
             order: {
               shopifyOrderId: orderResult.orderId,
@@ -237,6 +242,11 @@ export class SeedShopifyOrdersUseCase {
             customerEmail: orderInput.customer.email,
             error: error instanceof Error ? error : new Error(errorMessage),
           });
+
+          // Notify progress callback of failure
+          if (request.onOrderProgress) {
+            request.onOrderProgress(orderIndex + 1, request.orders.length, orderInput.customer.email, false);
+          }
 
           return {
             success: false as const,

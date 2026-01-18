@@ -33,6 +33,7 @@ import { join, dirname } from "path";
 import type { OrderTemplate } from "./services/InteractivePromptService";
 import { OutputFormatter } from "./utils/outputFormatter";
 import { ErrorFormatter } from "./utils/errorFormatter";
+import { ProgressTracker } from "./utils/progress";
 
 interface CliOptions {
   dryRun: boolean;
@@ -258,26 +259,50 @@ async function main(): Promise<void> {
       // Prompt for region if not provided
       const region = options.region || (await promptService.promptRegion());
 
-      // Load reference data
+      // Load reference data with progress tracking
       const referenceDataStart = Date.now();
+      const loadingProgress = new ProgressTracker({ showSpinner: false });
+      loadingProgress.start("Loading reference data", 4);
+      
       console.log(OutputFormatter.info("Loading reference data..."));
+      
+      loadingProgress.update(1, "Loading variants...");
+      const variantsPromise = dataRepository.getAvailableVariants(region);
+      
+      loadingProgress.update(2, "Loading customers...");
+      const customersPromise = dataRepository.getCustomers(region);
+      
+      loadingProgress.update(3, "Loading carriers...");
+      const carriersPromise = dataRepository.getCarriers(region);
+      
+      loadingProgress.update(4, "Loading templates...");
+      const templatesPromise = Promise.resolve(loadOrderTemplates());
+      
       let [variants, customers, carriers, allTemplates] = await Promise.all([
-        dataRepository.getAvailableVariants(region),
-        dataRepository.getCustomers(region),
-        dataRepository.getCarriers(region),
-        Promise.resolve(loadOrderTemplates()),
+        variantsPromise,
+        customersPromise,
+        carriersPromise,
+        templatesPromise,
       ]);
+      
       performanceMetrics.referenceDataLoadTime = Date.now() - referenceDataStart;
+      loadingProgress.complete(`Loaded reference data (${OutputFormatter.duration(performanceMetrics.referenceDataLoadTime)})`);
 
       // Filter templates to only include those with valid SKUs for this region
+      console.log(OutputFormatter.info("Validating templates..."));
       let templates = filterValidTemplates(allTemplates, variants);
 
       // Batch fetch all locations for customers upfront (performance optimization)
       const locationLoadStart = Date.now();
-      console.log(OutputFormatter.info("Loading locations..."));
+      const locationProgress = new ProgressTracker({ showSpinner: false });
+      locationProgress.start("Loading locations", customers.length);
+      
+      console.log(OutputFormatter.info("Loading customer locations..."));
       const locationsCache = await dataRepository.getLocationsForCustomers(customers);
       const locationLoadTime = Date.now() - locationLoadStart;
-      console.log(OutputFormatter.success(`Loaded ${locationsCache.size} location(s) (${OutputFormatter.duration(locationLoadTime)})`));
+      
+      locationProgress.update(customers.length);
+      locationProgress.complete(`Loaded ${locationsCache.size} location(s) (${OutputFormatter.duration(locationLoadTime)})`);
       console.log();
 
       const referenceItems: Array<{ label: string; value: string | number }> = [
@@ -285,6 +310,7 @@ async function main(): Promise<void> {
         { label: "Customers", value: customers.length },
         { label: "Carriers", value: carriers.length },
         { label: "Templates", value: `${templates.length} valid${templates.length !== allTemplates.length ? ` (${allTemplates.length - templates.length} filtered out)` : ""}` },
+        { label: "Locations", value: locationsCache.size },
       ];
       
       console.log(OutputFormatter.summary({

@@ -300,10 +300,12 @@ async function executeSeedingFlow(
     batchId,
     region: config.region || config.collectionPrep?.region || "CA",
     collectionPrepName,
+    onOrderProgress: (current: number, total: number, customerEmail: string, _success: boolean): void => {
+      progressTracker.update(current, customerEmail);
+    },
   };
 
   const shopifyResult = await services.seedShopifyOrdersHandler.execute(shopifyRequest);
-  progressTracker.update(config.orders.length);
   progressTracker.complete();
   
   const createdLabel = isDryRun ? "Would create" : "Created";
@@ -396,10 +398,12 @@ async function executeSeedingFlow(
     }),
     collectionPrepId,
     region,
+    onOrderProgress: (current: number, total: number, shopifyOrderId: string, _success: boolean): void => {
+      wmsProgressTracker.update(current, shopifyOrderId);
+    },
   };
 
   const wmsResult = await services.seedWmsEntitiesHandler.execute(wmsRequest);
-  wmsProgressTracker.update(shopifyResult.shopifyOrders.length);
   wmsProgressTracker.complete();
   
   const wmsSuccessCount = wmsResult.orders.length;
