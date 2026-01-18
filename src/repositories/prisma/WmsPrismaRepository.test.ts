@@ -263,7 +263,7 @@ describe("WmsPrismaRepository", () => {
           collectionPrepId: "cp-1",
           orderId: "order-123",
           region: "CA",
-          status: "pending",
+          status: "ACTIVE",
         }),
       ).rejects.toThrow("Shipment for order order-123 and collectionPrep cp-1 already exists");
     });
