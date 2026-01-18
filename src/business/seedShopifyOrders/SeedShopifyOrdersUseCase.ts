@@ -389,7 +389,6 @@ export class SeedShopifyOrdersUseCase {
       metrics: batchMetrics,
     });
 
-    const batchDuration = Date.now() - batchStartTime;
     const result = {
       shopifyOrders,
       failures: errors.length > 0
@@ -400,18 +399,6 @@ export class SeedShopifyOrdersUseCase {
           }))
         : undefined,
     };
-
-    // Log performance metrics
-    Logger.performance({
-      operation: "seedShopifyOrders",
-      duration: batchDuration,
-      itemCount: request.orders.length,
-      successfulCount: shopifyOrders.length,
-      failedCount: errors.length,
-      totalApiCalls,
-      totalRequestedCost,
-      totalActualCost,
-    });
 
     Logger.endOperation(operationId, errors.length === 0, {
       successfulOrders: shopifyOrders.length,
