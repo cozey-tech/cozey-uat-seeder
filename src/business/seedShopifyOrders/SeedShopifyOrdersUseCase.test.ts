@@ -69,7 +69,7 @@ describe("SeedShopifyOrdersUseCase", () => {
     expect(result.shopifyOrders[0].lineItems[0].sku).toBe("SKU-001");
   });
 
-  it("should process multiple orders sequentially", async () => {
+  it("should process multiple orders in parallel", async () => {
     const request: SeedShopifyOrdersRequest = {
       batchId: "batch-123",
       orders: [
@@ -153,6 +153,92 @@ describe("SeedShopifyOrdersUseCase", () => {
     expect(result.shopifyOrders[0].lineItems[0].sku).toBe("SKU-001");
     // Line item ID should be a mock ID (gid://shopify/LineItem/...)
     expect(result.shopifyOrders[0].lineItems[0].lineItemId).toMatch(/^gid:\/\/shopify\/LineItem\//);
+  });
+
+  it("should continue processing other orders when one fails (continue-on-error)", async () => {
+    const request: SeedShopifyOrdersRequest = {
+      batchId: "batch-123",
+      orders: [
+        {
+          customer: {
+            name: "Customer 1",
+            email: "customer1@example.com",
+          },
+          lineItems: [{ sku: "SKU-001", quantity: 1 }],
+        },
+        {
+          customer: {
+            name: "Customer 2",
+            email: "customer2@example.com",
+          },
+          lineItems: [{ sku: "SKU-002", quantity: 1 }],
+        },
+        {
+          customer: {
+            name: "Customer 3",
+            email: "customer3@example.com",
+          },
+          lineItems: [{ sku: "SKU-003", quantity: 1 }],
+        },
+      ],
+    };
+
+    // First order succeeds
+    vi.mocked(mockShopifyService.createDraftOrder)
+      .mockResolvedValueOnce({ draftOrderId: "gid://shopify/DraftOrder/1" });
+    vi.mocked(mockShopifyService.completeDraftOrder)
+      .mockResolvedValueOnce({ orderId: "gid://shopify/Order/1", orderNumber: "#1001", lineItems: undefined });
+    vi.mocked(mockShopifyService.queryOrderById)
+      .mockResolvedValueOnce({
+        orderId: "gid://shopify/Order/1",
+        orderNumber: "#1001",
+        lineItems: [{ lineItemId: "line-1", sku: "SKU-001", quantity: 1 }],
+      });
+
+    // Second order fails
+    vi.mocked(mockShopifyService.createDraftOrder)
+      .mockRejectedValueOnce(new Error("Variant not found for SKU: SKU-002"));
+
+    // Third order succeeds
+    vi.mocked(mockShopifyService.createDraftOrder)
+      .mockResolvedValueOnce({ draftOrderId: "gid://shopify/DraftOrder/3" });
+    vi.mocked(mockShopifyService.completeDraftOrder)
+      .mockResolvedValueOnce({ orderId: "gid://shopify/Order/3", orderNumber: "#1003", lineItems: undefined });
+    vi.mocked(mockShopifyService.queryOrderById)
+      .mockResolvedValueOnce({
+        orderId: "gid://shopify/Order/3",
+        orderNumber: "#1003",
+        lineItems: [{ lineItemId: "line-3", sku: "SKU-003", quantity: 1 }],
+      });
+
+    const result = await useCase.execute(request);
+
+    // Should have 2 successful orders (first and third)
+    expect(result.shopifyOrders).toHaveLength(2);
+    expect(result.shopifyOrders[0].shopifyOrderId).toBe("gid://shopify/Order/1");
+    expect(result.shopifyOrders[1].shopifyOrderId).toBe("gid://shopify/Order/3");
+    expect(mockShopifyService.createDraftOrder).toHaveBeenCalledTimes(3);
+  });
+
+  it("should throw error if all orders fail", async () => {
+    const request: SeedShopifyOrdersRequest = {
+      batchId: "batch-123",
+      orders: [
+        {
+          customer: {
+            name: "Customer 1",
+            email: "customer1@example.com",
+          },
+          lineItems: [{ sku: "SKU-001", quantity: 1 }],
+        },
+      ],
+    };
+
+    vi.mocked(mockShopifyService.createDraftOrder).mockRejectedValueOnce(
+      new Error("Variant not found for SKU: SKU-001"),
+    );
+
+    await expect(useCase.execute(request)).rejects.toThrow("All 1 orders failed");
   });
 
 });

@@ -4,6 +4,7 @@ import { ShopifyService } from "../../services/ShopifyService";
 import { Logger } from "../../utils/logger";
 import { v4 as uuidv4 } from "uuid";
 import type { BatchPerformanceMetrics, OrderMetrics, OperationMetrics } from "../../shared/types/PerformanceMetrics";
+import pLimit from "p-limit";
 
 export class SeedShopifyOrdersUseCase {
   constructor(private readonly shopifyService: ShopifyService) {}
@@ -63,12 +64,29 @@ export class SeedShopifyOrdersUseCase {
     // Track variant lookup cost if available (from service logging)
     totalApiCalls += variantLookupMetrics.apiCallCount;
 
-    // Process orders sequentially to avoid rate limits
-    for (let orderIndex = 0; orderIndex < request.orders.length; orderIndex++) {
-      const orderInput = request.orders[orderIndex];
-      const orderStartTime = Date.now();
+    // Phase 4: Process orders in parallel with controlled concurrency
+    // Start with 10 concurrent orders (adjust based on GraphQL cost limits)
+    // Cost-aware: Monitor throttle status and adjust if needed
+    const CONCURRENT_ORDERS = 10;
+    const COST_THRESHOLD_LOW = 200; // If available cost drops below this, reduce concurrency
+    const limit = pLimit(CONCURRENT_ORDERS);
 
-      try {
+    Logger.info("Processing orders in parallel", {
+      batchId: request.batchId,
+      totalOrders: request.orders.length,
+      concurrentOrders: CONCURRENT_ORDERS,
+      costThresholdLow: COST_THRESHOLD_LOW,
+    });
+
+    // Track errors for continue-on-error strategy
+    const errors: Array<{ orderIndex: number; customerEmail: string; error: Error }> = [];
+
+    // Process orders in parallel (operations within each order remain sequential)
+    const orderPromises = request.orders.map((orderInput, orderIndex) =>
+      limit(async () => {
+        const orderStartTime = Date.now();
+
+        try {
         // Create draft order (variant map is now pre-fetched and passed in)
         const { result: draftOrderResult, metrics: createMetrics } = await this.measureOperation(
           "createDraftOrder",
@@ -164,7 +182,6 @@ export class SeedShopifyOrdersUseCase {
         }
 
         const orderDurationMs = Date.now() - orderStartTime;
-        totalApiCalls += createMetrics.apiCallCount + completeMetrics.apiCallCount + queryMetrics.apiCallCount;
 
         // Record order metrics
         // Note: variantLookup is batched, so all orders share the same metrics
@@ -174,30 +191,124 @@ export class SeedShopifyOrdersUseCase {
           apiCallCount: orderIndex === 0 ? variantLookupMetrics.apiCallCount : 0, // Only count once for first order
         };
 
-        orderMetrics.push({
-          orderIndex,
-          customerEmail: orderInput.customer.email,
-          variantLookup: perOrderVariantMetrics,
-          draftOrderCreate: createMetrics,
-          draftOrderComplete: completeMetrics,
-          orderQuery: queryMetrics,
-          totalDurationMs: orderDurationMs,
-        });
+        return {
+            success: true as const,
+            order: {
+              shopifyOrderId: orderResult.orderId,
+              shopifyOrderNumber: orderResult.orderNumber,
+              lineItems,
+              fulfillmentStatus: "UNFULFILLED" as const, // Orders are not fulfilled during seeding
+            },
+            metrics: {
+              orderIndex,
+              customerEmail: orderInput.customer.email,
+              variantLookup: perOrderVariantMetrics,
+              draftOrderCreate: createMetrics,
+              draftOrderComplete: completeMetrics,
+              orderQuery: queryMetrics,
+              totalDurationMs: orderDurationMs,
+            },
+          };
+        } catch (error) {
+          // Continue-on-error strategy: collect errors, don't fail entire batch
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          Logger.error("Failed to create Shopify order", error, {
+            batchId: request.batchId,
+            customerEmail: orderInput.customer.email,
+            orderIndex,
+          });
 
-        shopifyOrders.push({
-          shopifyOrderId: orderResult.orderId,
-          shopifyOrderNumber: orderResult.orderNumber,
-          lineItems,
-          fulfillmentStatus: "UNFULFILLED", // Orders are not fulfilled during seeding
-        });
-      } catch (error) {
-        // Log error with structured logging
-        Logger.error("Failed to create Shopify order", error, {
-          batchId: request.batchId,
-          customerEmail: orderInput.customer.email,
-          orderIndex,
-        });
-        throw error; // Re-throw to fail fast - can be changed to continue on error if needed
+          errors.push({
+            orderIndex,
+            customerEmail: orderInput.customer.email,
+            error: error instanceof Error ? error : new Error(errorMessage),
+          });
+
+          return {
+            success: false as const,
+            orderIndex,
+            customerEmail: orderInput.customer.email,
+            error: errorMessage,
+          };
+        }
+      }),
+    );
+
+    // Wait for all orders to complete (successful or failed)
+    const results = await Promise.all(orderPromises);
+
+    // Separate successful orders from failures
+    for (const result of results) {
+      if (result.success) {
+        shopifyOrders.push(result.order);
+        orderMetrics.push(result.metrics);
+        totalApiCalls +=
+          result.metrics.draftOrderCreate.apiCallCount +
+          result.metrics.draftOrderComplete.apiCallCount +
+          result.metrics.orderQuery.apiCallCount;
+
+        // Track GraphQL cost from successful orders
+        // Cost-aware rate limiting: monitor and warn if cost gets low
+        if (result.metrics.draftOrderCreate.graphQLCost) {
+          totalRequestedCost += result.metrics.draftOrderCreate.graphQLCost.requestedQueryCost;
+          totalActualCost += result.metrics.draftOrderCreate.graphQLCost.actualQueryCost;
+          const available = result.metrics.draftOrderCreate.graphQLCost.throttleStatus.currentlyAvailable;
+          throttleStatuses.push({
+            currentlyAvailable: available,
+            maximumAvailable: result.metrics.draftOrderCreate.graphQLCost.throttleStatus.maximumAvailable,
+          });
+
+          // Warn if cost is getting low (cost-aware backoff signal)
+          if (available < COST_THRESHOLD_LOW) {
+            Logger.warn("GraphQL cost is low, consider reducing concurrency", {
+              batchId: request.batchId,
+              orderIndex: result.metrics.orderIndex,
+              currentlyAvailable: available,
+              threshold: COST_THRESHOLD_LOW,
+            });
+          }
+        }
+        if (result.metrics.draftOrderComplete.graphQLCost) {
+          totalRequestedCost += result.metrics.draftOrderComplete.graphQLCost.requestedQueryCost;
+          totalActualCost += result.metrics.draftOrderComplete.graphQLCost.actualQueryCost;
+          const available = result.metrics.draftOrderComplete.graphQLCost.throttleStatus.currentlyAvailable;
+          throttleStatuses.push({
+            currentlyAvailable: available,
+            maximumAvailable: result.metrics.draftOrderComplete.graphQLCost.throttleStatus.maximumAvailable,
+          });
+
+          // Warn if cost is getting low
+          if (available < COST_THRESHOLD_LOW) {
+            Logger.warn("GraphQL cost is low, consider reducing concurrency", {
+              batchId: request.batchId,
+              orderIndex: result.metrics.orderIndex,
+              currentlyAvailable: available,
+              threshold: COST_THRESHOLD_LOW,
+            });
+          }
+        }
+      }
+    }
+
+    // Log errors if any occurred
+    if (errors.length > 0) {
+      Logger.warn("Some orders failed during parallel processing", {
+        batchId: request.batchId,
+        failedCount: errors.length,
+        totalOrders: request.orders.length,
+        successfulCount: shopifyOrders.length,
+        errors: errors.map((e) => ({
+          orderIndex: e.orderIndex,
+          customerEmail: e.customerEmail,
+          error: e.error.message,
+        })),
+      });
+
+      // If all orders failed, throw an error
+      if (errors.length === request.orders.length) {
+        throw new Error(
+          `All ${request.orders.length} orders failed. First error: ${errors[0]?.error.message}`,
+        );
       }
     }
 
