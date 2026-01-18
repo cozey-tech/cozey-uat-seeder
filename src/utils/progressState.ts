@@ -40,6 +40,10 @@ export interface ProgressState {
       customerEmail?: string;
       error: string;
     }>;
+    shipments?: Array<{
+      shipmentId: string;
+      orderId: string;
+    }>;
   };
   collectionPrep?: {
     collectionPrepId: string;

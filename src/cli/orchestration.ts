@@ -444,9 +444,11 @@ export async function executeSeedingFlow(
     }));
     // Merge prepPartItems from previous successful run with new ones
     const previousPrepPartItems = resumeState.wmsEntities.successful.flatMap((s) => s.prepPartItems);
+    // Merge shipments from previous run with new ones
+    const previousShipments = resumeState.wmsEntities.shipments || [];
     finalWmsResult = {
       orders: [...previousSuccessful, ...wmsResult.orders],
-      shipments: wmsResult.shipments, // Shipments are recreated, so don't merge
+      shipments: [...previousShipments, ...wmsResult.shipments], // Merge previous and new shipments
       prepPartItems: [...previousPrepPartItems, ...wmsResult.prepPartItems],
       failures: wmsResult.failures,
     };
@@ -608,6 +610,7 @@ export async function executeSeedingFlow(
             error: failure.error,
           };
         }),
+        shipments: finalWmsResult.shipments, // Store all shipments (previous + new) for resume
       },
       collectionPrep: collectionPrepId
         ? { collectionPrepId, region: config.collectionPrep!.region }
