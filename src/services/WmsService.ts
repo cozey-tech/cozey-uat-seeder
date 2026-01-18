@@ -91,7 +91,8 @@ export class WmsService {
     const customerId = customer?.id || uuidv4();
 
     if (!customer) {
-      // Use transaction to ensure atomicity
+      // Use transaction to ensure atomicity: order and customer must be created together
+      // Prevents orphaned orders if customer creation fails after order creation
       const result = await this.repository.createOrderWithCustomerTransaction(
         {
           shopifyOrderId: shopifyOrderId,
@@ -237,7 +238,8 @@ export class WmsService {
     lineItems: Array<{ lineItemId: string; sku: string; quantity: number }>,
     region: string,
   ): Promise<Array<{ prepPartId: string; prepPartItemId: string; partId: string }>> {
-    // Batch lookup all parts by variant IDs (through variantPart relationship)
+    // Batch lookup all parts by variant IDs to avoid N+1 queries
+    // VariantPart relationship maps variants to their constituent parts
     const variantIds = preps.map((prep) => prep.variantId);
     const partsByVariantId = await this.repository.findPartsByVariantIds(variantIds, region);
 

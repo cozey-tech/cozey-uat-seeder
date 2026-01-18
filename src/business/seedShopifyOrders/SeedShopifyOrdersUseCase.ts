@@ -82,10 +82,11 @@ export class SeedShopifyOrdersUseCase {
 
     totalApiCalls += variantLookupMetrics.apiCallCount;
 
-    // Start with 10 concurrent orders (adjust based on GraphQL cost limits)
-    // Cost-aware: Monitor throttle status and adjust if needed
+    // Limit concurrency to avoid GraphQL cost throttling
+    // 10 concurrent orders balances throughput with cost limits (typical order creation costs ~20-30 points)
     const CONCURRENT_ORDERS = 10;
-    const COST_THRESHOLD_LOW = 200; // If available cost drops below this, reduce concurrency
+    // If available cost drops below 200, we're approaching throttle limits - reduce concurrency to avoid 429 errors
+    const COST_THRESHOLD_LOW = 200;
     const limit = pLimit(CONCURRENT_ORDERS);
 
     Logger.info("Processing orders in parallel", {
@@ -95,7 +96,8 @@ export class SeedShopifyOrdersUseCase {
       costThresholdLow: COST_THRESHOLD_LOW,
     });
 
-    // Track errors for continue-on-error strategy
+    // Continue-on-error: collect failures but don't fail entire batch
+    // This allows partial success when some orders fail (e.g., invalid SKU, API errors)
     const errors: Array<{ orderIndex: number; customerEmail: string; error: Error }> = [];
 
     // Process orders in parallel (operations within each order remain sequential)
@@ -171,7 +173,8 @@ export class SeedShopifyOrdersUseCase {
             apiCallCount: 0, // Skipped
           };
         } else {
-          // Need to query for line items - use single order query (more efficient than querying all by tag)
+          // Query single order by ID (more efficient than querying all by tag)
+          // Avoids unnecessary cost when we only need one order's line items
           const { result: createdOrder, metrics: queryMetricsResult } = await this.measureOperation(
             "queryOrderById",
             () => this.shopifyService.queryOrderById(orderResult.orderId),

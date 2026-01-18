@@ -80,7 +80,8 @@ export class ShopifyService {
    */
   constructor(dryRun: boolean = false) {
     this.dryRun = dryRun;
-    this.orderNumberCounter = 1000; // Start from #1000 for deterministic order numbers
+    // Start from #1000 to avoid conflicts with real order numbers (typically < 1000 in staging)
+    this.orderNumberCounter = 1000;
     const config = getEnvConfig();
     this.client = createAdminApiClient({
       storeDomain: config.SHOPIFY_STORE_DOMAIN,
