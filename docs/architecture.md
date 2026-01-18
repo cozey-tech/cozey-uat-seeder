@@ -323,6 +323,5 @@ Potential improvements (not in current scope):
 ## Related Documents
 
 - [AGENTS.md](../AGENTS.md): Engineering conventions and quickstart
-- [Technical Design Document](../.cursor/plans/uat_seeder_technical_design_document_8036ee46.plan.md): Detailed design decisions
-- [Implementation Progress](implementation/progress.md): Current implementation status
+- [Technical Design Document](../docs/technical-design-document.md): Detailed technical design and implementation decisions
 - [README.md](../README.md): User-facing documentation

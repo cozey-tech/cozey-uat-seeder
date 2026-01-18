@@ -268,7 +268,7 @@ src/
 
 - [Architecture Documentation](docs/architecture.md): System architecture and design decisions
 - [AGENTS.md](AGENTS.md): Engineering conventions and development guidelines
-- [Implementation Progress](docs/implementation/progress.md): Current implementation status
+- [Technical Design Document](docs/technical-design-document.md): Detailed technical design and implementation decisions
 
 ## Safety Features
 
