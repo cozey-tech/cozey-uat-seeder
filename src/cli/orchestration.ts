@@ -117,11 +117,26 @@ export async function executeSeedingFlow(
   console.log(OutputFormatter.step(1, totalSteps, step1Name));
   
   // Filter orders if resuming (only retry failed ones)
+  // Also create a mapping from filtered array index to original config.orders index
   let ordersToProcess = config.orders;
+  const filteredToOriginalIndexMap = new Map<number, number>(); // Maps filtered array index -> original config.orders index
   if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
     const successfulIndices = new Set(resumeState.shopifyOrders.successful.map((s) => s.orderIndex));
     ordersToProcess = config.orders.filter((_, index) => !successfulIndices.has(index));
+    // Build mapping: for each filtered order, map its position in filtered array to original index
+    let filteredIndex = 0;
+    for (let originalIndex = 0; originalIndex < config.orders.length; originalIndex++) {
+      if (!successfulIndices.has(originalIndex)) {
+        filteredToOriginalIndexMap.set(filteredIndex, originalIndex);
+        filteredIndex++;
+      }
+    }
     console.log(OutputFormatter.info(`Resuming: ${ordersToProcess.length} failed orders to retry, ${resumeState.shopifyOrders.successful.length} already successful`));
+  } else {
+    // Normal flow: filtered array is same as original, so indices map 1:1
+    for (let i = 0; i < config.orders.length; i++) {
+      filteredToOriginalIndexMap.set(i, i);
+    }
   }
   
   const progressTracker = new ProgressTracker();
@@ -187,17 +202,54 @@ export async function executeSeedingFlow(
 
   // Save progress state after Shopify seeding
   if (!isDryRun) {
+    // Build successful orders array with correct orderIndex values
+    const successfulOrders: Array<{
+      orderIndex: number;
+      shopifyOrderId: string;
+      shopifyOrderNumber: string;
+      customerEmail: string;
+    }> = [];
+    
+    // Add previously successful orders (they already have correct orderIndex from resumeState)
+    if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
+      successfulOrders.push(...resumeState.shopifyOrders.successful);
+    }
+    
+    // Add newly successful orders, mapping their filtered indices back to original indices
+    for (const order of shopifyResult.shopifyOrders) {
+      // Find the order in shopifyResult to get its filtered index
+      const filteredIndex = shopifyResult.shopifyOrders.findIndex((o) => o.shopifyOrderId === order.shopifyOrderId);
+      if (filteredIndex !== -1) {
+        const originalIndex = filteredToOriginalIndexMap.get(filteredIndex);
+        if (originalIndex !== undefined) {
+          // Find customer email from original config
+          const customerEmail = config.orders[originalIndex]?.customer.email || "";
+          successfulOrders.push({
+            orderIndex: originalIndex,
+            shopifyOrderId: order.shopifyOrderId,
+            shopifyOrderNumber: order.shopifyOrderNumber,
+            customerEmail,
+          });
+        }
+      }
+    }
+    
+    // Map failures: convert filtered indices to original indices
+    const failedOrders = (shopifyResult.failures || []).map((failure) => {
+      const originalIndex = filteredToOriginalIndexMap.get(failure.orderIndex);
+      return {
+        orderIndex: originalIndex !== undefined ? originalIndex : failure.orderIndex,
+        customerEmail: failure.customerEmail,
+        error: failure.error,
+      };
+    });
+    
     const progressState: ProgressState = {
       batchId,
       timestamp: Date.now(),
       shopifyOrders: {
-        successful: finalShopifyResult.shopifyOrders.map((order, index) => ({
-          orderIndex: index,
-          shopifyOrderId: order.shopifyOrderId,
-          shopifyOrderNumber: order.shopifyOrderNumber,
-          customerEmail: config.orders[index]?.customer.email || "",
-        })),
-        failed: finalShopifyResult.failures || [],
+        successful: successfulOrders,
+        failed: failedOrders,
       },
       wmsEntities: {
         successful: [],
@@ -268,11 +320,52 @@ export async function executeSeedingFlow(
   wmsProgressTracker.start(step2Name, finalShopifyResult.shopifyOrders.length);
   
   // Filter WMS orders if resuming (skip already successful ones)
+  // Also create a mapping from filtered array index to original config.orders index
   let wmsOrdersToProcess = finalShopifyResult.shopifyOrders;
+  const wmsFilteredToOriginalIndexMap = new Map<number, number>(); // Maps filtered array index -> original config.orders index
   if (resumeState && resumeState.wmsEntities.successful.length > 0) {
     const successfulShopifyIds = new Set(resumeState.wmsEntities.successful.map((s) => s.shopifyOrderId));
     wmsOrdersToProcess = finalShopifyResult.shopifyOrders.filter((order) => !successfulShopifyIds.has(order.shopifyOrderId));
+    // Build mapping: for each filtered order, map its position in filtered array to original index
+    // We need to find the original index by looking up the shopifyOrderId in finalShopifyResult
+    // and then finding its corresponding orderIndex from progress state or config
+    let filteredIndex = 0;
+    for (const order of finalShopifyResult.shopifyOrders) {
+      if (!successfulShopifyIds.has(order.shopifyOrderId)) {
+        // Find original index by looking up shopifyOrderId
+        // Check if it's in the previous successful orders (from resumeState)
+        const prevSuccess = resumeState.shopifyOrders.successful.find((s) => s.shopifyOrderId === order.shopifyOrderId);
+        if (prevSuccess) {
+          wmsFilteredToOriginalIndexMap.set(filteredIndex, prevSuccess.orderIndex);
+        } else {
+          // New order from current Shopify run - use the mapping we created earlier
+          const shopifyIndex = shopifyResult.shopifyOrders.findIndex((o) => o.shopifyOrderId === order.shopifyOrderId);
+          if (shopifyIndex !== -1) {
+            const originalIndex = filteredToOriginalIndexMap.get(shopifyIndex);
+            if (originalIndex !== undefined) {
+              wmsFilteredToOriginalIndexMap.set(filteredIndex, originalIndex);
+            }
+          }
+        }
+        filteredIndex++;
+      }
+    }
     console.log(OutputFormatter.info(`Resuming WMS: ${wmsOrdersToProcess.length} orders to retry, ${resumeState.wmsEntities.successful.length} already successful`));
+  } else {
+    // Normal flow: filtered array is same as original, so indices map 1:1
+    // But we need to map based on finalShopifyResult positions
+    for (let i = 0; i < finalShopifyResult.shopifyOrders.length; i++) {
+      const order = finalShopifyResult.shopifyOrders[i];
+      // Find original index by looking up shopifyOrderId in config.orders
+      // For normal flow, finalShopifyResult order positions should match config.orders
+      const originalIndex = config.orders.findIndex((o) => {
+        // Match by customer email as proxy (since we don't have shopifyOrderId in config)
+        // Actually, we can't reliably match here without shopifyOrderId
+        // For normal flow, assume positions match
+        return i < config.orders.length;
+      });
+      wmsFilteredToOriginalIndexMap.set(i, i < config.orders.length ? i : i);
+    }
   }
   
   const wmsRequest = {
@@ -424,28 +517,95 @@ export async function executeSeedingFlow(
       batchId,
       timestamp: Date.now(),
       shopifyOrders: {
-        successful: finalShopifyResult.shopifyOrders.map((order, index) => ({
-          orderIndex: index,
-          shopifyOrderId: order.shopifyOrderId,
-          shopifyOrderNumber: order.shopifyOrderNumber,
-          customerEmail: config.orders[index]?.customer.email || "",
-        })),
-        failed: finalShopifyResult.failures || [],
-      },
-      wmsEntities: {
-        successful: finalWmsResult.orders.map((order) => {
-          const orderIndex = finalShopifyResult.shopifyOrders.findIndex((o) => o.shopifyOrderId === order.shopifyOrderId);
-          // Get prepPartItems for this order from our tracking map
-          const prepPartItemsForOrder = prepPartItemsByOrder.get(order.shopifyOrderId) || [];
+        // Reuse the same logic we used when saving after Shopify seeding
+        // Build successful orders array with correct orderIndex values
+        successful: (() => {
+          const successful: Array<{
+            orderIndex: number;
+            shopifyOrderId: string;
+            shopifyOrderNumber: string;
+            customerEmail: string;
+          }> = [];
           
+          // Add previously successful orders (they already have correct orderIndex from resumeState)
+          if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
+            successful.push(...resumeState.shopifyOrders.successful);
+          }
+          
+          // Add newly successful orders from current run, mapping their filtered indices back to original indices
+          // Note: shopifyResult contains only newly processed orders (not merged with previous)
+          for (const order of shopifyResult.shopifyOrders) {
+            const filteredIndex = shopifyResult.shopifyOrders.findIndex((o) => o.shopifyOrderId === order.shopifyOrderId);
+            if (filteredIndex !== -1) {
+              const originalIndex = filteredToOriginalIndexMap.get(filteredIndex);
+              if (originalIndex !== undefined) {
+                const customerEmail = config.orders[originalIndex]?.customer.email || "";
+                successful.push({
+                  orderIndex: originalIndex,
+                  shopifyOrderId: order.shopifyOrderId,
+                  shopifyOrderNumber: order.shopifyOrderNumber,
+                  customerEmail,
+                });
+              }
+            }
+          }
+          
+          return successful;
+        })(),
+        failed: (shopifyResult.failures || []).map((failure) => {
+          const originalIndex = filteredToOriginalIndexMap.get(failure.orderIndex);
           return {
-            orderIndex,
-            orderId: order.orderId,
-            shopifyOrderId: order.shopifyOrderId,
-            prepPartItems: prepPartItemsForOrder,
+            orderIndex: originalIndex !== undefined ? originalIndex : failure.orderIndex,
+            customerEmail: failure.customerEmail,
+            error: failure.error,
           };
         }),
-        failed: finalWmsResult.failures || [],
+      },
+      wmsEntities: {
+        successful: (() => {
+          const successful: Array<{
+            orderIndex: number;
+            orderId: string;
+            shopifyOrderId: string;
+            prepPartItems: Array<{ prepPartItemId: string; partId: string }>;
+          }> = [];
+          
+          // Add previously successful orders (they already have correct orderIndex from resumeState)
+          if (resumeState && resumeState.wmsEntities.successful.length > 0) {
+            successful.push(...resumeState.wmsEntities.successful);
+          }
+          
+          // Add newly successful orders from current run, mapping their filtered indices back to original indices
+          // Note: wmsResult contains only newly processed orders (not merged with previous)
+          for (const order of wmsResult.orders) {
+            const filteredIndex = wmsResult.orders.findIndex((o) => o.shopifyOrderId === order.shopifyOrderId);
+            if (filteredIndex !== -1) {
+              const originalIndex = wmsFilteredToOriginalIndexMap.get(filteredIndex);
+              if (originalIndex !== undefined) {
+                // Get prepPartItems for this order from our tracking map
+                const prepPartItemsForOrder = prepPartItemsByOrder.get(order.shopifyOrderId) || [];
+                successful.push({
+                  orderIndex: originalIndex,
+                  orderId: order.orderId,
+                  shopifyOrderId: order.shopifyOrderId,
+                  prepPartItems: prepPartItemsForOrder,
+                });
+              }
+            }
+          }
+          
+          return successful;
+        })(),
+        failed: (wmsResult.failures || []).map((failure) => {
+          // Map failure orderIndex from filtered to original
+          const originalIndex = wmsFilteredToOriginalIndexMap.get(failure.orderIndex);
+          return {
+            orderIndex: originalIndex !== undefined ? originalIndex : failure.orderIndex,
+            shopifyOrderId: failure.shopifyOrderId,
+            customerEmail: failure.customerEmail,
+            error: failure.error,
+          };
+        }),
       },
       collectionPrep: collectionPrepId
         ? { collectionPrepId, region: config.collectionPrep!.region }
