@@ -31,6 +31,7 @@ describe("ProgressState", () => {
           orderIndex: 0,
           orderId: "wms-order-1",
           shopifyOrderId: "order-1",
+          prepPartItems: [],
         },
       ],
       failed: [],
