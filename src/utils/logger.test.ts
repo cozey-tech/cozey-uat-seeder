@@ -23,7 +23,7 @@ describe("Logger", () => {
     it("should log info messages", () => {
       Logger.info("Test message");
       expect(consoleLogSpy).toHaveBeenCalled();
-      const call = consoleLogSpy.mock.calls[0][0];
+      const call = consoleLogSpy.mock.calls[0][0] as string;
       expect(JSON.parse(call)).toMatchObject({
         level: "info",
         message: "Test message",
@@ -33,7 +33,7 @@ describe("Logger", () => {
     it("should log warn messages", () => {
       Logger.warn("Warning message");
       expect(consoleWarnSpy).toHaveBeenCalled();
-      const call = consoleWarnSpy.mock.calls[0][0];
+      const call = consoleWarnSpy.mock.calls[0][0] as string;
       expect(JSON.parse(call)).toMatchObject({
         level: "warn",
         message: "Warning message",
@@ -43,17 +43,18 @@ describe("Logger", () => {
     it("should log error messages", () => {
       Logger.error("Error message");
       expect(consoleErrorSpy).toHaveBeenCalled();
-      const call = consoleErrorSpy.mock.calls[0][0];
+      const call = consoleErrorSpy.mock.calls[0][0] as string;
       expect(JSON.parse(call)).toMatchObject({
         level: "error",
         message: "Error message",
       });
     });
 
-    it("should log debug messages", () => {
+    it("should log debug messages when log level is debug", () => {
+      process.env.LOG_LEVEL = "debug";
       Logger.debug("Debug message");
       expect(consoleLogSpy).toHaveBeenCalled();
-      const call = consoleLogSpy.mock.calls[0][0];
+      const call = consoleLogSpy.mock.calls[0][0] as string;
       expect(JSON.parse(call)).toMatchObject({
         level: "debug",
         message: "Debug message",
@@ -62,7 +63,7 @@ describe("Logger", () => {
 
     it("should include context in logs", () => {
       Logger.info("Test message", { key: "value", count: 42 });
-      const call = consoleLogSpy.mock.calls[0][0];
+      const call = consoleLogSpy.mock.calls[0][0] as string;
       const parsed = JSON.parse(call);
       expect(parsed.context).toMatchObject({
         key: "value",
@@ -72,7 +73,7 @@ describe("Logger", () => {
 
     it("should mask email addresses in context", () => {
       Logger.info("Test message", { email: "test@example.com" });
-      const call = consoleLogSpy.mock.calls[0][0];
+      const call = consoleLogSpy.mock.calls[0][0] as string;
       const parsed = JSON.parse(call);
       expect(parsed.context.email).toMatch(/^te\*\*\*@example\.com$/);
     });
@@ -80,7 +81,7 @@ describe("Logger", () => {
     it("should format Error objects in error logs", () => {
       const error = new Error("Test error");
       Logger.error("Error occurred", error);
-      const call = consoleErrorSpy.mock.calls[0][0];
+      const call = consoleErrorSpy.mock.calls[0][0] as string;
       const parsed = JSON.parse(call);
       expect(parsed.context.error).toMatchObject({
         message: "Test error",
@@ -99,16 +100,14 @@ describe("Logger", () => {
       expect(consoleLogSpy).toHaveBeenCalledTimes(2);
     });
 
-    it("should track operation duration", (done) => {
+    it("should track operation duration", async () => {
       const operationId = Logger.startOperation("testOperation");
-      setTimeout(() => {
-        Logger.endOperation(operationId, true);
-        const calls = consoleLogSpy.mock.calls;
-        const endCall = calls[calls.length - 1][0];
-        const parsed = JSON.parse(endCall);
-        expect(parsed.context.duration).toBeGreaterThan(0);
-        done();
-      }, 10);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      Logger.endOperation(operationId, true);
+      const calls = consoleLogSpy.mock.calls;
+      const endCall = calls[calls.length - 1][0] as string;
+      const parsed = JSON.parse(endCall);
+      expect(parsed.context.duration).toBeGreaterThan(0);
     });
 
     it("should log failed operations as warnings", () => {
@@ -126,7 +125,7 @@ describe("Logger", () => {
         itemCount: 10,
       });
       expect(consoleLogSpy).toHaveBeenCalled();
-      const call = consoleLogSpy.mock.calls[0][0];
+      const call = consoleLogSpy.mock.calls[0][0] as string;
       const parsed = JSON.parse(call);
       expect(parsed.context).toMatchObject({
         type: "performance",
@@ -141,7 +140,7 @@ describe("Logger", () => {
     it("should create logger with base context", () => {
       const logger = Logger.withContext({ batchId: "test-123" });
       logger.info("Test message", { orderId: "order-1" });
-      const call = consoleLogSpy.mock.calls[0][0];
+      const call = consoleLogSpy.mock.calls[0][0] as string;
       const parsed = JSON.parse(call);
       expect(parsed.context).toMatchObject({
         batchId: "test-123",
