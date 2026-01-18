@@ -35,6 +35,17 @@ export class SeedWmsEntitiesUseCase {
           orderId: existingOrder.id,
           shopifyOrderId: existingOrder.shopifyOrderId,
         });
+        
+        // Notify progress callback of success (idempotent order)
+        if (request.onOrderProgress) {
+          request.onOrderProgress(orderIndex + 1, request.shopifyOrders.length, shopifyOrder.shopifyOrderId, true);
+        }
+        
+        // Close operation tracking before continuing
+        Logger.endOperation(orderOperationId, true, {
+          orderId: existingOrder.id,
+          idempotent: true,
+        });
         continue; // Skip to next order
       }
 

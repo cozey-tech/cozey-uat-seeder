@@ -361,7 +361,7 @@ export async function executeSeedingFlow(
   }
   
   const wmsRequest = {
-    shopifyOrders: wmsOrdersToProcess.map((shopifyOrder) => {
+    shopifyOrders: wmsOrdersToProcess.map((shopifyOrder, filteredIndex) => {
       // Find the corresponding config order by matching shopifyOrderId
       // For resumed orders, we need to find the original config order by index
       let configOrder = config.orders[0]; // Default fallback
@@ -375,25 +375,17 @@ export async function executeSeedingFlow(
           // Use the stored orderIndex from progress state, not the array index
           configOrder = config.orders[prevSuccess.orderIndex];
         } else {
-          // New order from current run, find by index in finalShopifyResult
-          const currentIndex = finalShopifyResult.shopifyOrders.findIndex(
-            (o) => o.shopifyOrderId === shopifyOrder.shopifyOrderId,
-          );
-          if (currentIndex !== -1) {
-            // Adjust index to account for previous successful orders
-            const adjustedIndex = currentIndex - resumeState.shopifyOrders.successful.length;
-            if (adjustedIndex >= 0 && adjustedIndex < config.orders.length) {
-              configOrder = config.orders[adjustedIndex];
-            }
+          // New order from current run - use the mapping we built earlier
+          const originalIndex = wmsFilteredToOriginalIndexMap.get(filteredIndex);
+          if (originalIndex !== undefined && originalIndex < config.orders.length) {
+            configOrder = config.orders[originalIndex];
           }
         }
       } else {
-        // Normal flow: find by index
-        const currentIndex = finalShopifyResult.shopifyOrders.findIndex(
-          (o) => o.shopifyOrderId === shopifyOrder.shopifyOrderId,
-        );
-        if (currentIndex !== -1 && currentIndex < config.orders.length) {
-          configOrder = config.orders[currentIndex];
+        // Normal flow: use the mapping we built (1:1 in normal flow)
+        const originalIndex = wmsFilteredToOriginalIndexMap.get(filteredIndex);
+        if (originalIndex !== undefined && originalIndex < config.orders.length) {
+          configOrder = config.orders[originalIndex];
         }
       }
       // For resumed orders, lineItems might be empty, so use config order line items

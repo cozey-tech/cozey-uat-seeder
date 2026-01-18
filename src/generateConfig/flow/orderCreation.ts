@@ -125,16 +125,12 @@ export async function createOrders(
             
             saveTemplate(newTemplate);
             
-            // Reload templates to include the new one
+            // Reload templates to include the new one (for use in subsequent iterations)
             const updatedTemplates = loadOrderTemplates();
             const validUpdatedTemplates = filterValidTemplates(updatedTemplates, variants);
-            
-            // Return updated templates so caller can use them
-            return {
-              orders,
-              inventoryChecks,
-              updatedTemplates: validUpdatedTemplates,
-            };
+            // Update templates array so subsequent orders can use the new template
+            templates.length = 0;
+            templates.push(...validUpdatedTemplates);
           }
         }
       }
