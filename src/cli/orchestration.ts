@@ -232,7 +232,7 @@ export async function executeSeedingFlow(
       }
     }
 
-    // Now map successful orders using their position in ordersToProcess
+    // Map successful orders using their position in ordersToProcess
     for (const order of shopifyResult.shopifyOrders) {
       const processedIndex = successfulOrderIdToProcessedIndex.get(order.shopifyOrderId);
       if (processedIndex !== undefined) {
@@ -340,9 +340,7 @@ export async function executeSeedingFlow(
     wmsOrdersToProcess = finalShopifyResult.shopifyOrders.filter(
       (order) => !successfulShopifyIds.has(order.shopifyOrderId),
     );
-    // Build mapping: for each filtered order, map its position in filtered array to original index
-    // We need to find the original index by looking up the shopifyOrderId in finalShopifyResult
-    // and then finding its corresponding orderIndex from progress state or config
+    // Map each filtered order position to original index by looking up shopifyOrderId
     let filteredIndex = 0;
     for (const wmsOrder of finalShopifyResult.shopifyOrders) {
       if (!successfulShopifyIds.has(wmsOrder.shopifyOrderId)) {
@@ -472,11 +470,8 @@ export async function executeSeedingFlow(
     }
   }
 
-  // For new orders, prepPartItems are in wmsResult in sequential order
-  // We need to map them to orders. Since we don't know the exact count per order,
-  // we'll use the order index in wmsOrdersToProcess to map them.
-  // This assumes prepPartItems are created in the same order as orders.
-  // Note: wmsResult.orders only contains successful orders, so we need to track which orders succeeded
+  // Map prepPartItems to orders using order index in wmsOrdersToProcess
+  // Note: prepPartItems are created sequentially; wmsResult.orders only contains successful orders
   const wmsFailedIndicesForPrepMapping = new Set((wmsResult.failures || []).map((f) => f.orderIndex));
   let prepPartItemOffset = 0;
   let successfulOrderIndex = 0;
@@ -618,7 +613,7 @@ export async function executeSeedingFlow(
             }
           }
 
-          // Now map successful orders using their position in wmsOrdersToProcess
+          // Map successful orders using their position in wmsOrdersToProcess
           for (const order of wmsResult.orders) {
             const processedIndex = successfulOrderIdToProcessedIndex.get(order.shopifyOrderId);
             if (processedIndex !== undefined) {

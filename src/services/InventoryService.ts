@@ -176,9 +176,7 @@ export class InventoryService {
     locationId: string,
     region: string,
   ): Promise<InventoryCheckResult> {
-    // First, get variants for the SKUs in the order
-    // We need to get pickType from parts, so we'll use ConfigDataRepository
-    // For now, we'll fetch variants and determine pickType
+    // Get variants and determine pickType from parts via ConfigDataRepository
     const skus = order.lineItems.map((item) => item.sku);
     const variantRecords = await this.prisma.variant.findMany({
       where: {

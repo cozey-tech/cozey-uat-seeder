@@ -214,8 +214,7 @@ export class ShopifyService {
       return { draftOrderId };
     }
 
-    // First, we need to find variant IDs by SKU
-    // For now, we'll use a simplified approach - in production, you'd query products by SKU
+    // Find variant IDs by SKU using simplified approach
     const mutation = `
       mutation draftOrderCreate($input: DraftOrderInput!) {
         draftOrderCreate(input: $input) {
@@ -438,7 +437,7 @@ export class ShopifyService {
       return { fulfillmentId, status: "SUCCESS" };
     }
 
-    // First, get the order's line items and check for existing fulfillments
+    // Get order line items and check for existing fulfillments
     const queryOrder = `
       query getOrder($id: ID!) {
         order(id: $id) {
