@@ -330,20 +330,20 @@ export async function executeSeedingFlow(
     // We need to find the original index by looking up the shopifyOrderId in finalShopifyResult
     // and then finding its corresponding orderIndex from progress state or config
     let filteredIndex = 0;
-    for (const order of finalShopifyResult.shopifyOrders) {
-      if (!successfulShopifyIds.has(order.shopifyOrderId)) {
+    for (const wmsOrder of finalShopifyResult.shopifyOrders) {
+      if (!successfulShopifyIds.has(wmsOrder.shopifyOrderId)) {
         // Find original index by looking up shopifyOrderId
         // Check if it's in the previous successful orders (from resumeState)
-        const prevSuccess = resumeState.shopifyOrders.successful.find((s) => s.shopifyOrderId === order.shopifyOrderId);
+        const prevSuccess = resumeState.shopifyOrders.successful.find((s) => s.shopifyOrderId === wmsOrder.shopifyOrderId);
         if (prevSuccess) {
           wmsFilteredToOriginalIndexMap.set(filteredIndex, prevSuccess.orderIndex);
         } else {
           // New order from current Shopify run - use the mapping we created earlier
-          const shopifyIndex = shopifyResult.shopifyOrders.findIndex((o) => o.shopifyOrderId === order.shopifyOrderId);
+          const shopifyIndex = shopifyResult.shopifyOrders.findIndex((shopifyOrder) => shopifyOrder.shopifyOrderId === wmsOrder.shopifyOrderId);
           if (shopifyIndex !== -1) {
-            const originalIndex = filteredToOriginalIndexMap.get(shopifyIndex);
-            if (originalIndex !== undefined) {
-              wmsFilteredToOriginalIndexMap.set(filteredIndex, originalIndex);
+            const mappedOriginalIndex = filteredToOriginalIndexMap.get(shopifyIndex);
+            if (mappedOriginalIndex !== undefined) {
+              wmsFilteredToOriginalIndexMap.set(filteredIndex, mappedOriginalIndex);
             }
           }
         }
@@ -353,17 +353,9 @@ export async function executeSeedingFlow(
     console.log(OutputFormatter.info(`Resuming WMS: ${wmsOrdersToProcess.length} orders to retry, ${resumeState.wmsEntities.successful.length} already successful`));
   } else {
     // Normal flow: filtered array is same as original, so indices map 1:1
-    // But we need to map based on finalShopifyResult positions
+    // For normal flow, finalShopifyResult order positions should match config.orders
     for (let i = 0; i < finalShopifyResult.shopifyOrders.length; i++) {
-      const order = finalShopifyResult.shopifyOrders[i];
-      // Find original index by looking up shopifyOrderId in config.orders
-      // For normal flow, finalShopifyResult order positions should match config.orders
-      const originalIndex = config.orders.findIndex((o) => {
-        // Match by customer email as proxy (since we don't have shopifyOrderId in config)
-        // Actually, we can't reliably match here without shopifyOrderId
-        // For normal flow, assume positions match
-        return i < config.orders.length;
-      });
+      // In normal flow (no resume), positions match 1:1
       wmsFilteredToOriginalIndexMap.set(i, i < config.orders.length ? i : i);
     }
   }
