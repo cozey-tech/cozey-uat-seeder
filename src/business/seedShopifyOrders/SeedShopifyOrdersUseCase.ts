@@ -31,6 +31,11 @@ export class SeedShopifyOrdersUseCase {
   }
 
   async execute(request: SeedShopifyOrdersRequest): Promise<SeedShopifyOrdersResponse> {
+    // Validate input
+    if (request.orders.length === 0) {
+      throw new Error("Cannot seed orders: orders array is empty");
+    }
+
     const shopifyOrders: SeedShopifyOrdersResponse["shopifyOrders"] = [];
     const orderMetrics: OrderMetrics[] = [];
     const batchStartTime = Date.now();
@@ -60,6 +65,15 @@ export class SeedShopifyOrdersUseCase {
       "findVariantIdsBySkus",
       () => this.shopifyService.findVariantIdsBySkus(uniqueSkus),
     );
+
+    // Validate that all SKUs were found before processing orders
+    const missingSkus = uniqueSkus.filter((sku) => !variantMap.has(sku));
+    if (missingSkus.length > 0) {
+      throw new Error(
+        `Variant lookup failed for ${missingSkus.length} SKU(s): ${missingSkus.join(", ")}. ` +
+        `Cannot proceed with order creation. Please verify SKUs exist in Shopify.`,
+      );
+    }
 
     // Track variant lookup cost if available (from service logging)
     totalApiCalls += variantLookupMetrics.apiCallCount;
