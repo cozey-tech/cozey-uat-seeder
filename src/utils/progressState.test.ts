@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { existsSync, mkdirSync, unlinkSync, readdirSync } from "fs";
+import { existsSync, mkdirSync, unlinkSync, readdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import {
   saveProgressState,
@@ -115,8 +115,7 @@ describe("ProgressState", () => {
       if (!existsSync(progressDir)) {
         mkdirSync(progressDir, { recursive: true });
       }
-      const fs = require("fs");
-      fs.writeFileSync(join(progressDir, "invalid.json"), "invalid json");
+      writeFileSync(join(progressDir, "invalid.json"), "invalid json");
       expect(() => loadProgressState("invalid")).toThrow();
     });
   });
