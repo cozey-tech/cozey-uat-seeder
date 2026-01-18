@@ -76,12 +76,12 @@ export class ShopifyService {
   private orderNumberCounter: number;
 
   /**
-   * Initializes Shopify Admin API client with credentials from environment variables
    * @param dryRun - If true, skip actual API calls and return mock data
    */
   constructor(dryRun: boolean = false) {
     this.dryRun = dryRun;
-    this.orderNumberCounter = 1000; // Start from #1000 for deterministic order numbers
+    // Start from #1000 to avoid conflicts with real order numbers (typically < 1000 in staging)
+    this.orderNumberCounter = 1000;
     const config = getEnvConfig();
     this.client = createAdminApiClient({
       storeDomain: config.SHOPIFY_STORE_DOMAIN,
@@ -159,7 +159,6 @@ export class ShopifyService {
   }
 
   /**
-   * Formats a batch tag for Shopify (ensures it doesn't exceed 40 character limit)
    * @param batchId - Unique batch ID
    * @returns Tag string truncated to 40 characters
    */
@@ -177,8 +176,6 @@ export class ShopifyService {
   }
 
   /**
-   * Creates a draft order in Shopify
-   *
    * @param input - Customer and line items for the draft order
    * @param batchId - Unique batch ID for tagging (format: wms_seed_<batchId>)
    * @param region - Optional region code (CA or US) for determining country code in shipping address
@@ -255,8 +252,6 @@ export class ShopifyService {
         })
         .filter((item) => item !== null && item !== undefined);
 
-      // Build shipping address if provided
-      // Determine country code from region (CA -> "CA", US -> "US", default to "CA")
       const countryCode = region === "US" ? "US" : "CA";
       
       const shippingAddress = input.customer.address &&
@@ -272,7 +267,6 @@ export class ShopifyService {
           }
         : undefined;
 
-      // Build note with collection prep name if provided
       let note = `WMS Seed Order - Batch: ${batchId}`;
       if (collectionPrepName) {
         note = `WMS Seed Order - Batch: ${batchId}\nCollection Prep: ${collectionPrepName}`;
@@ -348,7 +342,6 @@ export class ShopifyService {
 
   async completeDraftOrder(draftOrderId: string): Promise<OrderResult> {
     if (this.dryRun) {
-      // Generate a deterministic order number (e.g., #1000, #1001, #1002, etc.)
       const orderNumber = `#${this.orderNumberCounter++}`;
       const orderId = `gid://shopify/Order/${uuidv4()}`;
       Logger.info("DRY RUN: Would complete draft order", {
@@ -359,7 +352,6 @@ export class ShopifyService {
       return { orderId, orderNumber };
     }
 
-    // Inspect if line items are available in the response - query them to see
     const mutation = `
       mutation draftOrderComplete($id: ID!, $paymentPending: Boolean) {
         draftOrderComplete(id: $id, paymentPending: $paymentPending) {
@@ -467,7 +459,6 @@ export class ShopifyService {
       // Get order line items and fulfillments
       const orderResponse = await this.client.request(queryOrder, { variables: { id: orderId } });
       
-      // Check for GraphQL errors (errors can be an object with graphQLErrors array or a direct array)
       const graphQLErrors = orderResponse.errors?.graphQLErrors || 
                             (Array.isArray(orderResponse.errors) ? orderResponse.errors : []);
       
@@ -487,7 +478,6 @@ export class ShopifyService {
       
       const order = orderResponse.data.order;
 
-      // Check if order already has fulfillments (fulfillments is a plain list, not a connection)
       const existingFulfillments = order.fulfillments || [];
       if (existingFulfillments.length > 0) {
         const firstFulfillment = existingFulfillments[0];
@@ -543,7 +533,6 @@ export class ShopifyService {
 
       const response = await this.client.request(mutation, { variables });
 
-      // Check for GraphQL errors (errors can be an object with graphQLErrors array or a direct array)
       const fulfillmentGraphQLErrors = response.errors?.graphQLErrors || 
                                        (Array.isArray(response.errors) ? response.errors : []);
       

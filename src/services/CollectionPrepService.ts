@@ -27,8 +27,6 @@ export class CollectionPrepService {
   }
 
   /**
-   * Creates a collection prep header in the WMS database
-   *
    * @param request - Collection prep configuration (ID, region, carrier, location, prep date, boxes)
    * @returns Created collection prep entity
    * @throws WmsServiceError if database operation fails

@@ -59,7 +59,7 @@ export class WmsService {
     customerEmail: string,
     locationId?: string,
   ): Promise<{ orderDbId: string; shopifyOrderId: string; customerId: string }> {
-    // Check if order already exists (idempotency) - still run in dry-run
+    // Idempotency check - still run in dry-run for validation
     const existingOrder = await this.repository.findOrderByShopifyId(shopifyOrderId);
     if (existingOrder) {
       return {
@@ -86,12 +86,13 @@ export class WmsService {
       return { orderDbId, shopifyOrderId, customerId };
     }
 
-    // Find or create customer by email (idempotency)
+    // Idempotency: reuse existing customer if found
     let customer = await this.repository.findCustomerByEmail(customerEmail, region);
     const customerId = customer?.id || uuidv4();
 
     if (!customer) {
-      // Use transaction to ensure atomicity
+      // Use transaction to ensure atomicity: order and customer must be created together
+      // Prevents orphaned orders if customer creation fails after order creation
       const result = await this.repository.createOrderWithCustomerTransaction(
         {
           shopifyOrderId: shopifyOrderId,
@@ -237,7 +238,8 @@ export class WmsService {
     lineItems: Array<{ lineItemId: string; sku: string; quantity: number }>,
     region: string,
   ): Promise<Array<{ prepPartId: string; prepPartItemId: string; partId: string }>> {
-    // Batch lookup all parts by variant IDs (through variantPart relationship)
+    // Batch lookup all parts by variant IDs to avoid N+1 queries
+    // VariantPart relationship maps variants to their constituent parts
     const variantIds = preps.map((prep) => prep.variantId);
     const partsByVariantId = await this.repository.findPartsByVariantIds(variantIds, region);
 
@@ -249,7 +251,6 @@ export class WmsService {
         throw new WmsServiceError(`Line item not found: ${prep.lineItemId}`);
       }
 
-      // Get all parts associated with this variant
       const variantParts = partsByVariantId.get(prep.variantId) || [];
       if (variantParts.length === 0) {
         throw new WmsServiceError(`No parts found for variant ID: ${prep.variantId} (SKU: ${lineItem.sku})`);

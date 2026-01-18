@@ -57,23 +57,19 @@ export async function createOrders(
 ): Promise<OrderCreationResult> {
   const { variants, customers, templates, locationsCache, region, promptService, compositionBuilder, inventoryService } = context;
   
-  // Prompt for order creation mode
   const creationMode = await promptService.promptOrderCreationMode();
 
   const orders: Order[] = [];
   let inventoryChecks: InventoryCheck[] = [];
 
   if (creationMode === "individual") {
-    // Individual mode: original flow
     const orderCount = await promptService.promptOrderCount();
     for (let i = 0; i < orderCount; i++) {
       console.log();
       console.log(OutputFormatter.progress(i + 1, orderCount, "Building Order"));
       console.log(OutputFormatter.separator());
 
-      // Select customer
       const customer = await promptService.promptCustomerSelection(customers);
-      // Use cached location (batched lookup)
       const location = locationsCache.get(customer.id);
       if (!location) {
         throw new Error(`Location not found for customer ${customer.id}`);

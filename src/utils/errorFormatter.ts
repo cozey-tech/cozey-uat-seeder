@@ -1,8 +1,6 @@
 /**
  * Error formatting utility for standardized, actionable error messages
- *
- * Provides consistent error formatting with context, recovery suggestions,
- * and actionable guidance for all error types in the CLI tools.
+ * with context and recovery suggestions.
  */
 
 import { InputValidationError } from "../services/InputParserService";
@@ -21,32 +19,14 @@ export interface ErrorContext {
    * Order index (1-based) if error is order-specific
    */
   orderIndex?: number;
-  /**
-   * Customer email if error is customer-specific
-   */
   customerEmail?: string;
-  /**
-   * SKU if error is SKU-specific
-   */
   sku?: string;
-  /**
-   * Additional context data
-   */
   [key: string]: unknown;
 }
 
 export interface FormattedError {
-  /**
-   * User-friendly error message
-   */
   message: string;
-  /**
-   * Recovery suggestions
-   */
   suggestions: string[];
-  /**
-   * Additional context information
-   */
   context?: string;
 }
 
@@ -82,15 +62,12 @@ export class ErrorFormatter {
     const formatted = this.format(error, context);
     const parts: string[] = [];
 
-    // Add context if present
     if (formatted.context) {
       parts.push(formatted.context);
     }
 
-    // Add main message
     parts.push(`❌ ${formatted.message}`);
 
-    // Add suggestions
     if (formatted.suggestions.length > 0) {
       parts.push("\n💡 Suggestions:");
       formatted.suggestions.forEach((suggestion) => {
@@ -107,17 +84,14 @@ export class ErrorFormatter {
   private static getBaseMessage(error: Error, context?: ErrorContext): string {
     let message = error.message;
 
-    // Add step context if provided
     if (context?.step) {
       message = `${context.step}: ${message}`;
     }
 
-    // Add order context if provided
     if (context?.orderIndex) {
       message = `Order ${context.orderIndex}: ${message}`;
     }
 
-    // Handle specific error types
     if (error instanceof InputValidationError) {
       return this.formatInputValidationError(error);
     }

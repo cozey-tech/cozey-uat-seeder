@@ -3,18 +3,14 @@
 /**
  * CLI Entry Point for Cozey UAT Seeder
  *
- * Orchestrates the full seeding workflow:
- * 1. Validates staging environment
- * 2. Parses and validates configuration file
- * 3. Seeds Shopify orders
- * 4. Seeds WMS entities
- * 5. Creates collection prep (if configured)
+ * Orchestrates the seeding workflow: validates staging environment,
+ * parses configuration, seeds Shopify orders and WMS entities,
+ * and optionally creates collection preps.
  */
 
 import { config } from "dotenv";
 import { resolve } from "path";
 
-// Load .env first, then .env.local (which will override .env values)
 config({ path: resolve(process.cwd(), ".env") });
 config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
@@ -34,13 +30,10 @@ import { loadProgressState, listProgressStates } from "./utils/progressState";
  */
 async function main(): Promise<void> {
   try {
-    // Initialize environment configuration (load from AWS Secrets Manager or .env)
     await initializeEnvConfig();
 
-    // Parse CLI arguments
     const options = parseArgs();
 
-    // Handle --resume flag
     if (options.resume) {
       const resumeState = loadProgressState(options.resume);
       if (!resumeState) {

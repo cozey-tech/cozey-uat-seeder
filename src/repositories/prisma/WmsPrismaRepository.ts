@@ -381,6 +381,8 @@ export class WmsPrismaRepository implements WmsRepository {
     }
   }
 
+  // Transaction ensures atomicity: order and customer must be created together
+  // Prevents orphaned orders if customer creation fails after order creation
   async createOrderWithCustomerTransaction(
     order: CreateOrderRequest,
     customer: { id: string; name: string; email?: string; region: string },
@@ -429,6 +431,8 @@ export class WmsPrismaRepository implements WmsRepository {
     });
   }
 
+  // Transaction ensures atomicity: order, variantOrders, and preps must be created together
+  // Prevents partial state if any operation fails (e.g., order created but variantOrders fail)
   async createOrderEntitiesTransaction(
     order: CreateOrderRequest,
     variantOrders: CreateVariantOrderRequest[],

@@ -1,8 +1,5 @@
 /**
- * Output formatting utility for consistent CLI output
- *
- * Provides standardized formatting for separators, spacing, emoji usage,
- * progress messages, and summaries across both CLI tools.
+ * Output formatting utility for consistent CLI output across both tools.
  */
 
 export interface SeparatorOptions {
@@ -17,13 +14,7 @@ export interface SeparatorOptions {
 }
 
 export interface SummaryOptions {
-  /**
-   * Title for the summary
-   */
   title: string;
-  /**
-   * Items to display in summary
-   */
   items: Array<{ label: string; value: string | number }>;
   /**
    * Whether to show a separator after (default: true)
@@ -60,38 +51,18 @@ export class OutputFormatter {
     return `${prefix}${text}`;
   }
 
-  /**
-   * Format a success message
-   * @param message - Success message
-   * @returns Formatted success message
-   */
   static success(message: string): string {
     return `✅ ${message}`;
   }
 
-  /**
-   * Format an error message
-   * @param message - Error message
-   * @returns Formatted error message
-   */
   static error(message: string): string {
     return `❌ ${message}`;
   }
 
-  /**
-   * Format a warning message
-   * @param message - Warning message
-   * @returns Formatted warning message
-   */
   static warning(message: string): string {
     return `⚠️  ${message}`;
   }
 
-  /**
-   * Format an info message
-   * @param message - Info message
-   * @returns Formatted info message
-   */
   static info(message: string): string {
     return `ℹ️  ${message}`;
   }
@@ -130,16 +101,13 @@ export class OutputFormatter {
   static summary(options: SummaryOptions): string {
     const lines: string[] = [];
 
-    // Title
     lines.push(options.title);
     lines.push(this.separator());
 
-    // Items
     options.items.forEach((item) => {
       lines.push(`   ${item.label}: ${item.value}`);
     });
 
-    // Optional separator after
     if (options.showSeparator !== false) {
       lines.push(this.separator());
     }

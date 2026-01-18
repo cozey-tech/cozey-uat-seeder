@@ -132,19 +132,15 @@ export async function loadReferenceData(
   const loadingProgress = new ProgressTracker({ showSpinner: true });
   loadingProgress.start("Loading reference data", 4);
   
-  // Load variants
   loadingProgress.update(1, "Loading variants...");
   const variants = await dataRepository.getAvailableVariants(region);
   
-  // Load customers
   loadingProgress.update(2, "Loading customers...");
   const customers = await dataRepository.getCustomers(region);
   
-  // Load carriers
   loadingProgress.update(3, "Loading carriers...");
   const carriers = await dataRepository.getCarriers(region);
   
-  // Load templates
   loadingProgress.update(4, "Loading templates...");
   const allTemplates = loadOrderTemplates();
   

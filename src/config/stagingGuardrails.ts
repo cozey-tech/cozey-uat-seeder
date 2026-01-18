@@ -22,8 +22,8 @@ const STAGING_SHOPIFY_PATTERNS = [
 ];
 
 export function assertStagingEnvironment(): void {
-  // If secrets came from AWS Secrets Manager, we trust them and skip pattern validation
-  // AWS Secrets Manager is a trusted source, so we assume the secrets are for the correct environment
+  // Trust AWS Secrets Manager: secrets are environment-specific and managed by infrastructure
+  // Pattern validation is only needed for local .env files where users might misconfigure
   if (areSecretsFromAws()) {
     return;
   }

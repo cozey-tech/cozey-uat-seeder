@@ -50,7 +50,6 @@ export class SeedShopifyOrdersUseCase {
     let totalActualCost = 0;
     const throttleStatuses: Array<{ currentlyAvailable: number; maximumAvailable: number }> = [];
 
-    // Phase 2: Batch variant lookup - extract all unique SKUs upfront
     const allSkus = new Set<string>();
     for (const orderInput of request.orders) {
       for (const lineItem of orderInput.lineItems) {
@@ -81,14 +80,13 @@ export class SeedShopifyOrdersUseCase {
       );
     }
 
-    // Track variant lookup cost if available (from service logging)
     totalApiCalls += variantLookupMetrics.apiCallCount;
 
-    // Phase 4: Process orders in parallel with controlled concurrency
-    // Start with 10 concurrent orders (adjust based on GraphQL cost limits)
-    // Cost-aware: Monitor throttle status and adjust if needed
+    // Limit concurrency to avoid GraphQL cost throttling
+    // 10 concurrent orders balances throughput with cost limits (typical order creation costs ~20-30 points)
     const CONCURRENT_ORDERS = 10;
-    const COST_THRESHOLD_LOW = 200; // If available cost drops below this, reduce concurrency
+    // If available cost drops below 200, we're approaching throttle limits - reduce concurrency to avoid 429 errors
+    const COST_THRESHOLD_LOW = 200;
     const limit = pLimit(CONCURRENT_ORDERS);
 
     Logger.info("Processing orders in parallel", {
@@ -98,16 +96,15 @@ export class SeedShopifyOrdersUseCase {
       costThresholdLow: COST_THRESHOLD_LOW,
     });
 
-    // Track errors for continue-on-error strategy
+    // Continue-on-error: collect failures but don't fail entire batch
+    // This allows partial success when some orders fail (e.g., invalid SKU, API errors)
     const errors: Array<{ orderIndex: number; customerEmail: string; error: Error }> = [];
 
-    // Process orders in parallel (operations within each order remain sequential)
     const orderPromises = request.orders.map((orderInput, orderIndex) =>
       limit(async () => {
         const orderStartTime = Date.now();
 
         try {
-        // Create draft order (variant map is now pre-fetched and passed in)
         const { result: draftOrderResult, metrics: createMetrics } = await this.measureOperation(
           "createDraftOrder",
           () =>
@@ -149,17 +146,11 @@ export class SeedShopifyOrdersUseCase {
           });
         }
 
-        // Note: Orders are created and marked as paid, but NOT fulfilled
-        // Fulfillment is not part of the seeding process
-
-        // Query order to get line item IDs
-        // Use the same tag format as when creating the order (truncated to 40 chars)
-        // Check if line items are available from completeDraftOrder response first
+        // Orders are created and marked as paid, but NOT fulfilled (not part of seeding)
         let lineItems: Array<{ lineItemId: string; sku: string }>;
         let queryMetrics: OperationMetrics;
 
         if (orderResult.lineItems && orderResult.lineItems.length > 0) {
-          // Line items are available in the completion response - no need to query!
           Logger.info("Line items available in draftOrderComplete response, skipping query", {
             orderId: orderResult.orderId,
             lineItemCount: orderResult.lineItems.length,
@@ -174,17 +165,16 @@ export class SeedShopifyOrdersUseCase {
             apiCallCount: 0, // Skipped
           };
         } else {
-          // Need to query for line items - use single order query (more efficient than querying all by tag)
+          // Query single order by ID (more efficient than querying all by tag)
+          // Avoids unnecessary cost when we only need one order's line items
           const { result: createdOrder, metrics: queryMetricsResult } = await this.measureOperation(
             "queryOrderById",
             () => this.shopifyService.queryOrderById(orderResult.orderId),
           );
           queryMetrics = queryMetricsResult;
 
-          // In dry-run mode, queryOrderById returns null, so construct from input
           if (!createdOrder) {
-            // This happens in dry-run mode - construct line items from input
-            // In normal mode, this would indicate a problem (order not found after creation)
+            // Dry-run mode: construct line items from input (normal mode would indicate order not found)
             Logger.warn("Order not found when querying by ID, constructing line items from input", {
               orderId: orderResult.orderId,
               batchId: request.batchId,
@@ -203,15 +193,12 @@ export class SeedShopifyOrdersUseCase {
 
         const orderDurationMs = Date.now() - orderStartTime;
 
-        // Record order metrics
-        // Note: variantLookup is batched, so all orders share the same metrics
-        // We divide the API call count by number of orders for per-order tracking
+        // variantLookup is batched, so divide API call count among orders for per-order tracking
         const perOrderVariantMetrics: OperationMetrics = {
           ...variantLookupMetrics,
-          apiCallCount: orderIndex === 0 ? variantLookupMetrics.apiCallCount : 0, // Only count once for first order
+          apiCallCount: orderIndex === 0 ? variantLookupMetrics.apiCallCount : 0,
         };
 
-          // Notify progress callback of success
           if (request.onOrderProgress) {
             request.onOrderProgress(orderIndex + 1, request.orders.length, orderInput.customer.email, true);
           }
@@ -235,7 +222,6 @@ export class SeedShopifyOrdersUseCase {
             },
           };
         } catch (error) {
-          // Continue-on-error strategy: collect errors, don't fail entire batch
           const errorMessage = error instanceof Error ? error.message : String(error);
           Logger.error("Failed to create Shopify order", error, {
             batchId: request.batchId,
@@ -264,7 +250,6 @@ export class SeedShopifyOrdersUseCase {
       }),
     );
 
-    // Wait for all orders to complete (successful or failed)
     const results = await Promise.all(orderPromises);
 
     // Separate successful orders from failures

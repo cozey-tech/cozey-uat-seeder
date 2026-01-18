@@ -1,8 +1,5 @@
 /**
- * Progress tracking utility for CLI operations
- *
- * Provides reusable progress tracking with time estimation and spinner support
- * for both CLI tools (seeding and config generator).
+ * Progress tracking utility with time estimation and spinner support for CLI operations.
  */
 
 import ora, { type Ora } from "ora";
@@ -16,9 +13,6 @@ export interface ProgressOptions {
    * Whether to show time estimates (default: true)
    */
   showTimeEstimate?: boolean;
-  /**
-   * Custom message format function
-   */
   formatMessage?: (current: number, total: number, message?: string) => string;
 }
 

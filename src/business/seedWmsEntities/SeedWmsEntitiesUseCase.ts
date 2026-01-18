@@ -166,7 +166,8 @@ export class SeedWmsEntitiesUseCase {
         shipmentId: shipments[shipments.length - 1]?.shipmentId,
       });
       } catch (error) {
-        // Continue-on-error strategy: collect errors, don't fail entire batch
+        // Continue-on-error: collect failures but don't fail entire batch
+        // Allows partial success when some orders fail (e.g., database constraints, missing SKUs)
         const errorMessage = error instanceof Error ? error.message : String(error);
         Logger.error("Failed to create WMS entities for order", error, {
           shopifyOrderId: shopifyOrder.shopifyOrderId,
