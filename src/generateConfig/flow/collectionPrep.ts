@@ -26,9 +26,7 @@ export interface CollectionPrepContext {
 /**
  * Configure collection preps based on builder mode
  */
-export async function configureCollectionPreps(
-  context: CollectionPrepContext,
-): Promise<{
+export async function configureCollectionPreps(context: CollectionPrepContext): Promise<{
   collectionPreps?: CollectionPrepConfig[];
   collectionPrepCount?: number;
   carrier?: Carrier;
@@ -41,7 +39,7 @@ export async function configureCollectionPreps(
     orderCount: orders.length,
     carrierCount: carriers.length,
   });
-  
+
   console.log();
   console.log(OutputFormatter.header("Collection Prep Configuration", "📋"));
   console.log(OutputFormatter.separator());
@@ -63,10 +61,7 @@ export async function configureCollectionPreps(
 
   if (builderMode === "bulk") {
     // Bulk collection prep creation mode
-    const bulkConfig = await promptService.promptBulkCollectionPrepConfig(
-      carriers,
-      orders.length,
-    );
+    const bulkConfig = await promptService.promptBulkCollectionPrepConfig(carriers, orders.length);
 
     // Group orders by locationId
     const ordersByLocation = new Map<string, number[]>();
@@ -118,9 +113,7 @@ export async function configureCollectionPreps(
     // Validate collection preps
     for (let i = 0; i < collectionPreps.length; i++) {
       const prep = collectionPreps[i];
-      const prepOrders = prep.orderIndices
-        ? prep.orderIndices.map((idx) => orders[idx])
-        : [];
+      const prepOrders = prep.orderIndices ? prep.orderIndices.map((idx) => orders[idx]) : [];
       const validation = validateCollectionPrep(
         i,
         prep.orderIndices || [],
@@ -131,23 +124,21 @@ export async function configureCollectionPreps(
         displayValidationIssues(validation.issues);
       }
     }
-    
+
     // Show allocation summary
     console.log();
     console.log(OutputFormatter.header("Bulk Collection Prep Summary", "📊"));
     console.log(OutputFormatter.separator());
     for (let i = 0; i < collectionPreps.length; i++) {
       const prep = collectionPreps[i];
-      const orderList = prep.orderIndices
-        ? prep.orderIndices.map((idx) => idx + 1).join(", ")
-        : "None";
+      const orderList = prep.orderIndices ? prep.orderIndices.map((idx) => idx + 1).join(", ") : "None";
       console.log(
         `   Prep ${i + 1}: ${prep.carrier.name} @ ${prep.locationId} - Orders: ${orderList} (${prep.orderIndices?.length || 0} orders)`,
       );
     }
     console.log(OutputFormatter.separator());
     console.log();
-    
+
     Logger.info("Bulk collection prep configuration complete", {
       prepCount: collectionPreps.length,
       totalOrders: orders.length,
@@ -182,9 +173,7 @@ export async function configureCollectionPreps(
       }
 
       // Get locationIds for selected orders
-      const selectedLocationIds = new Set(
-        selectedOrderIndices.map((idx) => orders[idx].locationId).filter(Boolean),
-      );
+      const selectedLocationIds = new Set(selectedOrderIndices.map((idx) => orders[idx].locationId).filter(Boolean));
 
       if (selectedLocationIds.size === 0) {
         throw new Error("Selected orders have no locationId");
@@ -217,9 +206,7 @@ export async function configureCollectionPreps(
     // Validate collection preps
     for (let i = 0; i < collectionPreps.length; i++) {
       const prep = collectionPreps[i];
-      const prepOrders = prep.orderIndices
-        ? prep.orderIndices.map((idx) => orders[idx])
-        : [];
+      const prepOrders = prep.orderIndices ? prep.orderIndices.map((idx) => orders[idx]) : [];
       const validation = validateCollectionPrep(
         i,
         prep.orderIndices || [],
@@ -230,23 +217,21 @@ export async function configureCollectionPreps(
         displayValidationIssues(validation.issues);
       }
     }
-    
+
     // Show allocation summary
     console.log();
     console.log(OutputFormatter.header("Collection Prep Allocation Summary", "📊"));
     console.log(OutputFormatter.separator());
     for (let i = 0; i < collectionPreps.length; i++) {
       const prep = collectionPreps[i];
-      const orderList = prep.orderIndices
-        ? prep.orderIndices.map((idx) => idx + 1).join(", ")
-        : "None";
+      const orderList = prep.orderIndices ? prep.orderIndices.map((idx) => idx + 1).join(", ") : "None";
       console.log(
         `   Prep ${i + 1}: ${prep.carrier.name} - Orders: ${orderList} (${prep.orderIndices?.length || 0} orders)`,
       );
     }
     console.log(OutputFormatter.separator());
     console.log();
-    
+
     Logger.info("Multiple collection prep configuration complete", {
       prepCount: collectionPreps.length,
       totalOrders: orders.length,

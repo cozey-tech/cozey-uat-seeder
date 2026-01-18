@@ -7,16 +7,19 @@ Project status: active development. Core seeder functionality is implemented and
 **2025-01-17:** Added section 3.5 "AI-Generated Documents & Agent Reference Information" with universal rule requiring all AI-generated reports to be saved to `ai-docs/` folder with plan name prefixes. This ensures proper separation between human-facing documentation (`docs/`) and AI-generated working notes (`ai-docs/`).
 
 ## 1) Purpose
+
 - This repository will hold a TypeScript-based seeder that creates coordinated Shopify staging orders and WMS staging entities for outbound compliance testing (collection prep + pick and pack).
 - Primary users: engineers and agents working on seeding and staging validation workflows.
 - Good changes are safe, idempotent, staging-only, and documented.
 
 ## Instruction Precedence
-1) `AGENTS.md` (this file)
-2) `ai-docs/` (scope and implementation references)
-3) `README.md`
+
+1. `AGENTS.md` (this file)
+2. `ai-docs/` (scope and implementation references)
+3. `README.md`
 
 ## 2) Quickstart (Verified Commands Only)
+
 - Install: `npm install`
 - Build: `npm run build`
 - Test: `npm run test`
@@ -34,6 +37,7 @@ Project status: active development. Core seeder functionality is implemented and
 ## 3) Repository Map
 
 **Source Code:**
+
 - `src/` - Main source code
   - `business/` - Business logic (handlers, use cases)
   - `config/` - Configuration (env, staging guardrails)
@@ -45,11 +49,13 @@ Project status: active development. Core seeder functionality is implemented and
   - `generateConfig.ts` - Interactive config generator
 
 **Configuration:**
+
 - `config/` - Configuration data files (customers, order templates)
 - `prisma/` - Prisma schema and migrations
 - `.env.example` - Environment variable template
 
 **Documentation:**
+
 - `docs/` - Human-facing documentation
 - `ai-docs/` - AI-only working notes (gitignored)
 - `README.md` - User-facing quickstart
@@ -57,6 +63,7 @@ Project status: active development. Core seeder functionality is implemented and
 - `CONTRIBUTING.md` - Contribution guidelines
 
 **Scripts:**
+
 - `scripts/` - Utility scripts
 
 ## 3.5) AI-Generated Documents & Agent Reference Information
@@ -64,14 +71,17 @@ Project status: active development. Core seeder functionality is implemented and
 **Universal Rule:** ALL AI-generated project files MUST be saved to the `ai-docs/` folder in the project root.
 
 **Documentation Separation:**
+
 - `docs/` → Human-facing documentation (for engineers, users, stakeholders)
 - `ai-docs/` → AI-generated files + AI reference information (gitignored, not in codebase)
 
 **Purpose of `ai-docs/`:**
+
 1. **AI-generated reports, review documents, and transient working notes** - All reports from review commands, audit commands, and analysis tools
 2. **Agent reference information** - Helpful information for AI agents to read and review that shouldn't be in the codebase
 
 **Naming Convention:**
+
 - Format: `{PLAN_NAME}_{TYPE}_REPORT.md` (e.g., `ai-docs-report-routing_CODE_REVIEW_REPORT.md`)
 - **Plan name is REQUIRED** in all report filenames to avoid conflicts when working on multiple plans
 - Plan name detection method:
@@ -83,6 +93,7 @@ Project status: active development. Core seeder functionality is implemented and
 - Include date/timestamp in filename if multiple versions are needed (e.g., `ai-docs-report-routing_CODE_REVIEW_REPORT_2025-01-17.md`)
 
 **Never save AI-generated files to:**
+
 - Repo root (except `AGENTS.md`)
 - `docs/` folder (reserved for human-facing documentation)
 - Any location that would be committed to git
@@ -90,12 +101,14 @@ Project status: active development. Core seeder functionality is implemented and
 **If `ai-docs/` doesn't exist, create it first** before saving any reports.
 
 ## 4) Architecture & Data
+
 - Orchestrator job runs end-to-end: seed Shopify orders first, then seed WMS entities using those orders.
 - Seed records must be tagged and safe to re-run; staging-only guardrails are required.
 - Prisma is selected for ORM; schema currently lives at `prisma/schema.prisma`.
 - Data model mappings documented in `docs/data-model.md`.
 
 ## 5) Engineering Conventions (Do / Don't)
+
 - Do follow the Cozey WMS coding conventions provided by Sam (TypeScript, clear naming, enums for string comparisons, avoid deep nesting).
 - Do validate all handler inputs with Zod; define per-use-case schemas and types.
 - Do follow CQRS typing: distinct types for commands, queries, and responses.
@@ -105,12 +118,14 @@ Project status: active development. Core seeder functionality is implemented and
 - Don't use async callbacks in `forEach`.
 
 ### Documentation Standards (Website Rebuild)
+
 - Every system/feature doc follows: Purpose, Context/Dependencies, How It Works, Edge Cases, Recent Changes, Related Documents.
 - Use clear H2/H3 headings, short paragraphs, tables for structured data, and minimal examples.
 - Include Primary Owner + Cross Reviewer and a “Last Updated” line on docs.
 - Keep docs living; update when behavior, ownership, or flows change.
 
 ## 6) Testing Strategy
+
 - **Test Runner:** Vitest (configured in `vitest.config.ts`)
 - **Test Location:** Tests live alongside source files (`*.test.ts` files)
 - **Coverage:** Configured with v8 provider, thresholds: 50% lines, 60% functions, 40% branches, 50% statements
@@ -118,6 +133,7 @@ Project status: active development. Core seeder functionality is implemented and
 - **Run Tests:** `npm run test` (run once), `npm run test:watch` (watch mode), `npm run test:coverage` (with coverage)
 
 ## 7) Tooling & Quality Gates
+
 - Lint: ESLint with `@cozey-tech/eslint-config` (`npm run lint`, `npm run lint:fix`)
 - Format: Prettier (`npm run format`, `npm run format:check`)
 - Typecheck: `tsc` (`npm run typecheck`)
@@ -127,18 +143,21 @@ Project status: active development. Core seeder functionality is implemented and
 - CI checks: To be added when CI workflows are configured
 
 ## 8) Git Workflow (Repo-Specific)
+
 - Branch naming: `chore/*`, `feat/*`, `fix/*`, `docs/*` (see [CONTRIBUTING.md](CONTRIBUTING.md) for details)
 - Commit style: Conventional Commits (see [CONTRIBUTING.md](CONTRIBUTING.md) for format)
 - Keep commits atomic; avoid force-push to `main`
 - See [CONTRIBUTING.md](CONTRIBUTING.md) for full workflow details
 
 ## 9) Security & Data Safety
+
 - Seeder must refuse to run unless connected to approved staging DBs and staging Shopify store.
 - Never log PII or secrets. Use test emails (e.g., `@example.com`) for Shopify orders.
 - No secrets in repo; add `.env.example` when env vars are known.
 - Database access must be via `DATABASE_URL` for Prisma.
 
 ## 10) Updating This File
+
 - Update `AGENTS.md` whenever tooling, scripts, architecture, or conventions change.
 - Replace TODOs with verified commands and links to source-of-truth files.
 

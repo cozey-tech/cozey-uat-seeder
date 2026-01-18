@@ -1,4 +1,8 @@
-import type { WmsRepository, CreateCollectionPrepRequest, ICollectionPrep } from "../repositories/interface/WmsRepository";
+import type {
+  WmsRepository,
+  CreateCollectionPrepRequest,
+  ICollectionPrep,
+} from "../repositories/interface/WmsRepository";
 import type { SeedConfig } from "../shared/types/SeedConfig";
 import { OrderType } from "../shared/enums/OrderType";
 import { PickType } from "../shared/enums/PickType";
@@ -22,7 +26,10 @@ export class CollectionPrepValidationError extends Error {
 export class CollectionPrepService {
   private readonly dryRun: boolean;
 
-  constructor(private readonly wmsRepository: WmsRepository, dryRun: boolean = false) {
+  constructor(
+    private readonly wmsRepository: WmsRepository,
+    dryRun: boolean = false,
+  ) {
     this.dryRun = dryRun;
   }
 
@@ -31,9 +38,7 @@ export class CollectionPrepService {
    * @returns Created collection prep entity
    * @throws WmsServiceError if database operation fails
    */
-  async createCollectionPrep(
-    request: CreateCollectionPrepRequest,
-  ): Promise<ICollectionPrep> {
+  async createCollectionPrep(request: CreateCollectionPrepRequest): Promise<ICollectionPrep> {
     if (this.dryRun) {
       const mockCollectionPrep: ICollectionPrep = {
         id: request.id,
@@ -94,9 +99,7 @@ export class CollectionPrepService {
     for (let i = 0; i < config.orders.length; i++) {
       const order = config.orders[i];
       if (order.orderType) {
-        const actualPickTypes = new Set(
-          order.lineItems.map((item) => item.pickType),
-        );
+        const actualPickTypes = new Set(order.lineItems.map((item) => item.pickType));
 
         if (order.orderType === OrderType.RegularOnly) {
           const hasPnpItems = actualPickTypes.has(PickType.PickAndPack);

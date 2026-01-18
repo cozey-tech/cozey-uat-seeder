@@ -30,9 +30,7 @@ export class CreateCollectionPrepUseCase {
     region: string,
   ): Promise<string> {
     // Get carrier name from enum
-    const carrier = carriers.find(
-      (c) => c.code.toLowerCase() === carrierId.toLowerCase(),
-    );
+    const carrier = carriers.find((c) => c.code.toLowerCase() === carrierId.toLowerCase());
 
     if (!carrier) {
       throw new Error(`Carrier ${carrierId} not found in carriers enum`);
@@ -89,12 +87,9 @@ export class CreateCollectionPrepUseCase {
 
   async execute(request: CreateCollectionPrepRequest): Promise<CreateCollectionPrepResponse> {
     // Use pre-generated collection prep name if provided, otherwise generate it
-    const collectionPrepId = request.collectionPrepName || await this.generateCollectionPrepName(
-      request.testTag,
-      request.carrier,
-      request.locationId,
-      request.region,
-    );
+    const collectionPrepId =
+      request.collectionPrepName ||
+      (await this.generateCollectionPrepName(request.testTag, request.carrier, request.locationId, request.region));
 
     const collectionPrep = await this.collectionPrepService.createCollectionPrep({
       id: collectionPrepId,

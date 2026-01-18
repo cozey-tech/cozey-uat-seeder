@@ -82,9 +82,7 @@ describe("Seeder Integration", () => {
       vi.mocked(mockShopifyService.queryOrderById).mockResolvedValue({
         orderId: "gid://shopify/Order/456",
         orderNumber: "#1001",
-        lineItems: [
-          { lineItemId: "line-1", sku: "SKU-001", quantity: 2 },
-        ],
+        lineItems: [{ lineItemId: "line-1", sku: "SKU-001", quantity: 2 }],
       });
 
       const shopifyRequest = {

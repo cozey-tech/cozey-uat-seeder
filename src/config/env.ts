@@ -124,11 +124,7 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
 
       if (rawAwsSecrets) {
         // Transform secret names to env var names (for plain string secrets)
-        awsSecrets = transformAwsSecrets(
-          rawAwsSecrets,
-          awsConfig.databaseSecretName,
-          awsConfig.shopifySecretName,
-        );
+        awsSecrets = transformAwsSecrets(rawAwsSecrets, awsConfig.databaseSecretName, awsConfig.shopifySecretName);
         secretsFromAws = true;
         Logger.info("Loaded secrets from AWS Secrets Manager", {
           secretCount: Object.keys(awsSecrets).length,
@@ -158,8 +154,7 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
     const missingVars = rawResult.error.errors.map((err) => err.path.join(".")).join(", ");
     const sources = awsSecrets ? "AWS Secrets Manager and .env files" : ".env files";
     throw new Error(
-      `Missing or invalid required environment variables: ${missingVars}. ` +
-        `Please check your ${sources}.`,
+      `Missing or invalid required environment variables: ${missingVars}. ` + `Please check your ${sources}.`,
     );
   }
 
@@ -216,8 +211,7 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
     const missingVars = result.error.errors.map((err) => err.path.join(".")).join(", ");
     const sources = awsSecrets ? "AWS Secrets Manager and .env files" : ".env files";
     throw new Error(
-      `Missing or invalid required environment variables: ${missingVars}. ` +
-        `Please check your ${sources}.`,
+      `Missing or invalid required environment variables: ${missingVars}. ` + `Please check your ${sources}.`,
     );
   }
 
@@ -239,8 +233,7 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
 export function getEnvConfig(): EnvConfig {
   if (!isInitialized || !cachedConfig) {
     throw new Error(
-      "Environment configuration not initialized. " +
-        "Call initializeEnvConfig() before using getEnvConfig().",
+      "Environment configuration not initialized. " + "Call initializeEnvConfig() before using getEnvConfig().",
     );
   }
 

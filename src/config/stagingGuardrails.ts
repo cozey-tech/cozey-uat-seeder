@@ -39,9 +39,7 @@ export function assertStagingEnvironment(): void {
   }
 
   // Check Shopify domain
-  const isStagingShopify = STAGING_SHOPIFY_PATTERNS.some((pattern) =>
-    pattern.test(config.SHOPIFY_STORE_DOMAIN),
-  );
+  const isStagingShopify = STAGING_SHOPIFY_PATTERNS.some((pattern) => pattern.test(config.SHOPIFY_STORE_DOMAIN));
   if (!isStagingShopify) {
     throw new StagingGuardrailError(
       `Shopify domain does not match staging patterns. Detected: ${config.SHOPIFY_STORE_DOMAIN}`,
@@ -66,9 +64,7 @@ export function displayStagingEnvironment(): {
   }
 
   const isStagingDb = STAGING_DB_PATTERNS.some((pattern) => pattern.test(config.DATABASE_URL));
-  const isStagingShopify = STAGING_SHOPIFY_PATTERNS.some((pattern) =>
-    pattern.test(config.SHOPIFY_STORE_DOMAIN),
-  );
+  const isStagingShopify = STAGING_SHOPIFY_PATTERNS.some((pattern) => pattern.test(config.SHOPIFY_STORE_DOMAIN));
 
   return {
     databaseUrl: maskUrl(config.DATABASE_URL),
@@ -77,9 +73,7 @@ export function displayStagingEnvironment(): {
   };
 }
 
-export async function requireExplicitStagingConfirmation(
-  skipConfirmation: boolean = false,
-): Promise<void> {
+export async function requireExplicitStagingConfirmation(skipConfirmation: boolean = false): Promise<void> {
   if (skipConfirmation) {
     return;
   }

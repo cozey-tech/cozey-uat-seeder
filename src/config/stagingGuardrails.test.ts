@@ -1,6 +1,10 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 
-import { assertStagingEnvironment, displayStagingEnvironment, requireExplicitStagingConfirmation } from "./stagingGuardrails";
+import {
+  assertStagingEnvironment,
+  displayStagingEnvironment,
+  requireExplicitStagingConfirmation,
+} from "./stagingGuardrails";
 import { StagingGuardrailError } from "../shared/errors/StagingGuardrailError";
 
 // Mock the env module

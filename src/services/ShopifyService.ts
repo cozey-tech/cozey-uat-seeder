@@ -54,7 +54,10 @@ export interface OrderQueryResult {
 }
 
 export class ShopifyServiceError extends Error {
-  constructor(message: string, public readonly userErrors?: Array<{ message: string; field?: string[] }>) {
+  constructor(
+    message: string,
+    public readonly userErrors?: Array<{ message: string; field?: string[] }>,
+  ) {
     super(message);
     this.name = "ShopifyServiceError";
     Object.setPrototypeOf(this, ShopifyServiceError.prototype);
@@ -166,12 +169,10 @@ export class ShopifyService {
     const prefix = "seed_batch_id:";
     const maxTagLength = 40;
     const maxBatchIdLength = maxTagLength - prefix.length;
-    
+
     // Truncate batchId if needed to fit within 40 character limit
-    const truncatedBatchId = batchId.length > maxBatchIdLength 
-      ? batchId.substring(0, maxBatchIdLength)
-      : batchId;
-    
+    const truncatedBatchId = batchId.length > maxBatchIdLength ? batchId.substring(0, maxBatchIdLength) : batchId;
+
     return `${prefix}${truncatedBatchId}`;
   }
 
@@ -253,19 +254,17 @@ export class ShopifyService {
         .filter((item) => item !== null && item !== undefined);
 
       const countryCode = region === "US" ? "US" : "CA";
-      
-      const shippingAddress = input.customer.address &&
-        input.customer.city &&
-        input.customer.province &&
-        input.customer.postalCode
-        ? {
-            address1: input.customer.address,
-            city: input.customer.city,
-            province: input.customer.province,
-            zip: input.customer.postalCode,
-            country: countryCode,
-          }
-        : undefined;
+
+      const shippingAddress =
+        input.customer.address && input.customer.city && input.customer.province && input.customer.postalCode
+          ? {
+              address1: input.customer.address,
+              city: input.customer.city,
+              province: input.customer.province,
+              zip: input.customer.postalCode,
+              country: countryCode,
+            }
+          : undefined;
 
       let note = `WMS Seed Order - Batch: ${batchId}`;
       if (collectionPrepName) {
@@ -336,7 +335,9 @@ export class ShopifyService {
       if (error instanceof ShopifyServiceError) {
         throw error;
       }
-      throw new ShopifyServiceError(`Failed to create draft order: ${error instanceof Error ? error.message : String(error)}`);
+      throw new ShopifyServiceError(
+        `Failed to create draft order: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -402,11 +403,13 @@ export class ShopifyService {
       }
 
       // Extract line items if available in the response
-      const lineItems = order.lineItems?.edges?.map((edge: { node: { id: string; sku: string; quantity: number } }) => ({
-        lineItemId: edge.node.id,
-        sku: edge.node.sku || "",
-        quantity: edge.node.quantity,
-      }));
+      const lineItems = order.lineItems?.edges?.map(
+        (edge: { node: { id: string; sku: string; quantity: number } }) => ({
+          lineItemId: edge.node.id,
+          sku: edge.node.sku || "",
+          quantity: edge.node.quantity,
+        }),
+      );
 
       return {
         orderId: order.id,
@@ -418,7 +421,9 @@ export class ShopifyService {
       if (error instanceof ShopifyServiceError) {
         throw error;
       }
-      throw new ShopifyServiceError(`Failed to complete draft order: ${error instanceof Error ? error.message : String(error)}`);
+      throw new ShopifyServiceError(
+        `Failed to complete draft order: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -458,10 +463,10 @@ export class ShopifyService {
     try {
       // Get order line items and fulfillments
       const orderResponse = await this.client.request(queryOrder, { variables: { id: orderId } });
-      
-      const graphQLErrors = orderResponse.errors?.graphQLErrors || 
-                            (Array.isArray(orderResponse.errors) ? orderResponse.errors : []);
-      
+
+      const graphQLErrors =
+        orderResponse.errors?.graphQLErrors || (Array.isArray(orderResponse.errors) ? orderResponse.errors : []);
+
       if (graphQLErrors.length > 0) {
         Logger.error("GraphQL errors when querying order", undefined, {
           orderId,
@@ -471,11 +476,11 @@ export class ShopifyService {
           `Failed to query order: ${graphQLErrors.map((e: { message: string }) => e.message).join(", ")}`,
         );
       }
-      
+
       if (!orderResponse.data?.order) {
         throw new ShopifyServiceError(`Order ${orderId} not found`);
       }
-      
+
       const order = orderResponse.data.order;
 
       const existingFulfillments = order.fulfillments || [];
@@ -533,9 +538,9 @@ export class ShopifyService {
 
       const response = await this.client.request(mutation, { variables });
 
-      const fulfillmentGraphQLErrors = response.errors?.graphQLErrors || 
-                                       (Array.isArray(response.errors) ? response.errors : []);
-      
+      const fulfillmentGraphQLErrors =
+        response.errors?.graphQLErrors || (Array.isArray(response.errors) ? response.errors : []);
+
       if (fulfillmentGraphQLErrors.length > 0) {
         Logger.error("GraphQL errors when creating fulfillment", undefined, {
           orderId,
@@ -577,7 +582,9 @@ export class ShopifyService {
       if (error instanceof ShopifyServiceError) {
         throw error;
       }
-      throw new ShopifyServiceError(`Failed to fulfill order: ${error instanceof Error ? error.message : String(error)}`);
+      throw new ShopifyServiceError(
+        `Failed to fulfill order: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -632,7 +639,9 @@ export class ShopifyService {
         })),
       };
     } catch (error) {
-      throw new ShopifyServiceError(`Failed to query order by ID: ${error instanceof Error ? error.message : String(error)}`);
+      throw new ShopifyServiceError(
+        `Failed to query order by ID: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -678,17 +687,27 @@ export class ShopifyService {
       this.logGraphQLCostIfPresent("queryOrdersByTag", response, { tag });
 
       const orders = response.data?.orders?.edges || [];
-      return orders.map((edge: { node: { id: string; name: string; lineItems: { edges: Array<{ node: { id: string; sku: string; quantity: number } }> } } }) => ({
-        orderId: edge.node.id,
-        orderNumber: edge.node.name || "",
-        lineItems: edge.node.lineItems.edges.map((itemEdge) => ({
-          lineItemId: itemEdge.node.id,
-          sku: itemEdge.node.sku || "",
-          quantity: itemEdge.node.quantity,
-        })),
-      }));
+      return orders.map(
+        (edge: {
+          node: {
+            id: string;
+            name: string;
+            lineItems: { edges: Array<{ node: { id: string; sku: string; quantity: number } }> };
+          };
+        }) => ({
+          orderId: edge.node.id,
+          orderNumber: edge.node.name || "",
+          lineItems: edge.node.lineItems.edges.map((itemEdge) => ({
+            lineItemId: itemEdge.node.id,
+            sku: itemEdge.node.sku || "",
+            quantity: itemEdge.node.quantity,
+          })),
+        }),
+      );
     } catch (error) {
-      throw new ShopifyServiceError(`Failed to query orders by tag: ${error instanceof Error ? error.message : String(error)}`);
+      throw new ShopifyServiceError(
+        `Failed to query orders by tag: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -752,7 +771,9 @@ export class ShopifyService {
 
       return variantMap;
     } catch (error) {
-      throw new ShopifyServiceError(`Failed to find variants by SKUs: ${error instanceof Error ? error.message : String(error)}`);
+      throw new ShopifyServiceError(
+        `Failed to find variants by SKUs: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

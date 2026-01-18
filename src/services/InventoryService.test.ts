@@ -100,12 +100,7 @@ describe("InventoryService", () => {
       // Create quantity map (defaults to 1 if not provided)
       const variantQuantities = new Map([["SOFA-001-BLK", 1]]);
 
-      const result = await service.checkInventoryAvailability(
-        variants,
-        "langley",
-        "CA",
-        variantQuantities,
-      );
+      const result = await service.checkInventoryAvailability(variants, "langley", "CA", variantQuantities);
 
       expect(result.sufficient).toBe(true);
       expect(result.shortages).toHaveLength(0);
@@ -164,12 +159,7 @@ describe("InventoryService", () => {
 
       const variantQuantities = new Map([["SOFA-001-BLK", 1]]);
 
-      const result = await service.checkInventoryAvailability(
-        variants,
-        "langley",
-        "CA",
-        variantQuantities,
-      );
+      const result = await service.checkInventoryAvailability(variants, "langley", "CA", variantQuantities);
 
       expect(result.sufficient).toBe(false);
       expect(result.shortages.length).toBeGreaterThan(0);
@@ -211,12 +201,7 @@ describe("InventoryService", () => {
 
       const variantQuantities = new Map([["SOFA-001-BLK", 1]]);
 
-      const result = await service.checkInventoryAvailability(
-        variants,
-        "langley",
-        "CA",
-        variantQuantities,
-      );
+      const result = await service.checkInventoryAvailability(variants, "langley", "CA", variantQuantities);
 
       expect(result.sufficient).toBe(false);
       expect(result.shortages[0].available).toBe(0);
@@ -268,12 +253,7 @@ describe("InventoryService", () => {
       // Order quantity is 3, so need 2 parts * 3 quantity = 6 parts
       const variantQuantities = new Map([["SOFA-001-BLK", 3]]);
 
-      const result = await service.checkInventoryAvailability(
-        variants,
-        "langley",
-        "CA",
-        variantQuantities,
-      );
+      const result = await service.checkInventoryAvailability(variants, "langley", "CA", variantQuantities);
 
       // Need 6, have 5, so insufficient
       expect(result.sufficient).toBe(false);
@@ -334,9 +314,7 @@ describe("InventoryService", () => {
         SHOPIFY_API_VERSION: "2024-01",
       } as ReturnType<typeof getEnvConfig>);
 
-      await expect(
-        service.modifyInventory("part-1", "langley", "CA", 10),
-      ).rejects.toThrow("only allowed in staging");
+      await expect(service.modifyInventory("part-1", "langley", "CA", 10)).rejects.toThrow("only allowed in staging");
     });
   });
 
@@ -404,7 +382,7 @@ describe("InventoryService", () => {
       // Should calculate: (2 + 3) * 1 = 5 parts needed
       // Have 10, so sufficient
       expect(result.sufficient).toBe(true);
-      
+
       // Verify that variantPart.findMany was called with batched query (for pickType lookup)
       expect(mockPrisma.variantPart.findMany).toHaveBeenCalledWith(
         expect.objectContaining({

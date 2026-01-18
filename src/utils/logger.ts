@@ -136,7 +136,7 @@ export class Logger {
   static startOperation(operation: string, context?: LogContext): string {
     const operationId = `${operation}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
     const startTime = Date.now();
-    
+
     activeOperations.set(operationId, {
       operationId,
       operation,
@@ -247,11 +247,7 @@ export class Logger {
    * @param context - Optional context
    * @returns Result of the function
    */
-  static async trackOperation<T>(
-    operation: string,
-    fn: () => Promise<T>,
-    context?: LogContext,
-  ): Promise<T> {
+  static async trackOperation<T>(operation: string, fn: () => Promise<T>, context?: LogContext): Promise<T> {
     const operationId = this.startOperation(operation, context);
     try {
       const result = await fn();

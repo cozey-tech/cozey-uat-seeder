@@ -95,15 +95,12 @@ export class AwsSecretsService {
         errorMessage.includes("InvalidClientTokenId") ||
         errorMessage.includes("SignatureDoesNotMatch")
       ) {
-        Logger.error(
-          "AWS credentials error - check your credentials or profile configuration",
-          error,
-          {
-            secretName,
-            hint: "Verify AWS credentials are valid and not expired. " +
-              "If using profiles, ensure AWS_PROFILE is set correctly.",
-          },
-        );
+        Logger.error("AWS credentials error - check your credentials or profile configuration", error, {
+          secretName,
+          hint:
+            "Verify AWS credentials are valid and not expired. " +
+            "If using profiles, ensure AWS_PROFILE is set correctly.",
+        });
       } else {
         // Other errors (network, permissions, etc.)
         Logger.warn("Failed to fetch secret from AWS, will fallback to .env", {
@@ -134,9 +131,7 @@ export class AwsSecretsService {
     });
 
     // Fetch all secrets in parallel
-    const results = await Promise.allSettled(
-      secretNames.map((secretName) => this.fetchSecret(secretName)),
-    );
+    const results = await Promise.allSettled(secretNames.map((secretName) => this.fetchSecret(secretName)));
 
     // Merge successful results
     const merged: Record<string, unknown> = {};

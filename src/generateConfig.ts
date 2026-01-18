@@ -69,11 +69,7 @@ async function main(): Promise<void> {
       const compositionBuilder = new OrderCompositionBuilder(promptService);
       const generatorService = new ConfigGeneratorService(prisma);
       const dataValidationService = new DataValidationService(prisma);
-      const validationService = new ConfigValidationService(
-        prisma,
-        dataRepository,
-        dataValidationService,
-      );
+      const validationService = new ConfigValidationService(prisma, dataRepository, dataValidationService);
       const inventoryService = new InventoryService(prisma);
 
       // Prompt for region if not provided
@@ -82,7 +78,7 @@ async function main(): Promise<void> {
       // Load reference data
       const { data: referenceData, loadTime } = await loadReferenceData(dataRepository, region);
       performanceMetrics.referenceDataLoadTime = loadTime;
-      
+
       let { variants, customers, carriers, templates, locationsCache } = referenceData;
 
       // Create orders
@@ -103,12 +99,12 @@ async function main(): Promise<void> {
           skipSaveTemplate: options.skipSaveTemplate,
         },
       );
-      
+
       // Update templates if new ones were saved
       if (orderCreationResult.updatedTemplates) {
         templates = orderCreationResult.updatedTemplates;
       }
-      
+
       let { orders, inventoryChecks } = orderCreationResult;
       performanceMetrics.orderCreationTime = Date.now() - orderCreationStart;
 
@@ -154,7 +150,8 @@ async function main(): Promise<void> {
         testTag: collectionPrepResult.testTag,
       });
 
-      performanceMetrics.collectionPrepCount = seedConfig.collectionPreps?.length || (seedConfig.collectionPrep ? 1 : 0);
+      performanceMetrics.collectionPrepCount =
+        seedConfig.collectionPreps?.length || (seedConfig.collectionPrep ? 1 : 0);
       if (seedConfig.collectionPreps && seedConfig.collectionPreps.length > 1) {
         performanceMetrics.parallelOperations = seedConfig.collectionPreps.length;
       }
@@ -167,15 +164,15 @@ async function main(): Promise<void> {
         orderCount: seedConfig.orders.length,
         hasCollectionPrep: !!seedConfig.collectionPrep || (seedConfig.collectionPreps?.length ?? 0) > 0,
       });
-      
+
       console.log(OutputFormatter.info("Validating configuration..."));
-      
+
       // Get incremental validation summary
       const incrementalValidation = getValidationSummary(
         orders.map((o) => ({ composition: o.composition })),
         variants,
       );
-      
+
       if (incrementalValidation.errorCount > 0) {
         console.error();
         console.error(OutputFormatter.error("Incremental validation found errors:"));
@@ -190,10 +187,10 @@ async function main(): Promise<void> {
           warningCount: incrementalValidation.warningCount,
         });
       }
-      
+
       const validationResult = await validationService.validateFull(seedConfig);
       performanceMetrics.validationTime = Date.now() - validationStart;
-      
+
       Logger.endOperation(validationOperationId, validationResult.valid, {
         errorCount: validationResult.errors.length,
         warningCount: validationResult.warnings.length,
@@ -222,7 +219,7 @@ async function main(): Promise<void> {
           warningCount: validationResult.warnings.length,
         });
       }
-      
+
       // Prevent saving if there are critical errors from incremental validation
       if (incrementalValidation.errorCount > 0 && !options.dryRun) {
         console.error();
@@ -241,22 +238,24 @@ async function main(): Promise<void> {
         const summaryItems: Array<{ label: string; value: string | number }> = [
           { label: "Orders", value: seedConfig.orders.length },
         ];
-        
+
         if (seedConfig.collectionPreps && seedConfig.collectionPreps.length > 0) {
           summaryItems.push({ label: "Collection Preps", value: seedConfig.collectionPreps.length });
         } else if (seedConfig.collectionPrep) {
-          summaryItems.push({ 
-            label: "Collection Prep", 
+          summaryItems.push({
+            label: "Collection Prep",
             value: `${seedConfig.collectionPrep.carrier} at ${seedConfig.collectionPrep.locationId}`,
           });
         }
-        
+
         console.log();
-        console.log(OutputFormatter.summary({
-          title: OutputFormatter.success("Config Generation Complete!"),
-          items: summaryItems,
-        }));
-        
+        console.log(
+          OutputFormatter.summary({
+            title: OutputFormatter.success("Config Generation Complete!"),
+            items: summaryItems,
+          }),
+        );
+
         displayPerformanceSummary(performanceMetrics);
       }
     } finally {
@@ -270,10 +269,7 @@ async function main(): Promise<void> {
         console.error(`Stack trace:\n${error.stack}\n`);
       }
     } else {
-      const formattedError = ErrorFormatter.formatAsString(
-        new Error(String(error)),
-        { step: "Config generation" },
-      );
+      const formattedError = ErrorFormatter.formatAsString(new Error(String(error)), { step: "Config generation" });
       console.error(`\n${formattedError}\n`);
     }
     process.exit(1);
@@ -282,10 +278,9 @@ async function main(): Promise<void> {
 
 // Run main function
 main().catch((error) => {
-  const formattedError = ErrorFormatter.formatAsString(
-    error instanceof Error ? error : new Error(String(error)),
-    { step: "Config generation" },
-  );
+  const formattedError = ErrorFormatter.formatAsString(error instanceof Error ? error : new Error(String(error)), {
+    step: "Config generation",
+  });
   console.error(`\n${formattedError}\n`);
   process.exit(1);
 });

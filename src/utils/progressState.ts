@@ -70,12 +70,12 @@ function getProgressStatePath(batchId: string): string {
  */
 export function saveProgressState(state: ProgressState): void {
   const stateDir = getProgressStateDir();
-  
+
   // Ensure directory exists
   if (!existsSync(stateDir)) {
     mkdirSync(stateDir, { recursive: true });
   }
-  
+
   const filePath = getProgressStatePath(state.batchId);
   writeFileSync(filePath, JSON.stringify(state, null, 2), "utf-8");
 }
@@ -85,11 +85,11 @@ export function saveProgressState(state: ProgressState): void {
  */
 export function loadProgressState(batchId: string): ProgressState | null {
   const filePath = getProgressStatePath(batchId);
-  
+
   if (!existsSync(filePath)) {
     return null;
   }
-  
+
   try {
     const content = readFileSync(filePath, "utf-8");
     return JSON.parse(content) as ProgressState;
@@ -105,13 +105,15 @@ export function loadProgressState(batchId: string): ProgressState | null {
  */
 export function deleteProgressState(batchId: string): void {
   const filePath = getProgressStatePath(batchId);
-  
+
   if (existsSync(filePath)) {
     try {
       unlinkSync(filePath);
     } catch (error) {
       // Ignore errors when deleting (file might not exist or be locked)
-      console.warn(`Warning: Could not delete progress state file: ${error instanceof Error ? error.message : String(error)}`);
+      console.warn(
+        `Warning: Could not delete progress state file: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }
@@ -121,13 +123,13 @@ export function deleteProgressState(batchId: string): void {
  */
 export function listProgressStates(): Array<{ batchId: string; timestamp: number }> {
   const stateDir = getProgressStateDir();
-  
+
   if (!existsSync(stateDir)) {
     return [];
   }
-  
+
   const files = readdirSync(stateDir).filter((f: string) => f.endsWith(".json"));
-  
+
   return files
     .map((file: string) => {
       const batchId = file.replace(".json", "");
@@ -143,6 +145,9 @@ export function listProgressStates(): Array<{ batchId: string; timestamp: number
         return null;
       }
     })
-    .filter((item: { batchId: string; timestamp: number } | null): item is { batchId: string; timestamp: number } => item !== null)
+    .filter(
+      (item: { batchId: string; timestamp: number } | null): item is { batchId: string; timestamp: number } =>
+        item !== null,
+    )
     .sort((a: { timestamp: number }, b: { timestamp: number }) => b.timestamp - a.timestamp);
 }

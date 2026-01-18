@@ -5,6 +5,7 @@ Seeder for Shopify staging orders and WMS staging entities to support repeatable
 ## Overview
 
 This tool creates coordinated test data across two systems:
+
 1. **Shopify**: Staging orders via Admin GraphQL API
 2. **WMS Database**: Warehouse entities (orders, preps, collection preps, pick-and-pack items)
 
@@ -23,6 +24,7 @@ The seeder is **staging-only** and includes hard-coded guardrails to prevent exe
 This project requires Node.js 20.13.0. We recommend using [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager) to manage Node versions.
 
 **Install nvm** (if not already installed):
+
 ```bash
 # macOS/Linux
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
@@ -32,6 +34,7 @@ brew install nvm
 ```
 
 **Use the correct Node version:**
+
 ```bash
 # Install Node 20.13.0 (if not already installed)
 nvm install 20.13.0
@@ -60,10 +63,12 @@ The seeder supports two methods for loading configuration:
 By default, the seeder attempts to fetch secrets from AWS Secrets Manager with automatic fallback to `.env` files. This is ideal when running in AWS environments (EC2, ECS, Lambda, etc.).
 
 **AWS Secrets:**
+
 - `dev/uat-database-url`: Contains `DATABASE_URL`
 - `dev/shopify-access-token`: Contains `SHOPIFY_ACCESS_TOKEN`, `SHOPIFY_STORE_DOMAIN`, and optionally `SHOPIFY_API_VERSION`
 
 **Configuration options:**
+
 - `USE_AWS_SECRETS`: Enable/disable AWS secrets (default: `true`)
 - `AWS_REGION`: AWS region (default: `us-east-1`). **Important:** Check your secret ARNs in AWS Secrets Manager to determine the correct region (e.g., if ARN contains `us-east-2`, set `AWS_REGION=us-east-2`)
 - `AWS_PROFILE`: AWS profile name from `~/.aws/credentials` (optional, defaults to "default" profile)
@@ -71,12 +76,14 @@ By default, the seeder attempts to fetch secrets from AWS Secrets Manager with a
 - `AWS_SHOPIFY_SECRET_NAME`: Custom Shopify secret name (default: `dev/shopify-access-token`)
 
 **AWS Credentials:** The seeder automatically detects AWS credentials from:
+
 1. Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
 2. AWS IAM role (when running in AWS)
 3. AWS credentials file (`~/.aws/credentials`) - specify profile via `AWS_PROFILE`
 4. Default credential provider chain
 
 **Multiple AWS Profiles:** If you have multiple profiles in `~/.aws/credentials`, set `AWS_PROFILE` to select which profile to use:
+
 ```bash
 # Use the "dev" profile from ~/.aws/credentials
 AWS_PROFILE=dev npm run seed config.json
@@ -87,6 +94,7 @@ AWS_PROFILE=dev npm run seed config.json
 For local development or when AWS is unavailable, use `.env` files:
 
 1. Copy `.env.example` to `.env`:
+
    ```bash
    cp .env.example .env
    ```
@@ -106,11 +114,13 @@ For local development or when AWS is unavailable, use `.env` files:
 1. Create a configuration file (JSON format). See [Configuration Format](#configuration-format) below.
 
 2. Run the seeder:
+
    ```bash
    npm run seed <config-file.json>
    ```
 
    Example:
+
    ```bash
    npm run seed examples/seed-config.json
    ```
@@ -132,6 +142,7 @@ npm run seed config.json --validate
 ```
 
 **Output:**
+
 ```
 ✅ Configuration file validation passed
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -153,6 +164,7 @@ npm run seed config.json --dry-run
 ```
 
 **Output:**
+
 ```
 🔍 DRY RUN MODE - No changes will be made
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -183,6 +195,7 @@ npm run seed config.json --dry-run
 #### `--resume` Flag
 
 Resume a previously failed seeding operation by batch ID. The seeder will:
+
 - Load progress state from the previous run
 - Skip orders that were successfully created
 - Retry only failed orders
@@ -193,6 +206,7 @@ npm run seed -- --resume <batch-id>
 ```
 
 **Example:**
+
 ```bash
 # First run fails after creating 5 of 10 orders
 npm run seed config.json
@@ -317,6 +331,7 @@ src/
 ### Progress Tracking
 
 The seeder provides real-time progress feedback:
+
 - **Step-level progress**: Shows progress for each major step (Shopify orders, WMS entities, collection prep)
 - **Order-by-order progress**: Real-time updates as each order is processed
 - **Time estimates**: Estimated time remaining based on current progress
@@ -325,6 +340,7 @@ The seeder provides real-time progress feedback:
 ### Error Handling
 
 All errors include:
+
 - **Actionable messages**: Clear description of what went wrong
 - **Recovery suggestions**: Specific steps to fix the issue
 - **Context information**: Relevant details (SKU, order index, etc.)
@@ -333,6 +349,7 @@ All errors include:
 ### Output Formatting
 
 Consistent, readable output:
+
 - **Structured summaries**: Key-value pairs for easy scanning
 - **Visual separators**: Clear section boundaries
 - **Status indicators**: Emoji-based status (✅ success, ❌ error, ⚠️ warning)
@@ -347,6 +364,7 @@ This error occurs if `getEnvConfig()` is called before `initializeEnvConfig()`. 
 ### "Staging Guardrail Violation" Error
 
 The tool detected a production environment. Check:
+
 - `DATABASE_URL` contains staging patterns (staging, stage, test, dev, uat)
 - `SHOPIFY_STORE_DOMAIN` contains staging patterns or ends with `.myshopify.com`
 
@@ -385,12 +403,14 @@ If you're experiencing issues with AWS Secrets Manager:
 ### "Missing SKUs in WMS" Error
 
 The configuration references SKUs that don't exist in the WMS database. Verify:
+
 - SKUs are correct and exist in the staging WMS database
 - Region matches the database region
 
 ### "Configuration file validation failed" Error
 
 The JSON configuration file doesn't match the expected schema. Check:
+
 - JSON syntax is valid
 - All required fields are present
 - Field types match (e.g., quantities are numbers, not strings)

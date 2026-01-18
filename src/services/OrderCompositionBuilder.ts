@@ -30,10 +30,7 @@ export class OrderCompositionBuilder {
    * Allows user to modify quantities or add/remove items
    * Uses pickType from the variant (database) rather than template to ensure consistency
    */
-  async buildFromTemplate(
-    template: OrderTemplate,
-    variants: Variant[],
-  ): Promise<OrderComposition> {
+  async buildFromTemplate(template: OrderTemplate, variants: Variant[]): Promise<OrderComposition> {
     // Create a map of SKU to variant for quick lookup
     const variantMap = new Map<string, Variant>();
     for (const variant of variants) {
@@ -56,10 +53,7 @@ export class OrderCompositionBuilder {
     // Allow user to modify
     let done = false;
     while (!done) {
-      const shouldModify = await this.promptService.promptConfirm(
-        "Would you like to modify this order?",
-        false,
-      );
+      const shouldModify = await this.promptService.promptConfirm("Would you like to modify this order?", false);
 
       if (!shouldModify) {
         done = true;

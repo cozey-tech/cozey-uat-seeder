@@ -30,7 +30,10 @@ export class WmsServiceError extends Error {
 export class WmsService {
   private readonly dryRun: boolean;
 
-  constructor(public readonly repository: WmsRepository, dryRun: boolean = false) {
+  constructor(
+    public readonly repository: WmsRepository,
+    dryRun: boolean = false,
+  ) {
     this.dryRun = dryRun;
   }
 
@@ -312,11 +315,7 @@ export class WmsService {
     return results;
   }
 
-  async createShipmentForOrder(
-    collectionPrepId: string,
-    orderId: string,
-    region: string,
-  ): Promise<string> {
+  async createShipmentForOrder(collectionPrepId: string, orderId: string, region: string): Promise<string> {
     if (this.dryRun) {
       const shipmentId = uuidv4();
       Logger.info("DRY RUN: Would create shipment", {
@@ -388,9 +387,7 @@ export class WmsService {
     return boxIds;
   }
 
-  async createPnpOrderBoxes(
-    orderBoxes: CreatePnpOrderBoxRequest[],
-  ): Promise<Array<{ id: string; lpn: string }>> {
+  async createPnpOrderBoxes(orderBoxes: CreatePnpOrderBoxRequest[]): Promise<Array<{ id: string; lpn: string }>> {
     const results: Array<{ id: string; lpn: string }> = [];
 
     for (const orderBox of orderBoxes) {

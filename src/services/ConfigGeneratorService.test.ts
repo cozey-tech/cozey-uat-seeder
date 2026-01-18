@@ -295,9 +295,7 @@ describe("ConfigGeneratorService", () => {
         region: "CA",
       };
 
-      await expect(service.generateConfig(options)).rejects.toThrow(
-        "orders have different locationIds",
-      );
+      await expect(service.generateConfig(options)).rejects.toThrow("orders have different locationIds");
     });
 
     it("should document race condition in collection prep ID generation", async () => {
@@ -437,9 +435,7 @@ describe("ConfigGeneratorService", () => {
         .mockResolvedValueOnce({ name: "Langley" });
 
       // Mock collection prep queries
-      mockPrisma.collectionPrep.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+      mockPrisma.collectionPrep.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       const result = await service.generateConfig(options);
 
@@ -573,10 +569,7 @@ describe("ConfigGeneratorService", () => {
         .mockResolvedValueOnce({ name: "Royal Mount" });
 
       // Mock collection prep queries
-      mockPrisma.collectionPrep.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+      mockPrisma.collectionPrep.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       const result = await service.generateConfig(options);
 
@@ -641,13 +634,7 @@ describe("ConfigGeneratorService", () => {
 
       mockPrisma.collectionPrep.findMany.mockResolvedValue([]);
 
-      const ids = await service.generateCollectionPrepIds(
-        2,
-        "CANPAR",
-        "windsor",
-        new Date("2024-01-07"),
-        "CA",
-      );
+      const ids = await service.generateCollectionPrepIds(2, "CANPAR", "windsor", new Date("2024-01-07"), "CA");
 
       expect(ids).toHaveLength(2);
       expect(ids[0]).toMatch(/^\d{6}WRCANPAR\d+$/);
@@ -660,18 +647,9 @@ describe("ConfigGeneratorService", () => {
         name: "Langley",
       });
 
-      mockPrisma.collectionPrep.findMany.mockResolvedValue([
-        { id: "010724LGCANPAR1" },
-        { id: "010724LGCANPAR2" },
-      ]);
+      mockPrisma.collectionPrep.findMany.mockResolvedValue([{ id: "010724LGCANPAR1" }, { id: "010724LGCANPAR2" }]);
 
-      const ids = await service.generateCollectionPrepIds(
-        2,
-        "CANPAR",
-        "langley",
-        new Date("2024-01-07"),
-        "CA",
-      );
+      const ids = await service.generateCollectionPrepIds(2, "CANPAR", "langley", new Date("2024-01-07"), "CA");
 
       expect(ids[0]).toContain("3");
       expect(ids[1]).toContain("4");
@@ -680,9 +658,9 @@ describe("ConfigGeneratorService", () => {
     it("should throw error if location not found", async () => {
       mockPrisma.location.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.generateCollectionPrepIds(1, "CANPAR", "invalid", new Date(), "CA"),
-      ).rejects.toThrow("Location invalid not found");
+      await expect(service.generateCollectionPrepIds(1, "CANPAR", "invalid", new Date(), "CA")).rejects.toThrow(
+        "Location invalid not found",
+      );
     });
   });
 
@@ -777,9 +755,7 @@ describe("ConfigGeneratorService", () => {
         .mockResolvedValueOnce({ name: "Langley" })
         .mockResolvedValueOnce({ name: "Windsor" });
 
-      mockPrisma.collectionPrep.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+      mockPrisma.collectionPrep.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       const result = await service.generateCollectionPrepIdsBatch(configs, "CA", 5);
 
@@ -816,9 +792,9 @@ describe("ConfigGeneratorService", () => {
 
       mockPrisma.location.findMany.mockResolvedValue([]); // No location found
 
-      await expect(
-        service.generateCollectionPrepIdsBatch(configs, "CA", 5),
-      ).rejects.toThrow("Location invalid not found");
+      await expect(service.generateCollectionPrepIdsBatch(configs, "CA", 5)).rejects.toThrow(
+        "Location invalid not found",
+      );
     });
   });
 });

@@ -181,9 +181,7 @@ describe("InteractivePromptService", () => {
     });
 
     it("should throw error if no templates available", async () => {
-      await expect(service.promptTemplateSelection([])).rejects.toThrow(
-        "No templates available",
-      );
+      await expect(service.promptTemplateSelection([])).rejects.toThrow("No templates available");
     });
   });
 

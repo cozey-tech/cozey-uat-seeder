@@ -185,9 +185,7 @@ describe("CollectionPrepService", () => {
         ],
       };
 
-      expect(() => service.validateOrderMix(config, ["order-1"])).toThrow(
-        CollectionPrepValidationError,
-      );
+      expect(() => service.validateOrderMix(config, ["order-1"])).toThrow(CollectionPrepValidationError);
       expect(() => service.validateOrderMix(config, ["order-1"])).toThrow(
         "is declared as 'regular-only' but contains Pick and Pack items",
       );
@@ -219,9 +217,7 @@ describe("CollectionPrepService", () => {
         ],
       };
 
-      expect(() => service.validateOrderMix(config, ["order-1"])).toThrow(
-        CollectionPrepValidationError,
-      );
+      expect(() => service.validateOrderMix(config, ["order-1"])).toThrow(CollectionPrepValidationError);
       expect(() => service.validateOrderMix(config, ["order-1"])).toThrow(
         "is declared as 'pnp-only' but contains Regular items",
       );
@@ -253,9 +249,7 @@ describe("CollectionPrepService", () => {
         ],
       };
 
-      expect(() => service.validateOrderMix(config, ["order-1"])).toThrow(
-        CollectionPrepValidationError,
-      );
+      expect(() => service.validateOrderMix(config, ["order-1"])).toThrow(CollectionPrepValidationError);
       expect(() => service.validateOrderMix(config, ["order-1"])).toThrow(
         "is declared as 'mixed' but does not contain both Regular and Pick and Pack items",
       );

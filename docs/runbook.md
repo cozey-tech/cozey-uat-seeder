@@ -14,14 +14,17 @@ This runbook provides operational guidance for running, troubleshooting, and mai
 The seeder requires the following environment variables (see `.env.example` for details):
 
 **Database:**
+
 - `DATABASE_URL` - PostgreSQL connection string (must match staging patterns)
 
 **Shopify:**
+
 - `SHOPIFY_STORE_DOMAIN` - Shopify store domain (must match staging patterns)
 - `SHOPIFY_ACCESS_TOKEN` - Shopify Admin API access token
 - `SHOPIFY_API_VERSION` - API version (optional, defaults to 2024-01)
 
 **AWS Secrets Manager (Optional):**
+
 - `USE_AWS_SECRETS` - Enable/disable AWS secrets (default: `true`)
 - `AWS_REGION` - AWS region (default: `us-east-1`)
 - `AWS_PROFILE` - AWS profile name (optional)
@@ -33,6 +36,7 @@ The seeder requires the following environment variables (see `.env.example` for 
 The seeder enforces staging-only execution via hard-coded guardrails:
 
 **Database URL patterns (any match):**
+
 - `/staging/i`
 - `/stage/i`
 - `/test/i`
@@ -40,10 +44,12 @@ The seeder enforces staging-only execution via hard-coded guardrails:
 - `/uat/i`
 
 **Shopify domain patterns (any match):**
+
 - Same as database patterns above
 - `/.myshopify.com$/i` (any `.myshopify.com` domain)
 
 **Verification:**
+
 - Run with `--dry-run` flag to test environment without making changes
 - Staging check happens before any database or API operations
 
@@ -52,22 +58,26 @@ The seeder enforces staging-only execution via hard-coded guardrails:
 ### Staging Guardrail Violation
 
 **Symptom:**
+
 ```
 ❌ Staging Guardrail Violation:
    Database URL does not match staging patterns
 ```
 
 **Causes:**
+
 - `DATABASE_URL` contains production database connection
 - `SHOPIFY_STORE_DOMAIN` points to production store
 
 **Solution:**
+
 1. Verify environment variables are set correctly
 2. Check that `DATABASE_URL` contains staging keywords (staging, stage, test, dev, uat)
 3. Check that `SHOPIFY_STORE_DOMAIN` matches staging patterns
 4. If using AWS Secrets Manager, verify secret values are correct
 
 **Prevention:**
+
 - Always use `.env` files for local development
 - Never commit `.env` files to git
 - Use `--dry-run` flag to test before actual execution
@@ -75,11 +85,13 @@ The seeder enforces staging-only execution via hard-coded guardrails:
 ### Database Connection Issues
 
 **Symptom:**
+
 ```
 Error: P1001: Can't reach database server
 ```
 
 **Causes:**
+
 - Database server is down or unreachable
 - Network connectivity issues
 - Incorrect `DATABASE_URL`
@@ -87,13 +99,16 @@ Error: P1001: Can't reach database server
 - Connection pool exhausted
 
 **Solution:**
+
 1. **Verify database is accessible:**
+
    ```bash
    # Test connection (replace with your DATABASE_URL)
    psql $DATABASE_URL -c "SELECT 1"
    ```
 
 2. **Check connection string format:**
+
    ```
    postgresql://user:password@host:port/database
    ```
@@ -113,6 +128,7 @@ Error: P1001: Can't reach database server
    - Verify database is in same network/VPC
 
 **Prevention:**
+
 - Use connection pooling (Prisma handles this automatically)
 - Set appropriate connection limits
 - Monitor connection usage
@@ -120,15 +136,18 @@ Error: P1001: Can't reach database server
 ### Shopify API Rate Limiting
 
 **Symptom:**
+
 ```
 Error: Shopify API rate limit exceeded
 ```
 
 **Causes:**
+
 - Too many API requests in short time
 - Shopify Admin API has rate limits (varies by plan)
 
 **Solution:**
+
 1. **Wait and retry:**
    - Shopify rate limits reset over time
    - Wait a few minutes and retry
@@ -142,6 +161,7 @@ Error: Shopify API rate limit exceeded
    - Check `X-Shopify-Shop-Api-Call-Limit` header
 
 **Prevention:**
+
 - Seeder processes orders sequentially (not in parallel)
 - This helps avoid rate limits but may be slow for large batches
 - Consider splitting very large seed operations
@@ -149,18 +169,22 @@ Error: Shopify API rate limit exceeded
 ### Missing SKUs/Variants
 
 **Symptom:**
+
 ```
 ❌ Data validation failed:
    Missing SKUs in WMS: SOFA-CHAR-BLK, PILLOW-STD-WHT
 ```
 
 **Causes:**
+
 - SKUs don't exist in WMS database
 - SKUs exist but in different region
 - SKUs are disabled or inactive
 
 **Solution:**
+
 1. **Verify SKUs exist:**
+
    ```sql
    -- Check if variant exists
    SELECT sku, region FROM variant WHERE sku = 'SOFA-CHAR-BLK' AND region = 'CA';
@@ -171,6 +195,7 @@ Error: Shopify API rate limit exceeded
    - CA and US have separate variant records
 
 3. **Check variant status:**
+
    ```sql
    -- Check if variant is disabled
    SELECT sku, disabled FROM variant WHERE sku = 'SOFA-CHAR-BLK' AND region = 'CA';
@@ -181,6 +206,7 @@ Error: Shopify API rate limit exceeded
    - Or query database directly for available variants
 
 **Prevention:**
+
 - Use `--validate` flag to check config before seeding
 - Use `generate-config` tool to ensure valid SKUs
 - Keep list of available test SKUs documented
@@ -188,19 +214,23 @@ Error: Shopify API rate limit exceeded
 ### Configuration File Validation Errors
 
 **Symptom:**
+
 ```
 ❌ Configuration file validation failed:
    orders[0].lineItems[0].quantity: Expected number, received string
 ```
 
 **Causes:**
+
 - JSON syntax errors
 - Type mismatches (string instead of number)
 - Missing required fields
 - Invalid enum values
 
 **Solution:**
+
 1. **Validate JSON syntax:**
+
    ```bash
    # Use jq or online JSON validator
    cat config.json | jq .
@@ -212,6 +242,7 @@ Error: Shopify API rate limit exceeded
    - Verify field types match schema
 
 3. **Use validation flag:**
+
    ```bash
    npm run seed config.json --validate
    ```
@@ -222,6 +253,7 @@ Error: Shopify API rate limit exceeded
    - Enums must match exactly: `"pickType": "Regular"` not `"pickType": "regular"`
 
 **Prevention:**
+
 - Always use `--validate` flag before actual seeding
 - Use `generate-config` tool to create valid configs
 - Review schema documentation
@@ -229,12 +261,14 @@ Error: Shopify API rate limit exceeded
 ### AWS Secrets Manager Issues
 
 **Symptom:**
+
 ```
 ⚠️  Failed to fetch secret from AWS: dev/uat-database-url
    Falling back to .env file
 ```
 
 **Causes:**
+
 - AWS credentials not configured
 - Secret doesn't exist in AWS Secrets Manager
 - IAM permissions insufficient
@@ -242,17 +276,20 @@ Error: Shopify API rate limit exceeded
 - Secret name mismatch
 
 **Solution:**
+
 1. **Verify AWS credentials:**
+
    ```bash
    # Check AWS credentials
    aws sts get-caller-identity
    ```
 
 2. **Check secret exists:**
+
    ```bash
    # List secrets
    aws secretsmanager list-secrets --region us-east-1
-   
+
    # Get secret value (if you have permissions)
    aws secretsmanager get-secret-value --secret-id dev/uat-database-url --region us-east-1
    ```
@@ -274,6 +311,7 @@ Error: Shopify API rate limit exceeded
    - Seeder will use `.env` file only
 
 **Prevention:**
+
 - Configure AWS credentials properly
 - Document secret names and regions
 - Use `.env` files for local development
@@ -281,26 +319,30 @@ Error: Shopify API rate limit exceeded
 ### Partial Seeding Failures
 
 **Symptom:**
+
 - Some orders created in Shopify but not in WMS
 - Some WMS entities created but collection prep missing
 
 **Causes:**
+
 - Error occurred mid-execution
 - Transaction rollback on error
 - Network timeout
 
 **Solution:**
+
 1. **Re-run seeder:**
    - Seeder is idempotent
    - Re-running will skip already-created records
    - Check for existing records before creating
 
 2. **Check what was created:**
+
    ```sql
    -- Check created orders
-   SELECT shopifyOrderId, shopifyOrderNumber, sourceName 
-   FROM "order" 
-   WHERE sourceName = 'wms_seed' 
+   SELECT shopifyOrderId, shopifyOrderNumber, sourceName
+   FROM "order"
+   WHERE sourceName = 'wms_seed'
    ORDER BY createdAt DESC;
    ```
 
@@ -310,6 +352,7 @@ Error: Shopify API rate limit exceeded
    - Manually delete if needed (be careful!)
 
 **Prevention:**
+
 - Use `--dry-run` to preview changes
 - Process orders sequentially (already implemented)
 - Use transactions for atomicity (already implemented)
@@ -321,6 +364,7 @@ Error: Shopify API rate limit exceeded
 **Scenario:** Database connection fails mid-execution
 
 **Steps:**
+
 1. Check database server status
 2. Verify network connectivity
 3. Check connection pool exhaustion
@@ -332,6 +376,7 @@ Error: Shopify API rate limit exceeded
 **Scenario:** Shopify API returns errors for some orders
 
 **Steps:**
+
 1. Check error message for specific issue
 2. Verify SKUs exist in Shopify store
 3. Check Shopify store status
@@ -344,6 +389,7 @@ Error: Shopify API rate limit exceeded
 **Scenario:** (Should never happen, but if it does)
 
 **Steps:**
+
 1. **STOP IMMEDIATELY** - Do not proceed
 2. Verify environment variables
 3. Check if guardrail logic is working
@@ -376,6 +422,7 @@ After running the seeder:
 ### Verification Queries
 
 **Check created orders:**
+
 ```sql
 SELECT shopifyOrderId, shopifyOrderNumber, status, sourceName, createdAt
 FROM "order"
@@ -385,6 +432,7 @@ LIMIT 10;
 ```
 
 **Check collection preps:**
+
 ```sql
 SELECT id, region, carrier, locationId, prepDate, boxes, createdAt
 FROM collectionPrep
@@ -393,6 +441,7 @@ ORDER BY createdAt DESC;
 ```
 
 **Check Shopify orders (via Shopify Admin):**
+
 - Filter by tag: `wms_seed_<batchId>`
 - Or search for orders with notes containing "WMS Seed"
 
@@ -427,6 +476,7 @@ For seeding many orders (10+):
 ### Log Levels
 
 The seeder uses structured logging:
+
 - **Debug:** GraphQL cost tracking, detailed operation info
 - **Info:** Progress messages, summary information
 - **Error:** Failures, validation errors
@@ -434,6 +484,7 @@ The seeder uses structured logging:
 ### Key Log Messages
 
 **Success:**
+
 ```
 ✅ Created 2 Shopify order(s)
 ✅ Created 2 WMS order(s)
@@ -441,6 +492,7 @@ The seeder uses structured logging:
 ```
 
 **Errors:**
+
 ```
 ❌ Configuration file validation failed: ...
 ❌ Data validation failed: Missing SKUs in WMS: ...

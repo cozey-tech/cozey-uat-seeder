@@ -35,13 +35,13 @@ export async function reviewOrders(
   options: ReviewOptions,
 ): Promise<{ orders: Order[]; inventoryChecks: InventoryCheck[] }> {
   const { variants, customers, templates, locationsCache, promptService, compositionBuilder } = context;
-  
+
   // Show validation summary at start of review
   const validationSummary = getValidationSummary(
     orders.map((o) => ({ composition: o.composition })),
     variants,
   );
-  
+
   if (validationSummary.errorCount > 0 || validationSummary.warningCount > 0) {
     console.log();
     console.log(OutputFormatter.header("Validation Summary", "🔍"));
@@ -49,7 +49,7 @@ export async function reviewOrders(
     console.log(OutputFormatter.keyValue("Errors", validationSummary.errorCount));
     console.log(OutputFormatter.keyValue("Warnings", validationSummary.warningCount));
     console.log();
-    
+
     if (validationSummary.errorCount > 0) {
       displayValidationIssues(validationSummary.issues);
       Logger.warn("Config has validation errors", {
@@ -58,7 +58,7 @@ export async function reviewOrders(
       });
     }
   }
-  
+
   let reviewComplete = false;
   while (!reviewComplete) {
     const reviewAction = await promptService.promptOrderReviewAction(orders);

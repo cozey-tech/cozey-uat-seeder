@@ -162,9 +162,7 @@ describe("ErrorFormatter", () => {
     });
 
     it("should format ShopifyServiceError with user errors", () => {
-      const error = new ShopifyServiceError("Failed", [
-        { message: "Field required", field: ["customer", "email"] },
-      ]);
+      const error = new ShopifyServiceError("Failed", [{ message: "Field required", field: ["customer", "email"] }]);
       const formatted = ErrorFormatter.format(error);
 
       expect(formatted.message).toContain("customer.email");

@@ -164,9 +164,7 @@ describe("WmsService", () => {
 
   describe("createPrepPartsAndItems", () => {
     it("should batch lookup parts by variant IDs and create prepParts", async () => {
-      const partsByVariantId = new Map([
-        ["variant-1", [{ id: "part-1", sku: "PART-SKU-001", quantity: 1 }]],
-      ]);
+      const partsByVariantId = new Map([["variant-1", [{ id: "part-1", sku: "PART-SKU-001", quantity: 1 }]]]);
 
       vi.mocked(mockRepository.findPartsByVariantIds).mockResolvedValue(partsByVariantId);
       vi.mocked(mockRepository.createPrepPart).mockResolvedValue({ id: "prepPart-1" } as never);

@@ -57,7 +57,7 @@ async function main(): Promise<void> {
       console.log(OutputFormatter.info("Initializing services for resume..."));
       const initProgress = new ProgressTracker({ showSpinner: false });
       initProgress.start("Initializing", 4);
-      
+
       initProgress.update(1, "Connecting to database...");
       const services = initializeServices(false);
       initProgress.update(2, "Initializing Shopify client...");
@@ -69,7 +69,9 @@ async function main(): Promise<void> {
       // Load original config from progress state (we'd need to store it, but for now we'll require it)
       // For now, we'll require the config file even when resuming
       if (!options.configFile) {
-        console.error(OutputFormatter.error("Config file is required when resuming (needed to reconstruct order data)"));
+        console.error(
+          OutputFormatter.error("Config file is required when resuming (needed to reconstruct order data)"),
+        );
         process.exit(1);
       }
 
@@ -117,7 +119,7 @@ async function main(): Promise<void> {
       console.log(OutputFormatter.info("Initializing services (DRY RUN mode)..."));
       const initProgress = new ProgressTracker({ showSpinner: false });
       initProgress.start("Initializing", 4);
-      
+
       initProgress.update(1, "Connecting to database...");
       const services = initializeServices(true);
       initProgress.update(2, "Initializing Shopify client...");
@@ -125,7 +127,7 @@ async function main(): Promise<void> {
       initProgress.update(4, "Ready");
       initProgress.complete("Services initialized");
       console.log();
-      
+
       try {
         await executeDryRun(options.configFile, services);
       } finally {
@@ -141,7 +143,7 @@ async function main(): Promise<void> {
     console.log(OutputFormatter.info("Initializing services..."));
     const initProgress = new ProgressTracker({ showSpinner: false });
     initProgress.start("Initializing", 4);
-    
+
     initProgress.update(1, "Connecting to database...");
     const services = initializeServices(false);
     initProgress.update(2, "Initializing Shopify client...");
@@ -149,13 +151,13 @@ async function main(): Promise<void> {
     initProgress.update(4, "Ready");
     initProgress.complete("Services initialized");
     console.log();
-    
+
     try {
       if (!options.configFile) {
         console.error(OutputFormatter.error("Config file is required"));
         process.exit(1);
       }
-      
+
       const config = parseAndValidateConfig(options.configFile, services.inputParser);
       await validateData(config, services.dataValidator);
 
@@ -183,11 +185,11 @@ async function main(): Promise<void> {
       errorContext,
     );
     console.error(`\n${formattedError}\n`);
-    
+
     if (error instanceof Error && error.stack && process.env.NODE_ENV === "development") {
       console.error(`Stack trace:\n${error.stack}\n`);
     }
-    
+
     process.exit(1);
   }
 }

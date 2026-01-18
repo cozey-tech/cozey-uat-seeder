@@ -71,9 +71,7 @@ describe("SeedWmsEntitiesUseCase", () => {
           status: "fulfilled",
           customerName: "Test Customer",
           customerEmail: "test@example.com",
-          lineItems: [
-            { lineItemId: "line-1", sku: "SKU-001", quantity: 2 },
-          ],
+          lineItems: [{ lineItemId: "line-1", sku: "SKU-001", quantity: 2 }],
         },
       ],
       region: "CA",
@@ -119,9 +117,7 @@ describe("SeedWmsEntitiesUseCase", () => {
         {
           shopifyOrderId: "gid://shopify/Order/123",
           shopifyOrderNumber: "#1001",
-          lineItems: [
-            { lineItemId: "line-1", sku: "SKU-001", quantity: 5 },
-          ],
+          lineItems: [{ lineItemId: "line-1", sku: "SKU-001", quantity: 5 }],
         },
       ],
       region: "CA",

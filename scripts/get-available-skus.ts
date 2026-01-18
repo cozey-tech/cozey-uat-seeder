@@ -35,11 +35,7 @@ async function getAvailableSkus(region: string = "CA") {
         colorId: true,
         description: true,
       },
-      orderBy: [
-        { modelName: "asc" },
-        { colorId: "asc" },
-        { sku: "asc" },
-      ],
+      orderBy: [{ modelName: "asc" }, { colorId: "asc" }, { sku: "asc" }],
       take: 100, // Limit to first 100 for display
     });
 
@@ -69,7 +65,7 @@ async function getAvailableSkus(region: string = "CA") {
     // Get pickType for each variant
     const variantsWithPickType = variants.map((v) => {
       const variantParts = variantPartsByVariantId.get(v.id) || [];
-      
+
       // Determine pickType from parts
       let pickType: "Regular" | "Pick and Pack" = "Regular";
       if (variantParts.length > 0) {
@@ -123,18 +119,24 @@ async function getAvailableSkus(region: string = "CA") {
     // Output JSON for easy template creation
     console.log("\n\n📋 Sample SKUs for templates (JSON):");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log(JSON.stringify({
-      regular: regularSkus.slice(0, 5).map((v) => ({
-        sku: v.sku,
-        pickType: v.pickType,
-        description: v.description,
-      })),
-      pickAndPack: pnpSkus.slice(0, 5).map((v) => ({
-        sku: v.sku,
-        pickType: v.pickType,
-        description: v.description,
-      })),
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          regular: regularSkus.slice(0, 5).map((v) => ({
+            sku: v.sku,
+            pickType: v.pickType,
+            description: v.description,
+          })),
+          pickAndPack: pnpSkus.slice(0, 5).map((v) => ({
+            sku: v.sku,
+            pickType: v.pickType,
+            description: v.description,
+          })),
+        },
+        null,
+        2,
+      ),
+    );
 
     return {
       regular: regularSkus,

@@ -25,9 +25,7 @@ describe("SeedShopifyOrdersHandler", () => {
             name: "Test Customer",
             email: "test@example.com",
           },
-          lineItems: [
-            { sku: "SKU-001", quantity: 1 },
-          ],
+          lineItems: [{ sku: "SKU-001", quantity: 1 }],
         },
       ],
     };
@@ -37,9 +35,7 @@ describe("SeedShopifyOrdersHandler", () => {
         {
           shopifyOrderId: "gid://shopify/Order/456",
           shopifyOrderNumber: "#1001",
-          lineItems: [
-            { lineItemId: "line-1", sku: "SKU-001" },
-          ],
+          lineItems: [{ lineItemId: "line-1", sku: "SKU-001" }],
           fulfillmentStatus: "SUCCESS",
         },
       ],

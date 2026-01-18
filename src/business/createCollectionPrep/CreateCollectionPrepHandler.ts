@@ -4,7 +4,10 @@ import type { CreateCollectionPrepResponse } from "../../shared/responses/Create
 import { CreateCollectionPrepUseCase } from "./CreateCollectionPrepUseCase";
 import { BaseHandler } from "../BaseHandler";
 
-export class CreateCollectionPrepHandler extends BaseHandler<CreateCollectionPrepRequest, CreateCollectionPrepResponse> {
+export class CreateCollectionPrepHandler extends BaseHandler<
+  CreateCollectionPrepRequest,
+  CreateCollectionPrepResponse
+> {
   constructor(private readonly useCase: CreateCollectionPrepUseCase) {
     super();
   }

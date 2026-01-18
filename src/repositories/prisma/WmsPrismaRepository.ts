@@ -131,7 +131,10 @@ export class WmsPrismaRepository implements WmsRepository {
         status: created.status,
       };
     } catch (error: unknown) {
-      this.handlePrismaError(error, `Shipment for order ${shipment.orderId} and collectionPrep ${shipment.collectionPrepId}`);
+      this.handlePrismaError(
+        error,
+        `Shipment for order ${shipment.orderId} and collectionPrep ${shipment.collectionPrepId}`,
+      );
     }
   }
 
@@ -247,7 +250,10 @@ export class WmsPrismaRepository implements WmsRepository {
     return partMap;
   }
 
-  async findPartsByVariantIds(variantIds: string[], region: string): Promise<Map<string, Array<{ id: string; sku: string; quantity: number }>>> {
+  async findPartsByVariantIds(
+    variantIds: string[],
+    region: string,
+  ): Promise<Map<string, Array<{ id: string; sku: string; quantity: number }>>> {
     const variantParts = await this.prisma.variantPart.findMany({
       where: {
         variantId: { in: variantIds },
@@ -320,7 +326,10 @@ export class WmsPrismaRepository implements WmsRepository {
     };
   }
 
-  async findCustomerByEmail(email: string, region: string): Promise<{ id: string; name: string; email?: string } | null> {
+  async findCustomerByEmail(
+    email: string,
+    region: string,
+  ): Promise<{ id: string; name: string; email?: string } | null> {
     const customer = await this.prisma.customer.findFirst({
       where: {
         email: email,
@@ -361,12 +370,7 @@ export class WmsPrismaRepository implements WmsRepository {
     return order;
   }
 
-  async createCustomer(customer: {
-    id: string;
-    name: string;
-    email?: string;
-    region: string;
-  }): Promise<unknown> {
+  async createCustomer(customer: { id: string; name: string; email?: string; region: string }): Promise<unknown> {
     try {
       return await this.prisma.customer.create({
         data: {

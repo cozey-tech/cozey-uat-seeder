@@ -2,10 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { PrismaClient } from "@prisma/client";
 
 import { WmsPrismaRepository } from "./WmsPrismaRepository";
-import type {
-  CreateOrderRequest,
-  CreateCollectionPrepRequest,
-} from "../interface/WmsRepository";
+import type { CreateOrderRequest, CreateCollectionPrepRequest } from "../interface/WmsRepository";
 
 describe("WmsPrismaRepository", () => {
   let mockPrisma: PrismaClient;

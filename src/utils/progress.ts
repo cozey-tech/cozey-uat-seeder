@@ -149,7 +149,7 @@ export class ProgressTracker {
   private getProgressText(message?: string): string {
     const percentage = this.total > 0 ? Math.round((this.current / this.total) * 100) : 0;
     const percentageText = `${percentage}%`;
-    
+
     // Create a visual progress bar
     const barLength = 20;
     const filled = Math.round((this.current / this.total) * barLength);

@@ -11,7 +11,7 @@ export class SeedShopifyOrdersHandler extends BaseHandler<SeedShopifyOrdersReque
 
   async execute(request: unknown): Promise<SeedShopifyOrdersResponse> {
     const validatedRequest = this.validateRequest(request, seedShopifyOrdersRequestSchema, "SeedShopifyOrders");
-    
+
     const requestWithCallback: SeedShopifyOrdersRequest = {
       ...validatedRequest,
       ...(typeof request === "object" && request !== null && "onOrderProgress" in request

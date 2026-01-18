@@ -39,11 +39,13 @@ export async function validateConfig(configFilePath: string): Promise<void> {
     if (config.pnpConfig) {
       validationItems.push({ label: "PnP Config", value: "Present" });
     }
-    
-    console.log(OutputFormatter.summary({
-      title: OutputFormatter.success("Configuration file validation passed"),
-      items: validationItems,
-    }));
+
+    console.log(
+      OutputFormatter.summary({
+        title: OutputFormatter.success("Configuration file validation passed"),
+        items: validationItems,
+      }),
+    );
   } catch (error) {
     if (error instanceof InputValidationError) {
       const formattedError = ErrorFormatter.formatAsString(error, { step: "Config validation" });
@@ -51,10 +53,9 @@ export async function validateConfig(configFilePath: string): Promise<void> {
       process.exit(1);
     }
     // Handle file I/O errors, permission errors, etc.
-    const formattedError = ErrorFormatter.formatAsString(
-      error instanceof Error ? error : new Error(String(error)),
-      { step: "Config file reading" },
-    );
+    const formattedError = ErrorFormatter.formatAsString(error instanceof Error ? error : new Error(String(error)), {
+      step: "Config file reading",
+    });
     console.error(`\n${formattedError}\n`);
     process.exit(1);
   }
@@ -63,10 +64,7 @@ export async function validateConfig(configFilePath: string): Promise<void> {
 /**
  * Parse and validate configuration file
  */
-export function parseAndValidateConfig(
-  configFilePath: string,
-  inputParser: InputParserService,
-): SeedConfig {
+export function parseAndValidateConfig(configFilePath: string, inputParser: InputParserService): SeedConfig {
   console.log(OutputFormatter.info(`Parsing configuration file: ${configFilePath}`));
   try {
     return inputParser.parseInputFile(configFilePath);
@@ -83,10 +81,7 @@ export function parseAndValidateConfig(
 /**
  * Validate data (SKUs, customers, etc.)
  */
-export async function validateData(
-  config: SeedConfig,
-  dataValidator: DataValidationService,
-): Promise<void> {
+export async function validateData(config: SeedConfig, dataValidator: DataValidationService): Promise<void> {
   console.log(OutputFormatter.info("Validating data..."));
   try {
     await dataValidator.validateSeedConfig(config);
@@ -108,15 +103,17 @@ export function checkStagingEnvironment(): void {
   const envInfo = displayStagingEnvironment();
   const statusEmoji = envInfo.isStaging ? "✅" : "❌";
   const statusText = envInfo.isStaging ? "Staging" : "Not Staging";
-  
-  console.log(OutputFormatter.summary({
-    title: OutputFormatter.header("Staging Environment Check", "🔒"),
-    items: [
-      { label: "Database", value: envInfo.databaseUrl },
-      { label: "Shopify", value: envInfo.shopifyDomain },
-      { label: "Status", value: `${statusEmoji} ${statusText}` },
-    ],
-  }));
+
+  console.log(
+    OutputFormatter.summary({
+      title: OutputFormatter.header("Staging Environment Check", "🔒"),
+      items: [
+        { label: "Database", value: envInfo.databaseUrl },
+        { label: "Shopify", value: envInfo.shopifyDomain },
+        { label: "Status", value: `${statusEmoji} ${statusText}` },
+      ],
+    }),
+  );
   console.log();
 
   try {

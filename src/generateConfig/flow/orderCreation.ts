@@ -55,8 +55,17 @@ export async function createOrders(
   context: OrderCreationContext,
   options: OrderCreationOptions,
 ): Promise<OrderCreationResult> {
-  const { variants, customers, templates, locationsCache, region, promptService, compositionBuilder, inventoryService } = context;
-  
+  const {
+    variants,
+    customers,
+    templates,
+    locationsCache,
+    region,
+    promptService,
+    compositionBuilder,
+    inventoryService,
+  } = context;
+
   const creationMode = await promptService.promptOrderCreationMode();
 
   const orders: Order[] = [];
@@ -86,27 +95,27 @@ export async function createOrders(
       } else {
         // Build custom order
         composition = await compositionBuilder.buildCustom(variants);
-        
+
         // Offer to save custom order as template (unless skipped)
         if (!options.skipSaveTemplate) {
           const shouldSave = await promptService.promptConfirm(
             "Would you like to save this order as a template for future use?",
             false,
           );
-          
+
           if (shouldSave) {
             Logger.info("Saving order as template", { orderIndex: orders.length });
             const templateName = await promptService.promptTemplateName();
             const templateDescription = await promptService.promptTemplateDescription();
-            
+
             // Generate suggested ID from name
             const suggestedId = templateName
               .toLowerCase()
               .replace(/[^a-z0-9]+/g, "-")
               .replace(/^-+|-+$/g, "");
-            
+
             const templateId = await promptService.promptTemplateId(suggestedId);
-            
+
             // Create template from composition
             const newTemplate: OrderTemplate = {
               id: templateId,
@@ -118,9 +127,9 @@ export async function createOrders(
                 pickType: item.pickType, // Informational only - will use variant's pickType when used
               })),
             };
-            
+
             saveTemplate(newTemplate);
-            
+
             // Reload templates to include the new one (for use in subsequent iterations)
             const updatedTemplates = loadOrderTemplates();
             const validUpdatedTemplates = filterValidTemplates(updatedTemplates, variants);
@@ -169,10 +178,7 @@ export async function createOrders(
 
     const template = await promptService.promptTemplateSelection(templates);
     const bulkCount = await promptService.promptBulkOrderCount(50);
-    const { customer: baseCustomer, useSameForAll } = await promptService.promptBulkCustomerSelection(
-      customers,
-      true,
-    );
+    const { customer: baseCustomer, useSameForAll } = await promptService.promptBulkCustomerSelection(customers, true);
 
     // Validate baseCustomer location exists (consistent with other modes)
     const baseLocation = locationsCache.get(baseCustomer.id);
@@ -190,9 +196,7 @@ export async function createOrders(
 
     for (let i = 0; i < bulkCount; i++) {
       // Select customer (if not using same for all)
-      const customer = useSameForAll
-        ? baseCustomer
-        : await promptService.promptCustomerSelection(customers);
+      const customer = useSameForAll ? baseCustomer : await promptService.promptCustomerSelection(customers);
 
       // Validate customer location exists (if not using same for all, validate each customer)
       if (!useSameForAll) {
@@ -327,10 +331,7 @@ export async function createOrders(
       }
 
       // Allow editing the composition
-      const shouldEdit = await promptService.promptConfirm(
-        "Would you like to edit the order composition?",
-        false,
-      );
+      const shouldEdit = await promptService.promptConfirm("Would you like to edit the order composition?", false);
 
       let duplicateComposition: OrderComposition;
       if (shouldEdit) {
@@ -408,21 +409,21 @@ export async function createOrders(
         console.log(OutputFormatter.warning(`Order ${check.orderIndex + 1} has inventory shortages:`));
         const shouldModify = await promptService.promptInventoryModification(inventoryCheck);
         if (shouldModify) {
-          await inventoryService.ensureInventoryForOrder(
-            check.composition,
-            check.locationId,
-            region,
-          );
+          await inventoryService.ensureInventoryForOrder(check.composition, check.locationId, region);
           console.log(OutputFormatter.success(`Inventory updated for order ${check.orderIndex + 1}`));
         }
       }
     }
     const inventoryCheckTime = Date.now() - inventoryCheckStart;
-    console.log(OutputFormatter.success(`Inventory checks complete (${OutputFormatter.duration(inventoryCheckTime)} for ${inventoryChecks.length} orders)\n`));
+    console.log(
+      OutputFormatter.success(
+        `Inventory checks complete (${OutputFormatter.duration(inventoryCheckTime)} for ${inventoryChecks.length} orders)\n`,
+      ),
+    );
   }
 
-  return { 
-    orders, 
+  return {
+    orders,
     inventoryChecks,
   };
 }

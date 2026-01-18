@@ -43,10 +43,7 @@ export default [
       "@typescript-eslint/explicit-member-accessibility": "off",
       "@typescript-eslint/consistent-type-assertions": "error",
       "@typescript-eslint/explicit-module-boundary-types": "off",
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        { ignoreRestSiblings: true, argsIgnorePattern: "^_" },
-      ],
+      "@typescript-eslint/no-unused-vars": ["error", { ignoreRestSiblings: true, argsIgnorePattern: "^_" }],
       "@typescript-eslint/prefer-interface": "off",
       "@typescript-eslint/explicit-function-return-type": "error",
       "lines-between-class-members": ["error", "always", { exceptAfterSingleLine: true }],
@@ -80,10 +77,7 @@ export default [
       "@typescript-eslint/explicit-member-accessibility": "off",
       "@typescript-eslint/consistent-type-assertions": "error",
       "@typescript-eslint/explicit-module-boundary-types": "off",
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        { ignoreRestSiblings: true, argsIgnorePattern: "^_" },
-      ],
+      "@typescript-eslint/no-unused-vars": ["error", { ignoreRestSiblings: true, argsIgnorePattern: "^_" }],
       "@typescript-eslint/prefer-interface": "off",
       // Allow implicit return types in tests for readability
       "@typescript-eslint/explicit-function-return-type": "off",
@@ -98,13 +92,6 @@ export default [
   prettierConfig,
   // Ignore patterns
   {
-    ignores: [
-      "node_modules/**",
-      "dist/**",
-      "build/**",
-      "coverage/**",
-      "*.tsbuildinfo",
-      ".prisma/**",
-    ],
+    ignores: ["node_modules/**", "dist/**", "build/**", "coverage/**", "*.tsbuildinfo", ".prisma/**"],
   },
 ];
