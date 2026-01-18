@@ -342,7 +342,6 @@ export class ShopifyService {
 
   async completeDraftOrder(draftOrderId: string): Promise<OrderResult> {
     if (this.dryRun) {
-      // Generate a deterministic order number (e.g., #1000, #1001, #1002, etc.)
       const orderNumber = `#${this.orderNumberCounter++}`;
       const orderId = `gid://shopify/Order/${uuidv4()}`;
       Logger.info("DRY RUN: Would complete draft order", {
@@ -353,7 +352,6 @@ export class ShopifyService {
       return { orderId, orderNumber };
     }
 
-    // Inspect if line items are available in the response - query them to see
     const mutation = `
       mutation draftOrderComplete($id: ID!, $paymentPending: Boolean) {
         draftOrderComplete(id: $id, paymentPending: $paymentPending) {
@@ -461,7 +459,6 @@ export class ShopifyService {
       // Get order line items and fulfillments
       const orderResponse = await this.client.request(queryOrder, { variables: { id: orderId } });
       
-      // Check for GraphQL errors (errors can be an object with graphQLErrors array or a direct array)
       const graphQLErrors = orderResponse.errors?.graphQLErrors || 
                             (Array.isArray(orderResponse.errors) ? orderResponse.errors : []);
       
@@ -481,7 +478,6 @@ export class ShopifyService {
       
       const order = orderResponse.data.order;
 
-      // Check if order already has fulfillments (fulfillments is a plain list, not a connection)
       const existingFulfillments = order.fulfillments || [];
       if (existingFulfillments.length > 0) {
         const firstFulfillment = existingFulfillments[0];
@@ -537,7 +533,6 @@ export class ShopifyService {
 
       const response = await this.client.request(mutation, { variables });
 
-      // Check for GraphQL errors (errors can be an object with graphQLErrors array or a direct array)
       const fulfillmentGraphQLErrors = response.errors?.graphQLErrors || 
                                        (Array.isArray(response.errors) ? response.errors : []);
       
