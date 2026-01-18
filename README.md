@@ -268,7 +268,10 @@ src/
 
 - [Architecture Documentation](docs/architecture.md): System architecture and design decisions
 - [AGENTS.md](AGENTS.md): Engineering conventions and development guidelines
-- [Implementation Progress](docs/implementation/progress.md): Current implementation status
+- [Technical Design Document](docs/technical-design-document.md): Detailed technical design and implementation decisions
+- [Data Model Documentation](docs/data-model.md): Database schema, relationships, and entity details
+- [Runbook](docs/runbook.md): Operations guide, troubleshooting, and incident playbooks
+- [Contributing Guide](CONTRIBUTING.md): How to contribute to this project
 
 ## Safety Features
 
