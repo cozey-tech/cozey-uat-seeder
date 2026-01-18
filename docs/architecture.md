@@ -1,6 +1,6 @@
 # Architecture Documentation
 
-**Last Updated**: January 2026  
+**Last Updated**: January 2025  
 **Primary Owner**: Sam Morrison
 
 ## Purpose
@@ -323,5 +323,8 @@ Potential improvements (not in current scope):
 ## Related Documents
 
 - [AGENTS.md](../AGENTS.md): Engineering conventions and quickstart
-- [Technical Design Document](../docs/technical-design-document.md): Detailed technical design and implementation decisions
+- [Technical Design Document](technical-design-document.md): Detailed technical design and implementation decisions
+- [Data Model Documentation](data-model.md): Database schema, relationships, and entity details
+- [Runbook](runbook.md): Operations guide, troubleshooting, and incident playbooks
+- [Contributing Guide](../CONTRIBUTING.md): How to contribute to this project
 - [README.md](../README.md): User-facing documentation
