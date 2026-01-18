@@ -768,12 +768,4 @@ export class ShopifyService {
       throw new ShopifyServiceError(`Failed to find variants by SKUs: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-
-  /**
-   * Get GraphQL cost from a response (helper for performance tracking)
-   * This is a public method to allow use cases to track costs
-   */
-  extractGraphQLCostFromResponse(response: unknown): GraphQLCostInfo | undefined {
-    return this.extractGraphQLCost(response);
-  }
 }
