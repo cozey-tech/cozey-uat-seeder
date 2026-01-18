@@ -1,6 +1,7 @@
 import type { SeedWmsEntitiesRequest } from "../../shared/requests/SeedWmsEntitiesRequest";
 import type { SeedWmsEntitiesResponse } from "../../shared/responses/SeedWmsEntitiesResponse";
 import { WmsService } from "../../services/WmsService";
+import { Logger } from "../../utils/logger";
 
 export class SeedWmsEntitiesUseCase {
   constructor(private readonly wmsService: WmsService) {}
@@ -9,8 +10,12 @@ export class SeedWmsEntitiesUseCase {
     const orders: SeedWmsEntitiesResponse["orders"] = [];
     const shipments: SeedWmsEntitiesResponse["shipments"] = [];
     const prepPartItems: SeedWmsEntitiesResponse["prepPartItems"] = [];
+    const failures: SeedWmsEntitiesResponse["failures"] = [];
 
-    for (const shopifyOrder of request.shopifyOrders) {
+    for (let orderIndex = 0; orderIndex < request.shopifyOrders.length; orderIndex++) {
+      const shopifyOrder = request.shopifyOrders[orderIndex];
+      
+      try {
       // Check if order already exists (idempotency)
       const existingOrder = await this.wmsService.repository.findOrderByShopifyId(shopifyOrder.shopifyOrderId);
       if (existingOrder) {
@@ -95,12 +100,50 @@ export class SeedWmsEntitiesUseCase {
           orderId: shopifyOrder.shopifyOrderId,
         });
       }
+      } catch (error) {
+        // Continue-on-error strategy: collect errors, don't fail entire batch
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        Logger.error("Failed to create WMS entities for order", error, {
+          shopifyOrderId: shopifyOrder.shopifyOrderId,
+          orderIndex,
+          customerEmail: shopifyOrder.customerEmail,
+        });
+
+        failures.push({
+          orderIndex,
+          shopifyOrderId: shopifyOrder.shopifyOrderId,
+          customerEmail: shopifyOrder.customerEmail,
+          error: errorMessage,
+        });
+      }
+    }
+
+    // Log errors if any occurred
+    if (failures.length > 0) {
+      Logger.warn("Some WMS entity creations failed", {
+        failedCount: failures.length,
+        totalOrders: request.shopifyOrders.length,
+        successfulCount: orders.length,
+        errors: failures.map((f) => ({
+          orderIndex: f.orderIndex,
+          shopifyOrderId: f.shopifyOrderId,
+          error: f.error,
+        })),
+      });
+
+      // If all orders failed, throw an error
+      if (failures.length === request.shopifyOrders.length) {
+        throw new Error(
+          `All ${request.shopifyOrders.length} WMS entity creations failed. First error: ${failures[0]?.error}`,
+        );
+      }
     }
 
     return {
       orders,
       shipments,
       prepPartItems,
+      failures: failures.length > 0 ? failures : undefined,
     };
   }
 }

@@ -40,6 +40,10 @@ import { StagingGuardrailError } from "./shared/errors/StagingGuardrailError";
 import { InputValidationError } from "./services/InputParserService";
 import { DataValidationError } from "./services/DataValidationService";
 import type { SeedConfig } from "./shared/types/SeedConfig";
+import { ProgressTracker } from "./utils/progress";
+import { ErrorFormatter } from "./utils/errorFormatter";
+import { OutputFormatter } from "./utils/outputFormatter";
+import { InteractivePromptService } from "./services/InteractivePromptService";
 
 interface CliOptions {
   configFile: string;
@@ -122,24 +126,31 @@ async function validateConfig(configFilePath: string): Promise<void> {
     }
 
     // Display validation results
-    console.log("✅ Configuration file validation passed");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log(`   Schema: Valid`);
-    console.log(`   Orders: ${config.orders.length}`);
-    console.log(`   Collection Prep: ${config.collectionPrep ? "Configured" : "Not configured"}`);
+    const validationItems: Array<{ label: string; value: string | number }> = [
+      { label: "Schema", value: "Valid" },
+      { label: "Orders", value: config.orders.length },
+      { label: "Collection Prep", value: config.collectionPrep ? "Configured" : "Not configured" },
+    ];
     if (config.pnpConfig) {
-      console.log(`   PnP Config: Present`);
+      validationItems.push({ label: "PnP Config", value: "Present" });
     }
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    console.log(OutputFormatter.summary({
+      title: OutputFormatter.success("Configuration file validation passed"),
+      items: validationItems,
+    }));
   } catch (error) {
     if (error instanceof InputValidationError) {
-      console.error("❌ Configuration file validation failed:");
-      console.error(`   ${error.message}`);
+      const formattedError = ErrorFormatter.formatAsString(error, { step: "Config validation" });
+      console.error(`\n${formattedError}\n`);
       process.exit(1);
     }
     // Handle file I/O errors, permission errors, etc.
-    console.error("❌ Failed to read configuration file:");
-    console.error(`   ${error instanceof Error ? error.message : String(error)}`);
+    const formattedError = ErrorFormatter.formatAsString(
+      error instanceof Error ? error : new Error(String(error)),
+      { step: "Config file reading" },
+    );
+    console.error(`\n${formattedError}\n`);
     process.exit(1);
   }
 }
@@ -223,17 +234,18 @@ async function validateData(
   config: SeedConfig,
   dataValidator: DataValidationService,
 ): Promise<void> {
-  console.log("🔍 Validating data...");
+  console.log(OutputFormatter.info("Validating data..."));
   try {
     await dataValidator.validateSeedConfig(config);
   } catch (error) {
     if (error instanceof DataValidationError) {
-      console.error(`❌ Data validation failed:\n${error instanceof Error ? error.message : String(error)}\n`);
+      const formattedError = ErrorFormatter.formatAsString(error, { step: "Data validation" });
+      console.error(`\n${formattedError}\n`);
       process.exit(1);
     }
     throw error;
   }
-  console.log("✅ Data validation passed\n");
+  console.log(OutputFormatter.success("Data validation passed\n"));
 }
 
 /**
@@ -245,8 +257,15 @@ async function executeSeedingFlow(
   batchId: string,
   isDryRun: boolean,
 ): Promise<{
-  shopifyResult: { shopifyOrders: Array<{ shopifyOrderId: string; shopifyOrderNumber: string; lineItems: Array<{ lineItemId: string; sku: string }> }> };
-  wmsResult: { orders: Array<{ orderId: string }>; shipments: Array<{ shipmentId: string }> };
+  shopifyResult: { 
+    shopifyOrders: Array<{ shopifyOrderId: string; shopifyOrderNumber: string; lineItems: Array<{ lineItemId: string; sku: string }> }>;
+    failures?: Array<{ orderIndex: number; customerEmail: string; error: string }>;
+  };
+  wmsResult: { 
+    orders: Array<{ orderId: string }>; 
+    shipments: Array<{ shipmentId: string }>;
+    failures?: Array<{ orderIndex: number; shopifyOrderId: string; customerEmail?: string; error: string }>;
+  };
   collectionPrepResult?: { collectionPrepId: string; region: string };
 }> {
   // Generate collection prep name early if collection prep is configured
@@ -263,7 +282,13 @@ async function executeSeedingFlow(
 
   // Step 1: Seed Shopify orders
   const step1Label = isDryRun ? "Would seed" : "Seeding";
-  console.log(`🛒 Step 1: ${step1Label} Shopify orders...`);
+  const step1Name = `${step1Label} Shopify orders`;
+  const totalSteps = config.collectionPrep ? 3 : 2;
+  console.log(OutputFormatter.step(1, totalSteps, step1Name));
+  
+  const progressTracker = new ProgressTracker();
+  progressTracker.start(step1Name, config.orders.length);
+  
   const shopifyRequest = {
     orders: config.orders.map((order) => ({
       customer: order.customer,
@@ -278,18 +303,57 @@ async function executeSeedingFlow(
   };
 
   const shopifyResult = await services.seedShopifyOrdersHandler.execute(shopifyRequest);
+  progressTracker.update(config.orders.length);
+  progressTracker.complete();
+  
   const createdLabel = isDryRun ? "Would create" : "Created";
-  console.log(`✅ ${createdLabel} ${shopifyResult.shopifyOrders.length} Shopify order(s)\n`);
+  const successCount = shopifyResult.shopifyOrders.length;
+  const totalCount = config.orders.length;
+  
+  if (shopifyResult.failures && shopifyResult.failures.length > 0) {
+    console.log(OutputFormatter.warning(`${createdLabel} ${successCount}/${totalCount} Shopify order(s). ${shopifyResult.failures.length} failed.\n`));
+  } else {
+    console.log(OutputFormatter.success(`${createdLabel} ${successCount} Shopify order(s)\n`));
+  }
+
+  // Handle partial failures from Shopify seeding
+  if (shopifyResult.failures && shopifyResult.failures.length > 0) {
+    console.log(OutputFormatter.section("Shopify Seeding Failures", [
+      OutputFormatter.listItem(`Failed: ${shopifyResult.failures.length} of ${totalCount} orders`),
+      ...shopifyResult.failures.map((failure) =>
+        OutputFormatter.listItem(
+          `Order ${failure.orderIndex + 1} (${failure.customerEmail}): ${failure.error}`,
+          2,
+        ),
+      ),
+    ]));
+    
+    const promptService = new InteractivePromptService();
+    const shouldContinue = await promptService.promptConfirm(
+      "Some Shopify orders failed. Continue with WMS seeding for successful orders?",
+      false,
+    );
+    
+    if (!shouldContinue) {
+      console.log(OutputFormatter.info("Aborting seeding operation."));
+      process.exit(1);
+    }
+    console.log();
+  }
 
   // Step 2: Seed WMS entities
-  console.log(`🗄️  Step 2: ${step1Label} WMS entities...`);
+  const step2Number = config.collectionPrep ? 3 : 2;
+  const step2Name = `${step1Label} WMS entities`;
+  console.log(OutputFormatter.step(step2Number, config.collectionPrep ? 3 : 2, step2Name));
+  
   const region = config.collectionPrep?.region || "CA";
   let collectionPrepId: string | undefined;
 
   // Create collection prep if configured (using pre-generated name)
   if (config.collectionPrep) {
+    const step2aNumber = 2;
     const creatingLabel = isDryRun ? "Would create" : "Creating";
-    console.log(`📋 ${creatingLabel} collection prep...`);
+    console.log(OutputFormatter.step(step2aNumber, totalSteps, `${creatingLabel} collection prep`));
     const collectionPrepRequest = {
       orderIds: shopifyResult.shopifyOrders.map((o) => o.shopifyOrderId),
       carrier: config.collectionPrep.carrier,
@@ -302,10 +366,13 @@ async function executeSeedingFlow(
 
     const collectionPrepResult = await services.createCollectionPrepHandler.execute(collectionPrepRequest);
     collectionPrepId = collectionPrepResult.collectionPrepId;
-    console.log(`✅ ${createdLabel} collection prep: ${collectionPrepId}\n`);
+    console.log(OutputFormatter.success(`${createdLabel} collection prep: ${collectionPrepId}\n`));
   }
 
   // Seed WMS entities with Shopify order data
+  const wmsProgressTracker = new ProgressTracker();
+  wmsProgressTracker.start(step2Name, shopifyResult.shopifyOrders.length);
+  
   const wmsRequest = {
     shopifyOrders: shopifyResult.shopifyOrders.map((shopifyOrder, index) => {
       const configOrder = config.orders[index];
@@ -332,8 +399,33 @@ async function executeSeedingFlow(
   };
 
   const wmsResult = await services.seedWmsEntitiesHandler.execute(wmsRequest);
-  console.log(`✅ ${createdLabel} ${wmsResult.orders.length} WMS order(s)`);
-  console.log(`✅ ${createdLabel} ${wmsResult.shipments.length} shipment(s)\n`);
+  wmsProgressTracker.update(shopifyResult.shopifyOrders.length);
+  wmsProgressTracker.complete();
+  
+  const wmsSuccessCount = wmsResult.orders.length;
+  const wmsTotalCount = shopifyResult.shopifyOrders.length;
+  
+  if (wmsResult.failures && wmsResult.failures.length > 0) {
+    console.log(OutputFormatter.warning(`${createdLabel} ${wmsSuccessCount}/${wmsTotalCount} WMS order(s). ${wmsResult.failures.length} failed.`));
+    console.log(OutputFormatter.warning(`${createdLabel} ${wmsResult.shipments.length} shipment(s)\n`));
+  } else {
+    console.log(OutputFormatter.success(`${createdLabel} ${wmsSuccessCount} WMS order(s)`));
+    console.log(OutputFormatter.success(`${createdLabel} ${wmsResult.shipments.length} shipment(s)\n`));
+  }
+  
+  // Handle partial failures from WMS seeding
+  if (wmsResult.failures && wmsResult.failures.length > 0) {
+    console.log(OutputFormatter.section("WMS Seeding Failures", [
+      OutputFormatter.listItem(`Failed: ${wmsResult.failures.length} of ${wmsTotalCount} orders`),
+      ...wmsResult.failures.map((failure) =>
+        OutputFormatter.listItem(
+          `Order ${failure.orderIndex + 1} (${failure.shopifyOrderId}${failure.customerEmail ? `, ${failure.customerEmail}` : ""}): ${failure.error}`,
+          2,
+        ),
+      ),
+    ]));
+    console.log();
+  }
 
   const collectionPrepResult = collectionPrepId
     ? { collectionPrepId, region: config.collectionPrep!.region }
@@ -346,37 +438,80 @@ async function executeSeedingFlow(
  * Display summary of seeding results
  */
 function displaySummary(
-  shopifyResult: { shopifyOrders: Array<{ shopifyOrderId: string; shopifyOrderNumber: string }> },
-  wmsResult: { orders: Array<{ orderId: string }>; shipments: Array<{ shipmentId: string }> },
+  shopifyResult: { 
+    shopifyOrders: Array<{ shopifyOrderId: string; shopifyOrderNumber: string }>;
+    failures?: Array<{ orderIndex: number; customerEmail: string; error: string }>;
+  },
+  wmsResult: { 
+    orders: Array<{ orderId: string }>; 
+    shipments: Array<{ shipmentId: string }>;
+    failures?: Array<{ orderIndex: number; shopifyOrderId: string; customerEmail?: string; error: string }>;
+  },
   collectionPrepResult?: { collectionPrepId: string; region: string },
   isDryRun = false,
 ): void {
-  if (isDryRun) {
-    console.log("\n🔍 DRY RUN MODE - No changes will be made");
-  } else {
-    console.log("\n✅ Seeding Complete!");
-  }
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log(`📦 Shopify Orders ${isDryRun ? "Would Be" : "Created"}: ${shopifyResult.shopifyOrders.length}`);
-  shopifyResult.shopifyOrders.forEach((order) => {
-    console.log(`   - Order #${order.shopifyOrderNumber} (ID: ${order.shopifyOrderId})`);
+  const items: Array<{ label: string; value: string | number }> = [];
+  
+  const shopifySuccess = shopifyResult.shopifyOrders.length;
+  const shopifyFailures = shopifyResult.failures?.length || 0;
+  const shopifyTotal = shopifySuccess + shopifyFailures;
+  
+  items.push({
+    label: `Shopify Orders ${isDryRun ? "Would Be" : "Created"}`,
+    value: shopifyFailures > 0 ? `${shopifySuccess}/${shopifyTotal}` : shopifySuccess,
+  });
+  
+  const wmsSuccess = wmsResult.orders.length;
+  const wmsFailures = wmsResult.failures?.length || 0;
+  const wmsTotal = wmsSuccess + wmsFailures;
+  
+  items.push({
+    label: "WMS Orders",
+    value: wmsFailures > 0 ? `${wmsSuccess}/${wmsTotal}` : wmsSuccess,
+  });
+  
+  items.push({
+    label: "WMS Shipments",
+    value: wmsResult.shipments.length,
   });
 
-  console.log(`\n🗄️  WMS Entities ${isDryRun ? "Would Be" : "Created"}:`);
-  console.log(`   - Orders: ${wmsResult.orders.length}`);
-  console.log(`   - Shipments: ${wmsResult.shipments.length}`);
-
   if (collectionPrepResult) {
-    console.log(`\n📋 Collection Prep ${isDryRun ? "Would Be" : "Created"}:`);
-    console.log(`   - ID: ${collectionPrepResult.collectionPrepId}`);
-    console.log(`   - Region: ${collectionPrepResult.region}`);
+    items.push({
+      label: "Collection Prep ID",
+      value: collectionPrepResult.collectionPrepId,
+    });
+    items.push({
+      label: "Collection Prep Region",
+      value: collectionPrepResult.region,
+    });
+  }
+  
+  if (shopifyFailures > 0 || wmsFailures > 0) {
+    items.push({
+      label: "Total Failures",
+      value: (shopifyFailures || 0) + (wmsFailures || 0),
+    });
   }
 
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  console.log();
+  console.log(OutputFormatter.summary({
+    title: isDryRun 
+      ? OutputFormatter.header("DRY RUN MODE - No changes will be made", "🔍")
+      : OutputFormatter.success("Seeding Complete!"),
+    items,
+  }));
+  
+  // Show detailed order list if small number
+  if (shopifyResult.shopifyOrders.length <= 10) {
+    console.log(OutputFormatter.header("Shopify Orders", "📦"));
+    shopifyResult.shopifyOrders.forEach((order) => {
+      console.log(OutputFormatter.listItem(`Order #${order.shopifyOrderNumber} (ID: ${order.shopifyOrderId})`));
+    });
+    console.log();
+  }
+  
   if (isDryRun) {
-    console.log("⚠️  DRY RUN - No actual changes were made");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-  } else {
+    console.log(OutputFormatter.warning("DRY RUN - No actual changes were made"));
     console.log();
   }
 }
@@ -386,18 +521,25 @@ function displaySummary(
  */
 function checkStagingEnvironment(): void {
   const envInfo = displayStagingEnvironment();
-  console.log("🔒 Staging Environment Check");
-  console.log(`   Database: ${envInfo.databaseUrl}`);
-  console.log(`   Shopify: ${envInfo.shopifyDomain}`);
-  console.log(`   Status: ${envInfo.isStaging ? "✅ Staging" : "❌ Not Staging"}\n`);
+  const statusEmoji = envInfo.isStaging ? "✅" : "❌";
+  const statusText = envInfo.isStaging ? "Staging" : "Not Staging";
+  
+  console.log(OutputFormatter.summary({
+    title: OutputFormatter.header("Staging Environment Check", "🔒"),
+    items: [
+      { label: "Database", value: envInfo.databaseUrl },
+      { label: "Shopify", value: envInfo.shopifyDomain },
+      { label: "Status", value: `${statusEmoji} ${statusText}` },
+    ],
+  }));
+  console.log();
 
   try {
     assertStagingEnvironment();
   } catch (error) {
     if (error instanceof StagingGuardrailError) {
-      console.error("❌ Staging Guardrail Violation:");
-      console.error(`   ${error.message}\n`);
-      console.error("This tool can only run against staging environments.");
+      const formattedError = ErrorFormatter.formatAsString(error, { step: "Staging environment check" });
+      console.error(`\n${formattedError}\n`);
       process.exit(1);
     }
     throw error;
@@ -408,22 +550,34 @@ function checkStagingEnvironment(): void {
  * Execute dry-run mode: simulate full flow without making actual changes
  */
 async function executeDryRun(configFilePath: string): Promise<void> {
-  console.log("🔍 DRY RUN MODE - No changes will be made");
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+  console.log(OutputFormatter.header("DRY RUN MODE - No changes will be made", "🔍"));
+  console.log(OutputFormatter.separator());
+  console.log();
 
   // Config is already initialized in main(), so staging check can proceed
   checkStagingEnvironment();
 
   // Initialize services with dryRun=true
-  console.log("🔧 Initializing services (DRY RUN mode)...");
+  console.log(OutputFormatter.info("Initializing services (DRY RUN mode)..."));
+  const initProgress = new ProgressTracker({ showSpinner: false });
+  initProgress.start("Initializing", 4);
+  
+  initProgress.update(1, "Connecting to database...");
   const services = initializeServices(true);
+  initProgress.update(2, "Initializing Shopify client...");
+  initProgress.update(3, "Loading reference data...");
+  initProgress.update(4, "Ready");
+  initProgress.complete("Services initialized");
+  console.log();
+  
   try {
     const config = parseAndValidateConfig(configFilePath, services.inputParser);
     await validateData(config, services.dataValidator);
 
     // Generate batch ID for this run
     const batchId = uuidv4();
-    console.log(`🆔 Batch ID: ${batchId}\n`);
+    console.log(OutputFormatter.keyValue("Batch ID", batchId));
+    console.log();
 
     const { shopifyResult, wmsResult, collectionPrepResult } = await executeSeedingFlow(
       config,
@@ -465,15 +619,25 @@ async function main(): Promise<void> {
     checkStagingEnvironment();
 
     // Initialize services
-    console.log("🔧 Initializing services...");
+    console.log(OutputFormatter.info("Initializing services..."));
+    const initProgress = new ProgressTracker({ showSpinner: false });
+    initProgress.start("Initializing", 4);
+    
+    initProgress.update(1, "Connecting to database...");
     const services = initializeServices(false);
+    initProgress.update(2, "Initializing Shopify client...");
+    initProgress.update(3, "Loading reference data...");
+    initProgress.update(4, "Ready");
+    initProgress.complete("Services initialized");
+    console.log();
     try {
       const config = parseAndValidateConfig(options.configFile, services.inputParser);
       await validateData(config, services.dataValidator);
 
       // Generate batch ID for this run
       const batchId = uuidv4();
-      console.log(`🆔 Batch ID: ${batchId}\n`);
+      console.log(OutputFormatter.keyValue("Batch ID", batchId));
+      console.log();
 
       const { shopifyResult, wmsResult, collectionPrepResult } = await executeSeedingFlow(
         config,
@@ -488,15 +652,17 @@ async function main(): Promise<void> {
       await services.prisma.$disconnect();
     }
   } catch (error) {
-    console.error("\n❌ Seeding failed:");
-    if (error instanceof Error) {
-      console.error(`   ${error.message}`);
-      if (error.stack && process.env.NODE_ENV === "development") {
-        console.error(`\nStack trace:\n${error.stack}`);
-      }
-    } else {
-      console.error(`   ${String(error)}`);
+    const errorContext = { step: "Seeding operation" };
+    const formattedError = ErrorFormatter.formatAsString(
+      error instanceof Error ? error : new Error(String(error)),
+      errorContext,
+    );
+    console.error(`\n${formattedError}\n`);
+    
+    if (error instanceof Error && error.stack && process.env.NODE_ENV === "development") {
+      console.error(`Stack trace:\n${error.stack}\n`);
     }
+    
     process.exit(1);
   }
 }

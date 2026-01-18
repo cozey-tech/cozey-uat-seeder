@@ -8,4 +8,9 @@ export type SeedShopifyOrdersResponse = {
     }>;
     fulfillmentStatus: string;
   }>;
+  failures?: Array<{
+    orderIndex: number;
+    customerEmail: string;
+    error: string;
+  }>;
 };

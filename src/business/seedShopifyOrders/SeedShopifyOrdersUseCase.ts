@@ -363,6 +363,13 @@ export class SeedShopifyOrdersUseCase {
 
     return {
       shopifyOrders,
+      failures: errors.length > 0
+        ? errors.map((e) => ({
+            orderIndex: e.orderIndex,
+            customerEmail: e.customerEmail,
+            error: e.error.message,
+          }))
+        : undefined,
     };
   }
 }

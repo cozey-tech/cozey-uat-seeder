@@ -31,6 +31,8 @@ import { DataValidationService } from "./services/DataValidationService";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import type { OrderTemplate } from "./services/InteractivePromptService";
+import { OutputFormatter } from "./utils/outputFormatter";
+import { ErrorFormatter } from "./utils/errorFormatter";
 
 interface CliOptions {
   dryRun: boolean;
@@ -114,7 +116,7 @@ function loadOrderTemplates(): OrderTemplate[] {
     const config = JSON.parse(fileContent);
     return config.templates || [];
   } catch {
-    console.warn("⚠️  Could not load order templates, continuing without them");
+    console.warn(OutputFormatter.warning("Could not load order templates, continuing without them"));
     return [];
   }
 }
@@ -146,11 +148,11 @@ function saveTemplate(template: OrderTemplate): void {
     if (existingIndex !== -1) {
       // Update existing template
       config.templates[existingIndex] = template;
-      console.log(`✅ Updated existing template: ${template.name} (${template.id})`);
+      console.log(OutputFormatter.success(`Updated existing template: ${template.name} (${template.id})`));
     } else {
       // Add new template
       config.templates.push(template);
-      console.log(`✅ Saved new template: ${template.name} (${template.id})`);
+      console.log(OutputFormatter.success(`Saved new template: ${template.name} (${template.id})`));
     }
     
     // Write back to file
@@ -193,14 +195,15 @@ function filterValidTemplates(
 
   // Report invalid templates with detailed error messages
   if (invalidTemplates.length > 0) {
-    console.warn(`\n⚠️  Filtered out ${invalidTemplates.length} invalid template(s):`);
+    console.warn();
+    console.warn(OutputFormatter.warning(`Filtered out ${invalidTemplates.length} invalid template(s):`));
     for (const { template, reasons } of invalidTemplates) {
-      console.warn(`   ❌ Template "${template.name}" (${template.id}):`);
+      console.warn(OutputFormatter.listItem(`Template "${template.name}" (${template.id}):`));
       for (const reason of reasons) {
-        console.warn(`      - ${reason}`);
+        console.warn(OutputFormatter.listItem(reason, 2));
       }
     }
-    console.warn("");
+    console.warn();
   }
 
   return validTemplates;
@@ -226,11 +229,13 @@ async function main(): Promise<void> {
     // Parse CLI arguments
     const options = parseArgs();
 
-    console.log("🚀 Interactive Config Generator");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+    console.log(OutputFormatter.header("Interactive Config Generator", "🚀"));
+    console.log(OutputFormatter.separator());
+    console.log();
 
     if (options.dryRun) {
-      console.log("🔍 DRY RUN MODE - No files will be saved\n");
+      console.log(OutputFormatter.header("DRY RUN MODE - No files will be saved", "🔍"));
+      console.log();
     }
 
     // Initialize Prisma
@@ -255,7 +260,7 @@ async function main(): Promise<void> {
 
       // Load reference data
       const referenceDataStart = Date.now();
-      console.log("📊 Loading reference data...");
+      console.log(OutputFormatter.info("Loading reference data..."));
       let [variants, customers, carriers, allTemplates] = await Promise.all([
         dataRepository.getAvailableVariants(region),
         dataRepository.getCustomers(region),
@@ -269,15 +274,24 @@ async function main(): Promise<void> {
 
       // Batch fetch all locations for customers upfront (performance optimization)
       const locationLoadStart = Date.now();
-      console.log("📊 Loading locations...");
+      console.log(OutputFormatter.info("Loading locations..."));
       const locationsCache = await dataRepository.getLocationsForCustomers(customers);
       const locationLoadTime = Date.now() - locationLoadStart;
-      console.log(`   ✓ Loaded ${locationsCache.size} location(s) (${locationLoadTime}ms)\n`);
+      console.log(OutputFormatter.success(`Loaded ${locationsCache.size} location(s) (${OutputFormatter.duration(locationLoadTime)})`));
+      console.log();
 
-      console.log(`   ✓ Found ${variants.length} variants`);
-      console.log(`   ✓ Found ${customers.length} customers`);
-      console.log(`   ✓ Found ${carriers.length} carriers`);
-      console.log(`   ✓ Found ${templates.length} valid template(s)${templates.length !== allTemplates.length ? ` (${allTemplates.length - templates.length} filtered out)` : ""}\n`);
+      const referenceItems: Array<{ label: string; value: string | number }> = [
+        { label: "Variants", value: variants.length },
+        { label: "Customers", value: customers.length },
+        { label: "Carriers", value: carriers.length },
+        { label: "Templates", value: `${templates.length} valid${templates.length !== allTemplates.length ? ` (${allTemplates.length - templates.length} filtered out)` : ""}` },
+      ];
+      
+      console.log(OutputFormatter.summary({
+        title: OutputFormatter.header("Reference Data Loaded", "📊"),
+        items: referenceItems,
+      }));
+      console.log();
 
       // Validate reference data is not empty
       if (variants.length === 0) {
@@ -318,8 +332,9 @@ async function main(): Promise<void> {
         // Individual mode: original flow
         const orderCount = await promptService.promptOrderCount();
         for (let i = 0; i < orderCount; i++) {
-        console.log(`\n📦 Building Order ${i + 1} of ${orderCount}`);
-        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log();
+        console.log(OutputFormatter.progress(i + 1, orderCount, "Building Order"));
+        console.log(OutputFormatter.separator());
 
         // Select customer
         const customer = await promptService.promptCustomerSelection(customers);
@@ -595,7 +610,8 @@ async function main(): Promise<void> {
           );
 
           if (!inventoryCheck.sufficient) {
-            console.log(`\n⚠️  Order ${check.orderIndex + 1} has inventory shortages:`);
+            console.log();
+            console.log(OutputFormatter.warning(`Order ${check.orderIndex + 1} has inventory shortages:`));
             const shouldModify = await promptService.promptInventoryModification(inventoryCheck);
             if (shouldModify) {
               await inventoryService.ensureInventoryForOrder(
@@ -651,14 +667,17 @@ async function main(): Promise<void> {
             composition,
             locationId: customer.locationId,
           });
-          console.log(`✅ Added order ${orders.length}\n`);
+          console.log(OutputFormatter.success(`Added order ${orders.length}`));
+          console.log();
         } else if (reviewAction === "edit") {
           if (orders.length === 0) {
-            console.log("⚠️  No orders to edit.\n");
+            console.log(OutputFormatter.warning("No orders to edit."));
+            console.log();
             continue;
           }
           const orderIndex = await promptService.promptOrderToEdit(orders.length);
-          console.log(`\n📝 Editing Order ${orderIndex + 1}...`);
+          console.log();
+          console.log(OutputFormatter.info(`Editing Order ${orderIndex + 1}...`));
 
           // Rebuild the order
           const customer = await promptService.promptCustomerSelection(customers);
@@ -740,8 +759,9 @@ async function main(): Promise<void> {
       }
 
       // Prompt for collection prep
-      console.log("\n📋 Collection Prep Configuration");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log();
+      console.log(OutputFormatter.header("Collection Prep Configuration", "📋"));
+      console.log(OutputFormatter.separator());
 
       let collectionPreps: Array<{
         carrier: Carrier;
@@ -756,7 +776,8 @@ async function main(): Promise<void> {
       let testTag: string | undefined;
 
       if (carriers.length === 0) {
-        console.warn("⚠️  No carriers available. Skipping collection prep configuration.\n");
+        console.warn(OutputFormatter.warning("No carriers available. Skipping collection prep configuration."));
+        console.warn();
       } else {
         const builderMode = await promptService.promptCollectionPrepBuilderMode();
 
@@ -815,8 +836,9 @@ async function main(): Promise<void> {
           }
 
           // Show allocation summary
-          console.log("\n📊 Bulk Collection Prep Summary:");
-          console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+          console.log();
+          console.log(OutputFormatter.header("Bulk Collection Prep Summary", "📊"));
+          console.log(OutputFormatter.separator());
           for (let i = 0; i < collectionPreps.length; i++) {
             const prep = collectionPreps[i];
             const orderList = prep.orderIndices
@@ -890,8 +912,9 @@ async function main(): Promise<void> {
           }
 
           // Show allocation summary
-          console.log("\n📊 Collection Prep Allocation Summary:");
-          console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+          console.log();
+          console.log(OutputFormatter.header("Collection Prep Allocation Summary", "📊"));
+          console.log(OutputFormatter.separator());
           for (let i = 0; i < collectionPreps.length; i++) {
             const prep = collectionPreps[i];
             const orderList = prep.orderIndices
@@ -939,22 +962,24 @@ async function main(): Promise<void> {
 
       // Validate config
       const validationStart = Date.now();
-      console.log("✅ Validating configuration...");
+      console.log(OutputFormatter.info("Validating configuration..."));
       const validationResult = await validationService.validateFull(config);
       performanceMetrics.validationTime = Date.now() - validationStart;
 
       if (!validationResult.valid) {
-        console.error("\n❌ Validation failed:");
+        console.error();
+        console.error(OutputFormatter.error("Validation failed:"));
         validationResult.errors.forEach((error) => {
-          console.error(`   - ${error}`);
+          console.error(OutputFormatter.listItem(error));
         });
         process.exit(1);
       }
 
       if (validationResult.warnings.length > 0) {
-        console.warn("\n⚠️  Validation warnings:");
+        console.warn();
+        console.warn(OutputFormatter.warning("Validation warnings:"));
         validationResult.warnings.forEach((warning) => {
-          console.warn(`   - ${warning}`);
+          console.warn(OutputFormatter.listItem(warning));
         });
       }
 
@@ -975,50 +1000,80 @@ async function main(): Promise<void> {
         }
         
         writeFileSync(outputPath, JSON.stringify(config, null, 2), "utf-8");
-        console.log(`\n✅ Configuration saved to: ${outputPath}`);
+        console.log();
+        console.log(OutputFormatter.success(`Configuration saved to: ${outputPath}`));
       }
 
       // Display summary (only if generation completed successfully)
       if (config && config.orders.length > 0) {
         performanceMetrics.totalTime = Date.now() - startTime;
-        console.log("\n✅ Config Generation Complete!");
-        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        console.log(`📦 Orders: ${config.orders.length}`);
+        const summaryItems: Array<{ label: string; value: string | number }> = [
+          { label: "Orders", value: config.orders.length },
+        ];
+        
         if (config.collectionPreps && config.collectionPreps.length > 0) {
-          console.log(`📋 Collection Preps: ${config.collectionPreps.length}`);
-          for (let i = 0; i < config.collectionPreps.length; i++) {
-            const prep = config.collectionPreps[i];
-            console.log(`   Prep ${i + 1}: ${prep.carrier} at ${prep.locationId}`);
-          }
+          summaryItems.push({ label: "Collection Preps", value: config.collectionPreps.length });
         } else if (config.collectionPrep) {
-          console.log(`📋 Collection Prep: ${config.collectionPrep.carrier} at ${config.collectionPrep.locationId}`);
+          summaryItems.push({ 
+            label: "Collection Prep", 
+            value: `${config.collectionPrep.carrier} at ${config.collectionPrep.locationId}`,
+          });
         }
-        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        console.log("\n📊 Performance Summary:");
-        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        console.log(`   Total Time: ${performanceMetrics.totalTime}ms (${(performanceMetrics.totalTime / 1000).toFixed(2)}s)`);
-        console.log(`   Reference Data Load: ${performanceMetrics.referenceDataLoadTime}ms`);
-        console.log(`   Order Creation: ${performanceMetrics.orderCreationTime}ms (${performanceMetrics.orderCount} orders)`);
+        
+        console.log();
+        console.log(OutputFormatter.summary({
+          title: OutputFormatter.success("Config Generation Complete!"),
+          items: summaryItems,
+        }));
+        
+        // Performance summary
+        const perfItems: Array<{ label: string; value: string | number }> = [
+          { label: "Total Time", value: OutputFormatter.duration(performanceMetrics.totalTime) },
+          { label: "Reference Data Load", value: OutputFormatter.duration(performanceMetrics.referenceDataLoadTime) },
+          { label: "Order Creation", value: `${OutputFormatter.duration(performanceMetrics.orderCreationTime)} (${performanceMetrics.orderCount} orders)` },
+        ];
+        
         if (performanceMetrics.collectionPrepCount > 0) {
-          console.log(`   Collection Prep Generation: ${performanceMetrics.collectionPrepTime}ms (${performanceMetrics.collectionPrepCount} preps)`);
+          perfItems.push({ 
+            label: "Collection Prep Generation", 
+            value: `${OutputFormatter.duration(performanceMetrics.collectionPrepTime)} (${performanceMetrics.collectionPrepCount} preps)`,
+          });
           if (performanceMetrics.parallelOperations > 0) {
-            console.log(`   Parallel Operations: ${performanceMetrics.parallelOperations} collection preps generated in parallel`);
+            perfItems.push({ 
+              label: "Parallel Operations", 
+              value: `${performanceMetrics.parallelOperations} collection preps generated in parallel`,
+            });
           }
         }
-        console.log(`   Validation: ${performanceMetrics.validationTime}ms`);
-        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        
+        perfItems.push({ 
+          label: "Validation", 
+          value: OutputFormatter.duration(performanceMetrics.validationTime),
+        });
+        
+        console.log();
+        console.log(OutputFormatter.summary({
+          title: OutputFormatter.header("Performance Summary", "📊"),
+          items: perfItems,
+        }));
+        console.log();
       }
     } finally {
       await prisma.$disconnect();
     }
   } catch (error) {
     if (error instanceof Error) {
-      console.error(`\n❌ Error: ${error.message}`);
-      if (error.stack) {
-        console.error(error.stack);
+      const formattedError = ErrorFormatter.formatAsString(error, { step: "Config generation" });
+      console.error(`\n${formattedError}\n`);
+      if (error.stack && process.env.NODE_ENV === "development") {
+        console.error(`Stack trace:\n${error.stack}\n`);
       }
     } else {
-      console.error("\n❌ Unknown error:", error);
+      const formattedError = ErrorFormatter.formatAsString(
+        new Error(String(error)),
+        { step: "Config generation" },
+      );
+      console.error(`\n${formattedError}\n`);
     }
     process.exit(1);
   }
@@ -1026,6 +1081,10 @@ async function main(): Promise<void> {
 
 // Run main function
 main().catch((error) => {
-  console.error("Fatal error:", error);
+  const formattedError = ErrorFormatter.formatAsString(
+    error instanceof Error ? error : new Error(String(error)),
+    { step: "Config generation" },
+  );
+  console.error(`\n${formattedError}\n`);
   process.exit(1);
 });

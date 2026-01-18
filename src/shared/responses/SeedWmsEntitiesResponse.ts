@@ -11,4 +11,10 @@ export type SeedWmsEntitiesResponse = {
     prepPartItemId: string;
     partId: string;
   }>;
+  failures?: Array<{
+    orderIndex: number;
+    shopifyOrderId: string;
+    customerEmail?: string;
+    error: string;
+  }>;
 };
