@@ -91,6 +91,22 @@ export class ShopifyService {
   }
 
   /**
+   * Log GraphQL cost information if present in the response
+   * @param operation - Name of the operation (for logging context)
+   * @param response - GraphQL API response
+   * @param context - Additional context to include in log (e.g., orderId, tag)
+   */
+  private logGraphQLCostIfPresent(operation: string, response: unknown, context?: Record<string, unknown>): void {
+    const graphQLCost = this.extractGraphQLCost(response);
+    if (graphQLCost) {
+      Logger.debug(`GraphQL cost for ${operation}`, {
+        ...context,
+        cost: graphQLCost,
+      });
+    }
+  }
+
+  /**
    * Extract GraphQL cost information from API response extensions
    * @param response - GraphQL API response
    * @returns Cost information if available, undefined otherwise
@@ -610,13 +626,7 @@ export class ShopifyService {
 
     try {
       const response = await this.client.request(query, { variables });
-      const graphQLCost = this.extractGraphQLCost(response);
-      if (graphQLCost) {
-        Logger.debug("GraphQL cost for queryOrderById", {
-          orderId,
-          cost: graphQLCost,
-        });
-      }
+      this.logGraphQLCostIfPresent("queryOrderById", response, { orderId });
 
       if (!response.data?.order) {
         return null;
@@ -676,13 +686,7 @@ export class ShopifyService {
       const response = await this.client.request(query, { variables });
       // Note: Cost tracking for query operations - can be logged but not returned in this method
       // since it returns OrderQueryResult[] which doesn't include cost info
-      const graphQLCost = this.extractGraphQLCost(response);
-      if (graphQLCost) {
-        Logger.debug("GraphQL cost for queryOrdersByTag", {
-          tag,
-          cost: graphQLCost,
-        });
-      }
+      this.logGraphQLCostIfPresent("queryOrdersByTag", response, { tag });
 
       const orders = response.data?.orders?.edges || [];
       return orders.map((edge: { node: { id: string; name: string; lineItems: { edges: Array<{ node: { id: string; sku: string; quantity: number } }> } } }) => ({
@@ -742,13 +746,7 @@ export class ShopifyService {
       const response = await this.client.request(query, { variables });
       // Note: Cost tracking for variant lookup - can be logged but not returned
       // since it returns Map<string, string> which doesn't include cost info
-      const graphQLCost = this.extractGraphQLCost(response);
-      if (graphQLCost) {
-        Logger.debug("GraphQL cost for findVariantIdsBySkus", {
-          skuCount: skus.length,
-          cost: graphQLCost,
-        });
-      }
+      this.logGraphQLCostIfPresent("findVariantIdsBySkus", response, { skuCount: skus.length });
 
       const variantMap = new Map<string, string>();
       const products = response.data?.products?.edges || [];
@@ -767,13 +765,5 @@ export class ShopifyService {
     } catch (error) {
       throw new ShopifyServiceError(`Failed to find variants by SKUs: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-
-  /**
-   * Get GraphQL cost from a response (helper for performance tracking)
-   * This is a public method to allow use cases to track costs
-   */
-  extractGraphQLCostFromResponse(response: unknown): GraphQLCostInfo | undefined {
-    return this.extractGraphQLCost(response);
   }
 }

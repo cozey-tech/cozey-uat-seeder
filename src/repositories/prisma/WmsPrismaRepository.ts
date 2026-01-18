@@ -19,6 +19,19 @@ import type {
 export class WmsPrismaRepository implements WmsRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
+  /**
+   * Handle Prisma unique constraint violation errors (P2002)
+   * @param error - The error to check
+   * @param context - Context message for the error (e.g., "Order with shopifyOrderId X")
+   * @throws Error with context message if P2002 error, otherwise re-throws original error
+   */
+  private handlePrismaError(error: unknown, context: string): never {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+      throw new Error(`${context} already exists`);
+    }
+    throw error;
+  }
+
   async createOrder(order: CreateOrderRequest): Promise<IOrder> {
     try {
       const created = await this.prisma.order.create({
@@ -41,10 +54,7 @@ export class WmsPrismaRepository implements WmsRepository {
         region: created.region,
       };
     } catch (error: unknown) {
-      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
-        throw new Error(`Order with shopifyOrderId ${order.shopifyOrderId} already exists`);
-      }
-      throw error;
+      this.handlePrismaError(error, `Order with shopifyOrderId ${order.shopifyOrderId}`);
     }
   }
 
@@ -60,10 +70,7 @@ export class WmsPrismaRepository implements WmsRepository {
         },
       });
     } catch (error: unknown) {
-      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
-        throw new Error(`VariantOrder with lineItemId ${variantOrder.lineItemId} already exists`);
-      }
-      throw error;
+      this.handlePrismaError(error, `VariantOrder with lineItemId ${variantOrder.lineItemId}`);
     }
   }
 
@@ -80,10 +87,7 @@ export class WmsPrismaRepository implements WmsRepository {
         },
       });
     } catch (error: unknown) {
-      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
-        throw new Error(`Prep with id ${prep.prep} and region ${prep.region} already exists`);
-      }
-      throw error;
+      this.handlePrismaError(error, `Prep with id ${prep.prep} and region ${prep.region}`);
     }
   }
 
@@ -127,10 +131,7 @@ export class WmsPrismaRepository implements WmsRepository {
         status: created.status,
       };
     } catch (error: unknown) {
-      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
-        throw new Error(`Shipment for order ${shipment.orderId} and collectionPrep ${shipment.collectionPrepId} already exists`);
-      }
-      throw error;
+      this.handlePrismaError(error, `Shipment for order ${shipment.orderId} and collectionPrep ${shipment.collectionPrepId}`);
     }
   }
 
@@ -376,10 +377,7 @@ export class WmsPrismaRepository implements WmsRepository {
         },
       });
     } catch (error: unknown) {
-      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
-        throw new Error(`Customer with id ${customer.id} or email ${customer.email} already exists`);
-      }
-      throw error;
+      this.handlePrismaError(error, `Customer with id ${customer.id} or email ${customer.email}`);
     }
   }
 
