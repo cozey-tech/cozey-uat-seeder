@@ -119,12 +119,7 @@ describe("ConfigDataRepository", () => {
           region: true,
           description: true,
         },
-        orderBy: [
-          { modelName: "asc" },
-          { colorId: "asc" },
-          { description: "asc" },
-          { sku: "asc" },
-        ],
+        orderBy: [{ modelName: "asc" }, { colorId: "asc" }, { description: "asc" }, { sku: "asc" }],
       });
       // Verify batched variantPart query was called
       expect(mockPrisma.variantPart.findMany).toHaveBeenCalledWith({
@@ -186,9 +181,7 @@ describe("ConfigDataRepository", () => {
         },
       ];
 
-      vi.mocked(readFileSync).mockReturnValue(
-        JSON.stringify({ customers: mockCustomers }),
-      );
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ customers: mockCustomers }));
       vi.mocked(join).mockReturnValue("config/customers.json");
 
       const result = await repository.getCustomers();
@@ -219,13 +212,9 @@ describe("ConfigDataRepository", () => {
         },
       ];
 
-      vi.mocked(readFileSync).mockReturnValue(
-        JSON.stringify({ customers: invalidCustomers }),
-      );
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ customers: invalidCustomers }));
 
-      await expect(repository.getCustomers()).rejects.toThrow(
-        "Customer customer-1 is missing locationId",
-      );
+      await expect(repository.getCustomers()).rejects.toThrow("Customer customer-1 is missing locationId");
     });
   });
 
@@ -266,12 +255,12 @@ describe("ConfigDataRepository", () => {
       // Should include carriers with region: null (available for all regions)
       // and carriers with region: "CA"
       expect(result.length).toBeGreaterThan(0);
-      
+
       // Check that Canpar (region: null) is included
       const canpar = result.find((c) => c.id === "Canpar");
       expect(canpar).toBeDefined();
       expect(canpar?.name).toBe("Canpar");
-      
+
       // Check that GoBoltMontreal (region: "CA") is included
       const goBoltMontreal = result.find((c) => c.id === "GoBoltMontreal");
       expect(goBoltMontreal).toBeDefined();
@@ -285,14 +274,14 @@ describe("ConfigDataRepository", () => {
       // GoBoltMontreal should only be in CA results
       const goBoltMontrealCA = resultCA.find((c) => c.id === "GoBoltMontreal");
       const goBoltMontrealUS = resultUS.find((c) => c.id === "GoBoltMontreal");
-      
+
       expect(goBoltMontrealCA).toBeDefined();
       expect(goBoltMontrealUS).toBeUndefined();
 
       // GoBoltNewYorkCity should only be in US results
       const goBoltNYCCA = resultCA.find((c) => c.id === "GoBoltNewYorkCity");
       const goBoltNYCUS = resultUS.find((c) => c.id === "GoBoltNewYorkCity");
-      
+
       expect(goBoltNYCCA).toBeUndefined();
       expect(goBoltNYCUS).toBeDefined();
     });

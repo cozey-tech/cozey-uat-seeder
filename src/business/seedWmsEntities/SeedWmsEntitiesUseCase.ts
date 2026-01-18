@@ -25,72 +25,71 @@ export class SeedWmsEntitiesUseCase {
         orderIndex,
         shopifyOrderId: shopifyOrder.shopifyOrderId,
       });
-      
+
       try {
-      // Check if order already exists (idempotency)
-      const existingOrder = await this.wmsService.repository.findOrderByShopifyId(shopifyOrder.shopifyOrderId);
-      if (existingOrder) {
-        // Order already exists, skip creation but include in response
-        orders.push({
-          orderId: existingOrder.id,
-          shopifyOrderId: existingOrder.shopifyOrderId,
-        });
-        
-        // Check if shipment exists for this order and collection prep (if collection prep is configured)
-        // If not, create it to ensure idempotent orders have shipments when resuming
-        if (request.collectionPrepId) {
-          try {
-            // Try to create shipment - will throw if it already exists (P2002)
-            const shipmentId = await this.wmsService.createShipmentForOrder(
-              request.collectionPrepId,
-              existingOrder.id, // Use WMS database order ID, not Shopify order ID
-              request.region,
-            );
-            shipments.push({
-              shipmentId: shipmentId,
-              orderId: existingOrder.id,
-            });
-          } catch (error: unknown) {
-            // Shipment may already exist (unique constraint violation P2002)
-            // This is expected for idempotent orders that already have shipments
-            // Check if it's a P2002 error (unique constraint) - if so, shipment already exists, which is fine
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            if (errorMessage.includes("already exists")) {
-              Logger.info("Shipment already exists for idempotent order", {
-                shopifyOrderId: shopifyOrder.shopifyOrderId,
+        // Check if order already exists (idempotency)
+        const existingOrder = await this.wmsService.repository.findOrderByShopifyId(shopifyOrder.shopifyOrderId);
+        if (existingOrder) {
+          // Order already exists, skip creation but include in response
+          orders.push({
+            orderId: existingOrder.id,
+            shopifyOrderId: existingOrder.shopifyOrderId,
+          });
+
+          // Check if shipment exists for this order and collection prep (if collection prep is configured)
+          // If not, create it to ensure idempotent orders have shipments when resuming
+          if (request.collectionPrepId) {
+            try {
+              // Try to create shipment - will throw if it already exists (P2002)
+              const shipmentId = await this.wmsService.createShipmentForOrder(
+                request.collectionPrepId,
+                existingOrder.id, // Use WMS database order ID, not Shopify order ID
+                request.region,
+              );
+              shipments.push({
+                shipmentId: shipmentId,
                 orderId: existingOrder.id,
-                collectionPrepId: request.collectionPrepId,
               });
-              // Shipment already exists - this is fine, continue
-            } else {
-              // Re-throw unexpected errors
-              throw error;
+            } catch (error: unknown) {
+              // Shipment may already exist (unique constraint violation P2002)
+              // This is expected for idempotent orders that already have shipments
+              // Check if it's a P2002 error (unique constraint) - if so, shipment already exists, which is fine
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              if (errorMessage.includes("already exists")) {
+                Logger.info("Shipment already exists for idempotent order", {
+                  shopifyOrderId: shopifyOrder.shopifyOrderId,
+                  orderId: existingOrder.id,
+                  collectionPrepId: request.collectionPrepId,
+                });
+                // Shipment already exists - this is fine, continue
+              } else {
+                // Re-throw unexpected errors
+                throw error;
+              }
             }
           }
-        }
-        
-        // Notify progress callback of success (idempotent order)
-        if (request.onOrderProgress) {
-          request.onOrderProgress(orderIndex + 1, request.shopifyOrders.length, shopifyOrder.shopifyOrderId, true);
-        }
-        
-        // Close operation tracking before continuing
-        Logger.endOperation(orderOperationId, true, {
-          orderId: existingOrder.id,
-          idempotent: true,
-        });
-        continue; // Skip to next order
-      }
 
-      // Use actual data from Shopify order, with sensible defaults
-      // Orders are paid but not fulfilled during seeding
-      const orderStatus = shopifyOrder.status || "paid";
-      const customerName = shopifyOrder.customerName || "Seed Customer";
-      const customerEmail = shopifyOrder.customerEmail || "seed@example.com";
+          // Notify progress callback of success (idempotent order)
+          if (request.onOrderProgress) {
+            request.onOrderProgress(orderIndex + 1, request.shopifyOrders.length, shopifyOrder.shopifyOrderId, true);
+          }
 
-      // Create order with customer
-      const { orderDbId, shopifyOrderId: createdShopifyOrderId } =
-        await this.wmsService.createOrderWithCustomer(
+          // Close operation tracking before continuing
+          Logger.endOperation(orderOperationId, true, {
+            orderId: existingOrder.id,
+            idempotent: true,
+          });
+          continue; // Skip to next order
+        }
+
+        // Use actual data from Shopify order, with sensible defaults
+        // Orders are paid but not fulfilled during seeding
+        const orderStatus = shopifyOrder.status || "paid";
+        const customerName = shopifyOrder.customerName || "Seed Customer";
+        const customerEmail = shopifyOrder.customerEmail || "seed@example.com";
+
+        // Create order with customer
+        const { orderDbId, shopifyOrderId: createdShopifyOrderId } = await this.wmsService.createOrderWithCustomer(
           shopifyOrder.shopifyOrderId,
           shopifyOrder.shopifyOrderNumber,
           orderStatus,
@@ -99,72 +98,72 @@ export class SeedWmsEntitiesUseCase {
           customerEmail,
         );
 
-      orders.push({
-        orderId: orderDbId,
-        shopifyOrderId: createdShopifyOrderId,
-      });
-
-      // Create variantOrders - use actual quantities from Shopify
-      const variantOrders = await this.wmsService.createVariantOrdersForOrder(
-        shopifyOrder.shopifyOrderId, // Use shopifyOrderId as orderId reference (per schema FK)
-        shopifyOrder.lineItems.map((item) => ({
-          lineItemId: item.lineItemId,
-          sku: item.sku,
-          quantity: item.quantity || 1, // Use actual quantity from Shopify, default to 1
-        })),
-        request.region,
-      );
-
-      // Create preps
-      const preps = await this.wmsService.createPrepsForOrder(
-        shopifyOrder.shopifyOrderId,
-        variantOrders,
-        request.collectionPrepId,
-        request.region,
-      );
-
-      // Create prepParts and prepPartItems - use actual quantities
-      const prepPartsAndItems = await this.wmsService.createPrepPartsAndItems(
-        preps,
-        shopifyOrder.lineItems.map((item) => ({
-          lineItemId: item.lineItemId,
-          sku: item.sku,
-          quantity: item.quantity || 1, // Use actual quantity from Shopify
-        })),
-        request.region,
-      );
-
-      // Collect prepPartItem IDs
-      for (const prepPartItem of prepPartsAndItems) {
-        prepPartItems.push({
-          prepPartItemId: prepPartItem.prepPartItemId,
-          partId: prepPartItem.partId,
+        orders.push({
+          orderId: orderDbId,
+          shopifyOrderId: createdShopifyOrderId,
         });
-      }
 
-      // Create shipment if collectionPrepId is provided
-      if (request.collectionPrepId) {
-        const shipmentId = await this.wmsService.createShipmentForOrder(
-          request.collectionPrepId,
-          orderDbId, // Use WMS database order ID, not Shopify order ID
+        // Create variantOrders - use actual quantities from Shopify
+        const variantOrders = await this.wmsService.createVariantOrdersForOrder(
+          shopifyOrder.shopifyOrderId, // Use shopifyOrderId as orderId reference (per schema FK)
+          shopifyOrder.lineItems.map((item) => ({
+            lineItemId: item.lineItemId,
+            sku: item.sku,
+            quantity: item.quantity || 1, // Use actual quantity from Shopify, default to 1
+          })),
           request.region,
         );
 
-        shipments.push({
-          shipmentId: shipmentId,
-          orderId: orderDbId, // Use WMS database order ID, not Shopify order ID
+        // Create preps
+        const preps = await this.wmsService.createPrepsForOrder(
+          shopifyOrder.shopifyOrderId,
+          variantOrders,
+          request.collectionPrepId,
+          request.region,
+        );
+
+        // Create prepParts and prepPartItems - use actual quantities
+        const prepPartsAndItems = await this.wmsService.createPrepPartsAndItems(
+          preps,
+          shopifyOrder.lineItems.map((item) => ({
+            lineItemId: item.lineItemId,
+            sku: item.sku,
+            quantity: item.quantity || 1, // Use actual quantity from Shopify
+          })),
+          request.region,
+        );
+
+        // Collect prepPartItem IDs
+        for (const prepPartItem of prepPartsAndItems) {
+          prepPartItems.push({
+            prepPartItemId: prepPartItem.prepPartItemId,
+            partId: prepPartItem.partId,
+          });
+        }
+
+        // Create shipment if collectionPrepId is provided
+        if (request.collectionPrepId) {
+          const shipmentId = await this.wmsService.createShipmentForOrder(
+            request.collectionPrepId,
+            orderDbId, // Use WMS database order ID, not Shopify order ID
+            request.region,
+          );
+
+          shipments.push({
+            shipmentId: shipmentId,
+            orderId: orderDbId, // Use WMS database order ID, not Shopify order ID
+          });
+        }
+
+        // Notify progress callback of success
+        if (request.onOrderProgress) {
+          request.onOrderProgress(orderIndex + 1, request.shopifyOrders.length, shopifyOrder.shopifyOrderId, true);
+        }
+
+        Logger.endOperation(orderOperationId, true, {
+          orderId: orders[orders.length - 1]?.orderId,
+          shipmentId: shipments[shipments.length - 1]?.shipmentId,
         });
-      }
-      
-      // Notify progress callback of success
-      if (request.onOrderProgress) {
-        request.onOrderProgress(orderIndex + 1, request.shopifyOrders.length, shopifyOrder.shopifyOrderId, true);
-      }
-      
-      Logger.endOperation(orderOperationId, true, {
-        orderId: orders[orders.length - 1]?.orderId,
-        shipmentId: shipments[shipments.length - 1]?.shipmentId,
-      });
       } catch (error) {
         // Continue-on-error: collect failures but don't fail entire batch
         // Allows partial success when some orders fail (e.g., database constraints, missing SKUs)
@@ -181,12 +180,12 @@ export class SeedWmsEntitiesUseCase {
           customerEmail: shopifyOrder.customerEmail,
           error: errorMessage,
         });
-        
+
         // Notify progress callback of failure
         if (request.onOrderProgress) {
           request.onOrderProgress(orderIndex + 1, request.shopifyOrders.length, shopifyOrder.shopifyOrderId, false);
         }
-        
+
         Logger.endOperation(orderOperationId, false, {
           error: errorMessage,
         });

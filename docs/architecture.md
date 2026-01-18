@@ -10,6 +10,7 @@ This document describes the system architecture, data flows, and component relat
 ## System Overview
 
 The UAT Seeder is a TypeScript-based command-line tool that creates coordinated test data across two systems:
+
 1. **Shopify**: Staging orders via Admin GraphQL API
 2. **WMS Database**: Warehouse entities via Prisma ORM
 
@@ -61,6 +62,7 @@ The system includes several utility modules for consistent behavior:
 ### Progress Tracking (`src/utils/progress.ts`)
 
 `ProgressTracker` provides:
+
 - Step-level progress tracking with time estimation
 - Spinner support for visual feedback
 - Percentage calculation and elapsed time tracking
@@ -69,6 +71,7 @@ The system includes several utility modules for consistent behavior:
 ### Error Formatting (`src/utils/errorFormatter.ts`)
 
 `ErrorFormatter` standardizes error messages:
+
 - Type-specific formatting for different error classes
 - Recovery suggestions based on error type
 - Context-aware messages with relevant details
@@ -77,6 +80,7 @@ The system includes several utility modules for consistent behavior:
 ### Output Formatting (`src/utils/outputFormatter.ts`)
 
 `OutputFormatter` ensures consistent CLI output:
+
 - Headers, separators, and summaries
 - Status messages (success, error, warning, info)
 - Key-value pairs and lists
@@ -85,6 +89,7 @@ The system includes several utility modules for consistent behavior:
 ### Progress State (`src/utils/progressState.ts`)
 
 File-based storage for resume/retry capability:
+
 - Saves progress state after each major step
 - Tracks successful and failed operations
 - Enables resuming from batch ID
@@ -93,6 +98,7 @@ File-based storage for resume/retry capability:
 ### Structured Logging (`src/utils/logger.ts`)
 
 Enhanced logger with:
+
 - Operation tracking (start/end operations)
 - Performance logging helpers
 - Context helpers for consistent logging
@@ -104,6 +110,7 @@ Enhanced logger with:
 The config generator (`src/generateConfig.ts`) is an interactive CLI tool for creating seed configuration files:
 
 **Structure** (refactored for maintainability):
+
 - `src/generateConfig/args.ts`: Command-line argument parsing
 - `src/generateConfig/initialization.ts`: Reference data loading and template management
 - `src/generateConfig/flow/orderCreation.ts`: Order creation flows (individual, bulk-template, quick-duplicate)
@@ -113,6 +120,7 @@ The config generator (`src/generateConfig.ts`) is an interactive CLI tool for cr
 - `src/generateConfig/output.ts`: Config saving and performance summary display
 
 **Features**:
+
 - **Incremental validation**: Validates orders as they're created, shows warnings immediately
 - **Progress tracking**: Detailed loading feedback with timing and counts
 - **Template management**: Save and reuse order templates
@@ -125,6 +133,7 @@ The config generator (`src/generateConfig.ts`) is an interactive CLI tool for cr
 ### CLI Orchestrator (`src/cli.ts`)
 
 The main entry point that:
+
 - Parses command-line arguments
 - Validates staging environment
 - Initializes all services and dependencies
@@ -132,12 +141,14 @@ The main entry point that:
 - Provides user feedback and error handling
 
 **Structure** (refactored for maintainability):
+
 - `src/cli/args.ts`: Command-line argument parsing using `commander.js`
 - `src/cli/validation.ts`: Configuration and data validation
 - `src/cli/orchestration.ts`: Service initialization and workflow orchestration
 - `src/cli/output.ts`: Summary display and output formatting
 
 **Dependencies**:
+
 - All handlers (Shopify, WMS, Collection Prep)
 - Input parser and data validator
 - Staging guardrails
@@ -147,11 +158,13 @@ The main entry point that:
 ### Handler Layer
 
 Each handler (`*Handler.ts`) is responsible for:
+
 - Validating incoming requests with Zod schemas
 - Calling the corresponding use case
 - Catching and formatting errors
 
 **Handlers**:
+
 - `SeedShopifyOrdersHandler`: Validates and executes Shopify order seeding
 - `SeedWmsEntitiesHandler`: Validates and executes WMS entity seeding
 - `CreateCollectionPrepHandler`: Validates and executes collection prep creation
@@ -159,12 +172,14 @@ Each handler (`*Handler.ts`) is responsible for:
 ### Use Case Layer
 
 Each use case (`*UseCase.ts`) contains business logic:
+
 - Orchestrates service calls
 - Manages sequential processing
 - Generates batch IDs
 - Transforms data between layers
 
 **Use Cases**:
+
 - `SeedShopifyOrdersUseCase`: Creates draft orders → completes → fulfills → queries
 - `SeedWmsEntitiesUseCase`: Creates orders → variant orders → preps → prep parts → PnP entities
 - `CreateCollectionPrepUseCase`: Creates collection prep header and links preps
@@ -174,12 +189,14 @@ Each use case (`*UseCase.ts`) contains business logic:
 Services handle external system integrations:
 
 **ShopifyService** (`src/services/ShopifyService.ts`):
+
 - GraphQL API client initialization
 - Draft order creation with variant lookup
 - Order completion and fulfillment
 - Order querying by tags
 
 **WmsService** (`src/services/WmsService.ts`):
+
 - Order and customer creation (with transactions)
 - Variant order creation
 - Prep and prep part creation
@@ -187,16 +204,19 @@ Services handle external system integrations:
 - Shipment creation
 
 **CollectionPrepService** (`src/services/CollectionPrepService.ts`):
+
 - Collection prep header creation
 - Order mix validation (regular-only, PnP-only, mixed)
 
 **Supporting Services**:
+
 - `InputParserService`: Parses and validates JSON config files
 - `DataValidationService`: Validates SKUs, customers, quantities, PnP config
 
 ### Repository Layer
 
 **WmsPrismaRepository** (`src/repositories/prisma/WmsPrismaRepository.ts`):
+
 - Implements `WmsRepository` interface
 - All database operations via Prisma Client
 - Transaction support for atomicity
@@ -240,16 +260,19 @@ Services handle external system integrations:
 ### Data Transformation
 
 **Configuration → Shopify**:
+
 - `SeedConfig.orders[]` → `DraftOrderInput`
 - Customer and line items mapped directly
 - Batch ID added as tag
 
 **Shopify → WMS**:
+
 - `OrderQueryResult` → `SeedWmsEntitiesRequest`
 - Line items mapped with quantities from config
 - Customer data from config (not Shopify)
 
 **WMS Entity Relationships**:
+
 ```
 order (1) ──→ (many) variantOrder
 variantOrder (1) ──→ (1) prep
@@ -266,6 +289,7 @@ collectionPrep (1) ──→ (many) shipment
 **Rationale**: Enables isolated unit testing, clear separation of concerns, and easy extension.
 
 **Trade-offs**:
+
 - More boilerplate than monolithic script
 - Slightly more complex for simple operations
 - **Benefit**: Highly testable and maintainable
@@ -275,6 +299,7 @@ collectionPrep (1) ──→ (many) shipment
 **Approach**: Check for existing records by unique keys before creating.
 
 **Implementation**:
+
 - Orders: Check by `shopifyOrderId` (unique constraint)
 - Customers: Check by `email` + `region`
 - Variant orders: Check by `lineItemId` (unique)
@@ -287,6 +312,7 @@ collectionPrep (1) ──→ (many) shipment
 **Approach**: Hard-coded pattern matching on DB URL and Shopify domain.
 
 **Patterns**:
+
 - DB: `/staging/i`, `/stage/i`, `/test/i`, `/dev/i`, `/uat/i`
 - Shopify: Same as DB, plus `/.myshopify.com$/i`
 
@@ -296,7 +322,8 @@ collectionPrep (1) ──→ (many) shipment
 
 **Approach**: Process orders one at a time (not in parallel).
 
-**Rationale**: 
+**Rationale**:
+
 - Avoids Shopify API rate limits
 - Easier error handling and debugging
 - Clearer progress feedback
@@ -307,7 +334,8 @@ collectionPrep (1) ──→ (many) shipment
 
 **Approach**: JSON file defines all orders, customers, line items, and collection prep config.
 
-**Benefit**: 
+**Benefit**:
+
 - Repeatable test scenarios
 - Version-controlled test data
 - Easy to modify without code changes

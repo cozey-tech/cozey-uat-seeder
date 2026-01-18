@@ -17,6 +17,7 @@ Use the following branch naming patterns:
 - `test/<description>` - Test-related changes
 
 **Examples:**
+
 - `feat/add-retry-logic`
 - `fix/shopify-rate-limiting`
 - `chore/update-dependencies`
@@ -96,23 +97,27 @@ The project includes an `.nvmrc` file, so running `nvm use` in the project direc
 ### Initial Setup
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/cozey-tech/cozey-uat-seeder.git
    cd cozey-uat-seeder
    ```
 
 2. **Install dependencies:**
+
    ```bash
    npm install
    ```
 
 3. **Set up environment variables:**
+
    ```bash
    cp .env.example .env
    # Edit .env with your staging credentials
    ```
 
 4. **Generate Prisma Client:**
+
    ```bash
    npm run prisma:generate
    ```
@@ -139,6 +144,7 @@ See `.env.example` for all required variables. Minimum required:
 ### Making Changes
 
 1. **Create a feature branch:**
+
    ```bash
    git checkout -b feat/your-feature-name
    ```
@@ -149,6 +155,7 @@ See `.env.example` for all required variables. Minimum required:
    - Update documentation if needed
 
 3. **Run quality checks:**
+
    ```bash
    npm run typecheck  # Type checking
    npm run lint       # Linting
@@ -157,6 +164,7 @@ See `.env.example` for all required variables. Minimum required:
    ```
 
 4. **Commit your changes:**
+
    ```bash
    git add .
    git commit -m "feat: your feature description"

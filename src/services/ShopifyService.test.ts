@@ -117,9 +117,7 @@ describe("ShopifyService", () => {
         extensions: undefined,
       });
 
-      await expect(service.createDraftOrder(input, "batch-123")).rejects.toThrow(
-        ShopifyServiceError,
-      );
+      await expect(service.createDraftOrder(input, "batch-123")).rejects.toThrow(ShopifyServiceError);
       await expect(service.createDraftOrder(input, "batch-123")).rejects.toThrow("Variant not found for SKU: SKU-001");
     });
 
@@ -254,13 +252,9 @@ describe("ShopifyService", () => {
         data: {
           order: {
             id: "gid://shopify/Order/456",
-            fulfillments: [
-              { id: "gid://shopify/Fulfillment/789", status: "SUCCESS" },
-            ],
+            fulfillments: [{ id: "gid://shopify/Fulfillment/789", status: "SUCCESS" }],
             lineItems: {
-              edges: [
-                { node: { id: "gid://shopify/LineItem/1", quantity: 2, fulfillableQuantity: 0 } },
-              ],
+              edges: [{ node: { id: "gid://shopify/LineItem/1", quantity: 2, fulfillableQuantity: 0 } }],
             },
           },
         },
@@ -296,9 +290,7 @@ describe("ShopifyService", () => {
             id: "gid://shopify/Order/456",
             fulfillments: [],
             lineItems: {
-              edges: [
-                { node: { id: "gid://shopify/LineItem/1", quantity: 2, fulfillableQuantity: 0 } },
-              ],
+              edges: [{ node: { id: "gid://shopify/LineItem/1", quantity: 2, fulfillableQuantity: 0 } }],
             },
           },
         },

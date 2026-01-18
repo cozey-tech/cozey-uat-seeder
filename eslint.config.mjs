@@ -28,6 +28,7 @@ export default [
         ecmaVersion: 2021,
         sourceType: "module",
         impliedStrict: true,
+        project: "./tsconfig.json",
       },
       globals: {
         ...globals.node,
@@ -43,12 +44,10 @@ export default [
       "@typescript-eslint/explicit-member-accessibility": "off",
       "@typescript-eslint/consistent-type-assertions": "error",
       "@typescript-eslint/explicit-module-boundary-types": "off",
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        { ignoreRestSiblings: true, argsIgnorePattern: "^_" },
-      ],
+      "@typescript-eslint/no-unused-vars": ["error", { ignoreRestSiblings: true, argsIgnorePattern: "^_" }],
       "@typescript-eslint/prefer-interface": "off",
       "@typescript-eslint/explicit-function-return-type": "error",
+      "@typescript-eslint/return-await": ["error", "in-try-catch"],
       "lines-between-class-members": ["error", "always", { exceptAfterSingleLine: true }],
     },
   },
@@ -66,6 +65,7 @@ export default [
         ecmaVersion: 2021,
         sourceType: "module",
         impliedStrict: true,
+        project: "./tsconfig.json",
       },
       globals: {
         ...globals.node,
@@ -80,13 +80,11 @@ export default [
       "@typescript-eslint/explicit-member-accessibility": "off",
       "@typescript-eslint/consistent-type-assertions": "error",
       "@typescript-eslint/explicit-module-boundary-types": "off",
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        { ignoreRestSiblings: true, argsIgnorePattern: "^_" },
-      ],
+      "@typescript-eslint/no-unused-vars": ["error", { ignoreRestSiblings: true, argsIgnorePattern: "^_" }],
       "@typescript-eslint/prefer-interface": "off",
       // Allow implicit return types in tests for readability
       "@typescript-eslint/explicit-function-return-type": "off",
+      "@typescript-eslint/return-await": ["error", "in-try-catch"],
       "lines-between-class-members": ["error", "always", { exceptAfterSingleLine: true }],
       // Vitest-specific rules
       ...vitestPlugin.configs.recommended.rules,
@@ -105,6 +103,8 @@ export default [
       "coverage/**",
       "*.tsbuildinfo",
       ".prisma/**",
+      "*.config.*",
+      ".prettierrc.*",
     ],
   },
 ];

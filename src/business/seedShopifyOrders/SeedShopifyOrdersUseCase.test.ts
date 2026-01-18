@@ -30,9 +30,7 @@ describe("SeedShopifyOrdersUseCase", () => {
             name: "Test Customer",
             email: "test@example.com",
           },
-          lineItems: [
-            { sku: "SKU-001", quantity: 1 },
-          ],
+          lineItems: [{ sku: "SKU-001", quantity: 1 }],
         },
       ],
     };
@@ -207,32 +205,39 @@ describe("SeedShopifyOrdersUseCase", () => {
     );
 
     // First order succeeds
-    vi.mocked(mockShopifyService.createDraftOrder)
-      .mockResolvedValueOnce({ draftOrderId: "gid://shopify/DraftOrder/1" });
-    vi.mocked(mockShopifyService.completeDraftOrder)
-      .mockResolvedValueOnce({ orderId: "gid://shopify/Order/1", orderNumber: "#1001", lineItems: undefined });
-    vi.mocked(mockShopifyService.queryOrderById)
-      .mockResolvedValueOnce({
-        orderId: "gid://shopify/Order/1",
-        orderNumber: "#1001",
-        lineItems: [{ lineItemId: "line-1", sku: "SKU-001", quantity: 1 }],
-      });
+    vi.mocked(mockShopifyService.createDraftOrder).mockResolvedValueOnce({
+      draftOrderId: "gid://shopify/DraftOrder/1",
+    });
+    vi.mocked(mockShopifyService.completeDraftOrder).mockResolvedValueOnce({
+      orderId: "gid://shopify/Order/1",
+      orderNumber: "#1001",
+      lineItems: undefined,
+    });
+    vi.mocked(mockShopifyService.queryOrderById).mockResolvedValueOnce({
+      orderId: "gid://shopify/Order/1",
+      orderNumber: "#1001",
+      lineItems: [{ lineItemId: "line-1", sku: "SKU-001", quantity: 1 }],
+    });
 
     // Second order fails
-    vi.mocked(mockShopifyService.createDraftOrder)
-      .mockRejectedValueOnce(new Error("Variant not found for SKU: SKU-002"));
+    vi.mocked(mockShopifyService.createDraftOrder).mockRejectedValueOnce(
+      new Error("Variant not found for SKU: SKU-002"),
+    );
 
     // Third order succeeds
-    vi.mocked(mockShopifyService.createDraftOrder)
-      .mockResolvedValueOnce({ draftOrderId: "gid://shopify/DraftOrder/3" });
-    vi.mocked(mockShopifyService.completeDraftOrder)
-      .mockResolvedValueOnce({ orderId: "gid://shopify/Order/3", orderNumber: "#1003", lineItems: undefined });
-    vi.mocked(mockShopifyService.queryOrderById)
-      .mockResolvedValueOnce({
-        orderId: "gid://shopify/Order/3",
-        orderNumber: "#1003",
-        lineItems: [{ lineItemId: "line-3", sku: "SKU-003", quantity: 1 }],
-      });
+    vi.mocked(mockShopifyService.createDraftOrder).mockResolvedValueOnce({
+      draftOrderId: "gid://shopify/DraftOrder/3",
+    });
+    vi.mocked(mockShopifyService.completeDraftOrder).mockResolvedValueOnce({
+      orderId: "gid://shopify/Order/3",
+      orderNumber: "#1003",
+      lineItems: undefined,
+    });
+    vi.mocked(mockShopifyService.queryOrderById).mockResolvedValueOnce({
+      orderId: "gid://shopify/Order/3",
+      orderNumber: "#1003",
+      lineItems: [{ lineItemId: "line-3", sku: "SKU-003", quantity: 1 }],
+    });
 
     const result = await useCase.execute(request);
 
@@ -269,9 +274,7 @@ describe("SeedShopifyOrdersUseCase", () => {
       new Map([["SKU-001", "gid://shopify/ProductVariant/1"]]), // Missing SKU-002
     );
 
-    await expect(useCase.execute(request)).rejects.toThrow(
-      "Variant lookup failed for 1 SKU(s): SKU-002",
-    );
+    await expect(useCase.execute(request)).rejects.toThrow("Variant lookup failed for 1 SKU(s): SKU-002");
   });
 
   it("should throw error if orders array is empty", async () => {
@@ -307,5 +310,4 @@ describe("SeedShopifyOrdersUseCase", () => {
 
     await expect(useCase.execute(request)).rejects.toThrow("All 1 orders failed");
   });
-
 });

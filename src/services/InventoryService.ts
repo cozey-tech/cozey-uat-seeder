@@ -27,7 +27,7 @@ export class InventoryService {
 
   /**
    * Check inventory availability for variants at a location
-   * 
+   *
    * @param variants - Variants to check (with optional quantity map)
    * @param locationId - Warehouse location ID
    * @param region - Region code
@@ -62,7 +62,7 @@ export class InventoryService {
 
       // Get order quantity for this variant (default to 1 if not provided)
       const orderQuantity = variantQuantities?.get(variant.sku) || 1;
-      
+
       // Calculate required parts: variantPart.quantity * orderQuantity
       const key = variantPart.partId;
       const existing = partRequirements.get(key) || { sku: variantPart.part.sku, required: 0 };
@@ -82,9 +82,7 @@ export class InventoryService {
       });
 
       // Create a map for O(1) lookup
-      const inventoryMap = new Map(
-        inventories.map((inv) => [inv.partId, inv]),
-      );
+      const inventoryMap = new Map(inventories.map((inv) => [inv.partId, inv]));
 
       // Check each part requirement against batched inventory results
       for (const [partId, requirement] of partRequirements.entries()) {
@@ -124,20 +122,13 @@ export class InventoryService {
   /**
    * Modify inventory for a part (staging environments only)
    */
-  async modifyInventory(
-    partId: string,
-    locationId: string,
-    region: string,
-    quantity: number,
-  ): Promise<void> {
+  async modifyInventory(partId: string, locationId: string, region: string, quantity: number): Promise<void> {
     // Check environment - only allow in staging/uat/test
     const config = getEnvConfig();
     const isStaging = this.isStagingEnvironment(config.DATABASE_URL);
 
     if (!isStaging) {
-      throw new Error(
-        "Inventory modification is only allowed in staging/uat/test environments",
-      );
+      throw new Error("Inventory modification is only allowed in staging/uat/test environments");
     }
 
     // Get current inventory
@@ -185,9 +176,7 @@ export class InventoryService {
     locationId: string,
     region: string,
   ): Promise<InventoryCheckResult> {
-    // First, get variants for the SKUs in the order
-    // We need to get pickType from parts, so we'll use ConfigDataRepository
-    // For now, we'll fetch variants and determine pickType
+    // Get variants and determine pickType from parts via ConfigDataRepository
     const skus = order.lineItems.map((item) => item.sku);
     const variantRecords = await this.prisma.variant.findMany({
       where: {
@@ -261,12 +250,7 @@ export class InventoryService {
     }
 
     // Check availability with order quantities
-    const checkResult = await this.checkInventoryAvailability(
-      variants,
-      locationId,
-      region,
-      variantQuantities,
-    );
+    const checkResult = await this.checkInventoryAvailability(variants, locationId, region, variantQuantities);
 
     // If insufficient, modify inventory to meet requirements
     if (!checkResult.sufficient) {
@@ -275,12 +259,7 @@ export class InventoryService {
       }
 
       // Re-check after modification
-      return await this.checkInventoryAvailability(
-        variants,
-        locationId,
-        region,
-        variantQuantities,
-      );
+      return this.checkInventoryAvailability(variants, locationId, region, variantQuantities);
     }
 
     return checkResult;

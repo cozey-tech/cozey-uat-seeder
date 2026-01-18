@@ -38,7 +38,7 @@ erDiagram
         string email
         string region
     }
-    
+
     order {
         uuid id PK
         string shopifyOrderId UK
@@ -48,7 +48,7 @@ erDiagram
         string customerId FK
         string locationId FK
     }
-    
+
     variantOrder {
         string lineItemId PK
         string orderId FK
@@ -56,7 +56,7 @@ erDiagram
         int quantity
         string region
     }
-    
+
     prep {
         string prep PK
         string region PK
@@ -66,7 +66,7 @@ erDiagram
         string collectionPrepId FK
         string locationId FK
     }
-    
+
     prepPart {
         uuid id PK
         string prepId FK
@@ -74,14 +74,14 @@ erDiagram
         uuid partId FK
         int quantity
     }
-    
+
     prepPartItem {
         uuid id PK
         uuid prepPartId FK
         uuid pnpOrderBoxId FK
         string trackingNumber
     }
-    
+
     collectionPrep {
         string id PK
         string region PK
@@ -90,7 +90,7 @@ erDiagram
         datetime prepDate
         int boxes
     }
-    
+
     shipment {
         uuid id PK
         string orderId FK
@@ -98,7 +98,7 @@ erDiagram
         string region FK
         enum status
     }
-    
+
     pnpBox {
         uuid id PK
         string identifier
@@ -106,7 +106,7 @@ erDiagram
         decimal width
         decimal height
     }
-    
+
     pnpOrderBox {
         uuid id PK
         string collectionPrepId FK
@@ -123,8 +123,10 @@ erDiagram
 ### Models Created by Seeder
 
 #### `order`
+
 **Purpose:** WMS order records linked to Shopify orders  
 **Key Fields:**
+
 - `shopifyOrderId` (unique) - Links to Shopify order
 - `shopifyOrderNumber` - Human-readable order number
 - `status` - Order status (e.g., "paid", "fulfilled")
@@ -134,6 +136,7 @@ erDiagram
 - `sourceName` - Set to "wms_seed" for seed records
 
 **Relationships:**
+
 - One-to-many with `variantOrder`
 - One-to-many with `prep`
 - One-to-many with `shipment`
@@ -141,21 +144,26 @@ erDiagram
 - Many-to-one with `location`
 
 #### `customer`
+
 **Purpose:** Customer records for orders  
 **Key Fields:**
+
 - `id` (unique) - Customer identifier
 - `email` (unique with region) - Customer email
 - `name` - Customer name
 - `region` - Region code
 
 **Relationships:**
+
 - One-to-many with `order`
 
 **Idempotency:** Checked by `email` + `region` before creation
 
 #### `variantOrder`
+
 **Purpose:** Line item records linking Shopify line items to WMS variants  
 **Key Fields:**
+
 - `lineItemId` (unique) - Shopify line item ID (primary key)
 - `orderId` - References `order.shopifyOrderId`
 - `variantId` - References `variant.id`
@@ -163,6 +171,7 @@ erDiagram
 - `region` - Region code
 
 **Relationships:**
+
 - Many-to-one with `order`
 - Many-to-one with `variant`
 - One-to-one with `prep`
@@ -170,8 +179,10 @@ erDiagram
 **Idempotency:** Checked by `lineItemId` (unique constraint)
 
 #### `prep`
+
 **Purpose:** Prep records representing fulfillment units (one per line item)  
 **Key Fields:**
+
 - `prep` + `region` (composite primary key) - Prep identifier
 - `orderId` - References `order.shopifyOrderId`
 - `lineItemId` - References `variantOrder.lineItemId` (unique)
@@ -181,27 +192,33 @@ erDiagram
 - `fulfillmentStatus` - Defaults to "Open"
 
 **Relationships:**
+
 - Many-to-one with `order`
 - One-to-one with `variantOrder`
 - Many-to-one with `collectionPrep`
 - One-to-many with `prepPart`
 
 #### `prepPart`
+
 **Purpose:** Parts within a prep (bill of materials)  
 **Key Fields:**
+
 - `id` (UUID primary key)
 - `prepId` + `region` - References `prep`
 - `partId` - References `part.id`
 - `quantity` - Quantity of this part needed
 
 **Relationships:**
+
 - Many-to-one with `prep`
 - Many-to-one with `part`
 - One-to-many with `prepPartItem`
 
 #### `prepPartItem`
+
 **Purpose:** Individual items for pick-and-pack workflows  
 **Key Fields:**
+
 - `id` (UUID primary key)
 - `prepPartId` - References `prepPart.id`
 - `pnpOrderBoxId` - References `pnpOrderBox.id` (for PnP items)
@@ -209,12 +226,15 @@ erDiagram
 - `outboundStatus` - Status enum (PICKED, PACKED, LABEL_GENERATED, etc.)
 
 **Relationships:**
+
 - Many-to-one with `prepPart`
 - Many-to-one with `pnpOrderBox` (for PnP items)
 
 #### `collectionPrep`
+
 **Purpose:** Collection prep header grouping multiple orders for collection workflows  
 **Key Fields:**
+
 - `id` + `region` (composite primary key) - Collection prep identifier
 - `locationId` - References `location.id`
 - `carrier` - Carrier name (e.g., "FedEx")
@@ -222,27 +242,33 @@ erDiagram
 - `boxes` - Number of boxes
 
 **Relationships:**
+
 - One-to-many with `prep`
 - One-to-many with `shipment`
 - Many-to-one with `location`
 
 #### `shipment`
+
 **Purpose:** Links collection prep to orders for labeling workflows  
 **Key Fields:**
+
 - `id` (UUID primary key)
 - `orderId` - References `order.shopifyOrderId`
 - `collectionPrepId` + `region` - References `collectionPrep`
 - `status` - Enum: ACTIVE or CANCELLED
 
 **Relationships:**
+
 - Many-to-one with `order`
 - Many-to-one with `collectionPrep`
 
 **Unique Constraint:** `[collectionPrepId, orderId]`
 
 #### `pnpBox`
+
 **Purpose:** Package template definitions for pick-and-pack  
 **Key Fields:**
+
 - `id` (UUID primary key)
 - `identifier` - Box identifier (e.g., "SMALL_BOX")
 - `length`, `width`, `height` - Dimensions
@@ -251,8 +277,10 @@ erDiagram
 **Note:** Typically pre-existing in database, but seeder can create if needed
 
 #### `pnpOrderBox`
+
 **Purpose:** Actual box instance for an order in pick-and-pack workflow  
 **Key Fields:**
+
 - `id` (UUID primary key)
 - `collectionPrepId` + `region` - References `collectionPrep`
 - `orderId` - References `order.shopifyOrderId`
@@ -261,6 +289,7 @@ erDiagram
 - `status` - Enum: OPEN or CLOSED
 
 **Relationships:**
+
 - Many-to-one with `collectionPrep`
 - Many-to-one with `order`
 - Many-to-one with `pnpBox`
@@ -271,30 +300,37 @@ erDiagram
 These models are used for lookups and validation but are not created by the seeder:
 
 #### `variant`
+
 **Purpose:** Product variants (SKU definitions)  
 **Usage:** Seeder looks up variants by SKU to get `variantId` for creating `variantOrder` and `prep` records  
 **Key Fields:**
+
 - `id` (UUID primary key)
 - `sku` + `region` (unique) - Stock keeping unit
 - `description` - Variant description
 
 #### `part`
+
 **Purpose:** Parts/components that make up variants  
 **Usage:** Seeder looks up parts by SKU to create `prepPart` records  
 **Key Fields:**
+
 - `id` (UUID primary key)
 - `sku` + `qualityId` + `region` (unique) - Part SKU
 - `pickType` - Enum: "Regular" or "Pick and Pack"
 - `hasPrintedBarcode` - Boolean flag for barcode scanning
 
 #### `location`
+
 **Purpose:** Warehouse locations/fulfillment centers  
 **Usage:** Seeder looks up locations to validate `locationId` in collection prep and order configs  
 **Key Fields:**
+
 - `id` + `region` (composite primary key)
 - `name` - Location name
 
 #### `model`, `colors`, `quality`
+
 **Purpose:** Reference data for product catalog  
 **Usage:** Used by `variant` and `part` models, not directly used by seeder
 
@@ -351,6 +387,7 @@ The seeder is designed to be safe to re-run. Idempotency is ensured by:
 **Note:** The seeder does not require schema migrations. It uses the existing WMS Prisma schema without modifications.
 
 If the WMS schema changes:
+
 1. Update `prisma/schema.prisma` (this is a reference copy)
 2. Run `npm run prisma:generate` to regenerate Prisma Client
 3. Update seeder code if model interfaces change

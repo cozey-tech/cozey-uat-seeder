@@ -65,9 +65,7 @@ describe("processWithConcurrency", () => {
       return n * 2;
     });
 
-    await expect(processWithConcurrency(items, handler, 2)).rejects.toThrow(
-      "Test error",
-    );
+    await expect(processWithConcurrency(items, handler, 2)).rejects.toThrow("Test error");
   });
 
   it("should use default limit of 5", async () => {

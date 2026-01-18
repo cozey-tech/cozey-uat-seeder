@@ -113,9 +113,7 @@ export class ConfigGeneratorService {
     // Legacy approach: single collection prep
     else if (options.collectionPrepCount && options.collectionPrepCount > 0) {
       if (!options.carrier || !options.prepDate) {
-        throw new Error(
-          "Carrier and prepDate are required when collectionPrepCount > 0",
-        );
+        throw new Error("Carrier and prepDate are required when collectionPrepCount > 0");
       }
 
       // Validate all orders have the same locationId for collection prep
@@ -171,10 +169,7 @@ export class ConfigGeneratorService {
    * Allocate orders evenly across collection preps
    * Returns array of order indices for each collection prep
    */
-  allocateOrdersToCollectionPreps(
-    orderCount: number,
-    collectionPrepCount: number,
-  ): number[][] {
+  allocateOrdersToCollectionPreps(orderCount: number, collectionPrepCount: number): number[][] {
     if (collectionPrepCount === 0) {
       return [];
     }
@@ -228,9 +223,7 @@ export class ConfigGeneratorService {
       async ({ config, index }) => {
         const location = locationMap.get(config.locationId);
         if (!location) {
-          throw new Error(
-            `Location ${config.locationId} not found for region ${region}`,
-          );
+          throw new Error(`Location ${config.locationId} not found for region ${region}`);
         }
 
         // Generate single ID for this collection prep
@@ -318,11 +311,7 @@ export class ConfigGeneratorService {
           carrier,
           prepDate: {
             gte: new Date(prepDate.getFullYear(), prepDate.getMonth(), prepDate.getDate()),
-            lt: new Date(
-              prepDate.getFullYear(),
-              prepDate.getMonth(),
-              prepDate.getDate() + 1,
-            ),
+            lt: new Date(prepDate.getFullYear(), prepDate.getMonth(), prepDate.getDate() + 1),
           },
         },
         select: {
@@ -356,25 +345,14 @@ export class ConfigGeneratorService {
       // Handle race condition: if unique constraint violation and retries left, retry with exponential backoff
       // Prisma error code P2002 indicates unique constraint violation
       // Note: This catch handles errors from the entire try block, including DB operations
-      const isUniqueConstraintError =
-        error &&
-        typeof error === "object" &&
-        "code" in error &&
-        error.code === "P2002";
-      
+      const isUniqueConstraintError = error && typeof error === "object" && "code" in error && error.code === "P2002";
+
       if (isUniqueConstraintError && retryCount < 3) {
         const delayMs = 100 * Math.pow(2, retryCount); // Exponential backoff: 100ms, 200ms, 400ms
         await new Promise((resolve) => setTimeout(resolve, delayMs));
-        return this.generateCollectionPrepIds(
-          count,
-          carrier,
-          locationId,
-          prepDate,
-          region,
-          retryCount + 1,
-        );
+        return this.generateCollectionPrepIds(count, carrier, locationId, prepDate, region, retryCount + 1);
       }
-      
+
       // Re-throw if not a unique constraint error or retries exhausted
       throw error;
     }

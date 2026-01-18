@@ -76,7 +76,7 @@ export class SeedShopifyOrdersUseCase {
     if (missingSkus.length > 0) {
       throw new Error(
         `Variant lookup failed for ${missingSkus.length} SKU(s): ${missingSkus.join(", ")}. ` +
-        `Cannot proceed with order creation. Please verify SKUs exist in Shopify.`,
+          `Cannot proceed with order creation. Please verify SKUs exist in Shopify.`,
       );
     }
 
@@ -105,99 +105,99 @@ export class SeedShopifyOrdersUseCase {
         const orderStartTime = Date.now();
 
         try {
-        const { result: draftOrderResult, metrics: createMetrics } = await this.measureOperation(
-          "createDraftOrder",
-          () =>
-            this.shopifyService.createDraftOrder(
-              {
-                customer: orderInput.customer,
-                lineItems: orderInput.lineItems,
-              },
-              request.batchId,
-              request.region,
-              request.collectionPrepName,
-              variantMap, // Pass pre-fetched variant map
-            ),
-        );
-
-        createMetrics.graphQLCost = draftOrderResult.graphQLCost;
-        if (draftOrderResult.graphQLCost) {
-          totalRequestedCost += draftOrderResult.graphQLCost.requestedQueryCost;
-          totalActualCost += draftOrderResult.graphQLCost.actualQueryCost;
-          throttleStatuses.push({
-            currentlyAvailable: draftOrderResult.graphQLCost.throttleStatus.currentlyAvailable,
-            maximumAvailable: draftOrderResult.graphQLCost.throttleStatus.maximumAvailable,
-          });
-        }
-
-        // Complete draft order
-        const { result: orderResult, metrics: completeMetrics } = await this.measureOperation(
-          "completeDraftOrder",
-          () => this.shopifyService.completeDraftOrder(draftOrderResult.draftOrderId),
-        );
-
-        completeMetrics.graphQLCost = orderResult.graphQLCost;
-        if (orderResult.graphQLCost) {
-          totalRequestedCost += orderResult.graphQLCost.requestedQueryCost;
-          totalActualCost += orderResult.graphQLCost.actualQueryCost;
-          throttleStatuses.push({
-            currentlyAvailable: orderResult.graphQLCost.throttleStatus.currentlyAvailable,
-            maximumAvailable: orderResult.graphQLCost.throttleStatus.maximumAvailable,
-          });
-        }
-
-        // Orders are created and marked as paid, but NOT fulfilled (not part of seeding)
-        let lineItems: Array<{ lineItemId: string; sku: string }>;
-        let queryMetrics: OperationMetrics;
-
-        if (orderResult.lineItems && orderResult.lineItems.length > 0) {
-          Logger.info("Line items available in draftOrderComplete response, skipping query", {
-            orderId: orderResult.orderId,
-            lineItemCount: orderResult.lineItems.length,
-          });
-          lineItems = orderResult.lineItems.map((item) => ({
-            lineItemId: item.lineItemId,
-            sku: item.sku,
-          }));
-          queryMetrics = {
-            operation: "queryOrdersByTag",
-            durationMs: 0,
-            apiCallCount: 0, // Skipped
-          };
-        } else {
-          // Query single order by ID (more efficient than querying all by tag)
-          // Avoids unnecessary cost when we only need one order's line items
-          const { result: createdOrder, metrics: queryMetricsResult } = await this.measureOperation(
-            "queryOrderById",
-            () => this.shopifyService.queryOrderById(orderResult.orderId),
+          const { result: draftOrderResult, metrics: createMetrics } = await this.measureOperation(
+            "createDraftOrder",
+            () =>
+              this.shopifyService.createDraftOrder(
+                {
+                  customer: orderInput.customer,
+                  lineItems: orderInput.lineItems,
+                },
+                request.batchId,
+                request.region,
+                request.collectionPrepName,
+                variantMap, // Pass pre-fetched variant map
+              ),
           );
-          queryMetrics = queryMetricsResult;
 
-          if (!createdOrder) {
-            // Dry-run mode: construct line items from input (normal mode would indicate order not found)
-            Logger.warn("Order not found when querying by ID, constructing line items from input", {
-              orderId: orderResult.orderId,
-              batchId: request.batchId,
+          createMetrics.graphQLCost = draftOrderResult.graphQLCost;
+          if (draftOrderResult.graphQLCost) {
+            totalRequestedCost += draftOrderResult.graphQLCost.requestedQueryCost;
+            totalActualCost += draftOrderResult.graphQLCost.actualQueryCost;
+            throttleStatuses.push({
+              currentlyAvailable: draftOrderResult.graphQLCost.throttleStatus.currentlyAvailable,
+              maximumAvailable: draftOrderResult.graphQLCost.throttleStatus.maximumAvailable,
             });
-            lineItems = orderInput.lineItems.map((item) => ({
-              lineItemId: `gid://shopify/LineItem/${uuidv4()}`,
-              sku: item.sku,
-            }));
-          } else {
-            lineItems = createdOrder.lineItems.map((item) => ({
+          }
+
+          // Complete draft order
+          const { result: orderResult, metrics: completeMetrics } = await this.measureOperation(
+            "completeDraftOrder",
+            () => this.shopifyService.completeDraftOrder(draftOrderResult.draftOrderId),
+          );
+
+          completeMetrics.graphQLCost = orderResult.graphQLCost;
+          if (orderResult.graphQLCost) {
+            totalRequestedCost += orderResult.graphQLCost.requestedQueryCost;
+            totalActualCost += orderResult.graphQLCost.actualQueryCost;
+            throttleStatuses.push({
+              currentlyAvailable: orderResult.graphQLCost.throttleStatus.currentlyAvailable,
+              maximumAvailable: orderResult.graphQLCost.throttleStatus.maximumAvailable,
+            });
+          }
+
+          // Orders are created and marked as paid, but NOT fulfilled (not part of seeding)
+          let lineItems: Array<{ lineItemId: string; sku: string }>;
+          let queryMetrics: OperationMetrics;
+
+          if (orderResult.lineItems && orderResult.lineItems.length > 0) {
+            Logger.info("Line items available in draftOrderComplete response, skipping query", {
+              orderId: orderResult.orderId,
+              lineItemCount: orderResult.lineItems.length,
+            });
+            lineItems = orderResult.lineItems.map((item) => ({
               lineItemId: item.lineItemId,
               sku: item.sku,
             }));
+            queryMetrics = {
+              operation: "queryOrdersByTag",
+              durationMs: 0,
+              apiCallCount: 0, // Skipped
+            };
+          } else {
+            // Query single order by ID (more efficient than querying all by tag)
+            // Avoids unnecessary cost when we only need one order's line items
+            const { result: createdOrder, metrics: queryMetricsResult } = await this.measureOperation(
+              "queryOrderById",
+              () => this.shopifyService.queryOrderById(orderResult.orderId),
+            );
+            queryMetrics = queryMetricsResult;
+
+            if (!createdOrder) {
+              // Dry-run mode: construct line items from input (normal mode would indicate order not found)
+              Logger.warn("Order not found when querying by ID, constructing line items from input", {
+                orderId: orderResult.orderId,
+                batchId: request.batchId,
+              });
+              lineItems = orderInput.lineItems.map((item) => ({
+                lineItemId: `gid://shopify/LineItem/${uuidv4()}`,
+                sku: item.sku,
+              }));
+            } else {
+              lineItems = createdOrder.lineItems.map((item) => ({
+                lineItemId: item.lineItemId,
+                sku: item.sku,
+              }));
+            }
           }
-        }
 
-        const orderDurationMs = Date.now() - orderStartTime;
+          const orderDurationMs = Date.now() - orderStartTime;
 
-        // variantLookup is batched, so divide API call count among orders for per-order tracking
-        const perOrderVariantMetrics: OperationMetrics = {
-          ...variantLookupMetrics,
-          apiCallCount: orderIndex === 0 ? variantLookupMetrics.apiCallCount : 0,
-        };
+          // variantLookup is batched, so divide API call count among orders for per-order tracking
+          const perOrderVariantMetrics: OperationMetrics = {
+            ...variantLookupMetrics,
+            apiCallCount: orderIndex === 0 ? variantLookupMetrics.apiCallCount : 0,
+          };
 
           if (request.onOrderProgress) {
             request.onOrderProgress(orderIndex + 1, request.orders.length, orderInput.customer.email, true);
@@ -321,9 +321,7 @@ export class SeedShopifyOrdersUseCase {
 
       // If all orders failed, throw an error
       if (errors.length === request.orders.length) {
-        throw new Error(
-          `All ${request.orders.length} orders failed. First error: ${errors[0]?.error.message}`,
-        );
+        throw new Error(`All ${request.orders.length} orders failed. First error: ${errors[0]?.error.message}`);
       }
     }
 
@@ -331,17 +329,18 @@ export class SeedShopifyOrdersUseCase {
     const averageOrderDurationMs = orderMetrics.length > 0 ? totalDurationMs / orderMetrics.length : 0;
 
     // Calculate throttle status summary
-    const throttleStatus = throttleStatuses.length > 0
-      ? {
-          minimumAvailable: Math.min(...throttleStatuses.map((s) => s.currentlyAvailable)),
-          maximumAvailable: Math.max(...throttleStatuses.map((s) => s.maximumAvailable)),
-          finalAvailable: throttleStatuses[throttleStatuses.length - 1]?.currentlyAvailable ?? 0,
-        }
-      : {
-          minimumAvailable: 0,
-          maximumAvailable: 0,
-          finalAvailable: 0,
-        };
+    const throttleStatus =
+      throttleStatuses.length > 0
+        ? {
+            minimumAvailable: Math.min(...throttleStatuses.map((s) => s.currentlyAvailable)),
+            maximumAvailable: Math.max(...throttleStatuses.map((s) => s.maximumAvailable)),
+            finalAvailable: throttleStatuses[throttleStatuses.length - 1]?.currentlyAvailable ?? 0,
+          }
+        : {
+            minimumAvailable: 0,
+            maximumAvailable: 0,
+            finalAvailable: 0,
+          };
 
     // Log performance metrics
     const batchMetrics: BatchPerformanceMetrics = {
@@ -376,13 +375,14 @@ export class SeedShopifyOrdersUseCase {
 
     const result = {
       shopifyOrders,
-      failures: errors.length > 0
-        ? errors.map((e) => ({
-            orderIndex: e.orderIndex,
-            customerEmail: e.customerEmail,
-            error: e.error.message,
-          }))
-        : undefined,
+      failures:
+        errors.length > 0
+          ? errors.map((e) => ({
+              orderIndex: e.orderIndex,
+              customerEmail: e.customerEmail,
+              error: e.error.message,
+            }))
+          : undefined,
     };
 
     Logger.endOperation(operationId, errors.length === 0, {

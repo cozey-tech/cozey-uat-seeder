@@ -42,9 +42,7 @@ describe("DataValidationService", () => {
         ],
       };
 
-      mockPrisma.variant.findMany.mockResolvedValue([
-        { sku: "SKU-001" },
-      ]);
+      mockPrisma.variant.findMany.mockResolvedValue([{ sku: "SKU-001" }]);
 
       await expect(service.validateSeedConfig(config)).resolves.not.toThrow();
     });
@@ -73,9 +71,7 @@ describe("DataValidationService", () => {
         ],
       };
 
-      mockPrisma.variant.findMany.mockResolvedValue([
-        { sku: "SKU-001" },
-      ]);
+      mockPrisma.variant.findMany.mockResolvedValue([{ sku: "SKU-001" }]);
 
       await expect(service.validateSeedConfig(config)).rejects.toThrow(DataValidationError);
       await expect(service.validateSeedConfig(config)).rejects.toThrow("Missing SKUs in WMS");
@@ -100,9 +96,7 @@ describe("DataValidationService", () => {
         ],
       };
 
-      mockPrisma.variant.findMany.mockResolvedValue([
-        { sku: "SKU-001" },
-      ]);
+      mockPrisma.variant.findMany.mockResolvedValue([{ sku: "SKU-001" }]);
 
       await expect(service.validateSeedConfig(config)).rejects.toThrow(DataValidationError);
       await expect(service.validateSeedConfig(config)).rejects.toThrow("Customer name is required");
@@ -127,9 +121,7 @@ describe("DataValidationService", () => {
         ],
       };
 
-      mockPrisma.variant.findMany.mockResolvedValue([
-        { sku: "SKU-001" },
-      ]);
+      mockPrisma.variant.findMany.mockResolvedValue([{ sku: "SKU-001" }]);
 
       await expect(service.validateSeedConfig(config)).rejects.toThrow(DataValidationError);
       await expect(service.validateSeedConfig(config)).rejects.toThrow("Quantity must be positive");
@@ -154,9 +146,7 @@ describe("DataValidationService", () => {
         ],
       };
 
-      mockPrisma.variant.findMany.mockResolvedValue([
-        { sku: "SKU-001" },
-      ]);
+      mockPrisma.variant.findMany.mockResolvedValue([{ sku: "SKU-001" }]);
 
       // Should not throw - pnpConfig is optional since boxes exist in database
       await expect(service.validateSeedConfig(config)).resolves.toBeUndefined();
@@ -190,9 +180,7 @@ describe("DataValidationService", () => {
         },
       };
 
-      mockPrisma.variant.findMany.mockResolvedValue([
-        { sku: "SKU-001" },
-      ]);
+      mockPrisma.variant.findMany.mockResolvedValue([{ sku: "SKU-001" }]);
 
       await expect(service.validateSeedConfig(config)).rejects.toThrow(DataValidationError);
       await expect(service.validateSeedConfig(config)).rejects.toThrow("packageInfo");
@@ -232,9 +220,7 @@ describe("DataValidationService", () => {
         },
       };
 
-      mockPrisma.variant.findMany.mockResolvedValue([
-        { sku: "SKU-001" },
-      ]);
+      mockPrisma.variant.findMany.mockResolvedValue([{ sku: "SKU-001" }]);
 
       await expect(service.validateSeedConfig(config)).resolves.not.toThrow();
     });

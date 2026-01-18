@@ -13,6 +13,9 @@ export default defineConfig({
         "**/node_modules/**",
         "**/dist/**",
         "**/coverage/**",
+        "**/*.config.*", // Config files
+        ".prettierrc.*", // Prettier config
+        "ai-docs/**", // AI-generated documentation
         "src/index.ts", // Only exports version constant
       ],
       thresholds: {

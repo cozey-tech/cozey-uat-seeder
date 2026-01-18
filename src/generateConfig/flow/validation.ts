@@ -139,20 +139,20 @@ export function displayValidationIssues(issues: ValidationIssue[]): void {
   if (errors.length > 0) {
     console.log();
     console.log(OutputFormatter.error("Validation Errors:"));
-    errors.forEach((issue) => {
+    for (const issue of errors) {
       const prefix = issue.orderIndex !== undefined ? `Order ${issue.orderIndex + 1}: ` : "";
       console.log(OutputFormatter.listItem(`${prefix}${issue.message}`));
-    });
+    }
     console.log();
   }
 
   if (warnings.length > 0) {
     console.log();
     console.log(OutputFormatter.warning("Validation Warnings:"));
-    warnings.forEach((issue) => {
+    for (const issue of warnings) {
       const prefix = issue.orderIndex !== undefined ? `Order ${issue.orderIndex + 1}: ` : "";
       console.log(OutputFormatter.listItem(`${prefix}${issue.message}`));
-    });
+    }
     console.log();
   }
 }

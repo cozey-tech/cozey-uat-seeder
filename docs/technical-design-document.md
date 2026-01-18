@@ -134,23 +134,23 @@ graph TB
     subgraph Input["Input Layer"]
         ConfigFile[JSON Config File]
     end
-    
+
     subgraph Orchestrator["Orchestrator"]
         MainEntry[Main Entry Point<br/>cli.ts]
     end
-    
+
     subgraph Handlers["Handler Layer"]
         ShopifyHandler[SeedShopifyOrdersHandler]
         WmsHandler[SeedWmsEntitiesHandler]
         CollectionPrepHandler[CreateCollectionPrepHandler]
     end
-    
+
     subgraph UseCases["Use Case Layer"]
         ShopifyUC[SeedShopifyOrdersUseCase]
         WmsUC[SeedWmsEntitiesUseCase]
         CollectionPrepUC[CreateCollectionPrepUseCase]
     end
-    
+
     subgraph Services["Service Layer"]
         ShopifySvc[ShopifyService]
         WmsSvc[WmsService]
@@ -158,35 +158,35 @@ graph TB
         ValidationSvc[DataValidationService]
         ParserSvc[InputParserService]
     end
-    
+
     subgraph Repositories["Repository Layer"]
         WmsRepo[WmsPrismaRepository]
     end
-    
+
     subgraph External["External Systems"]
         ShopifyAPI[Shopify Admin API]
         WmsDB[(WMS PostgreSQL DB)]
     end
-    
+
     ConfigFile --> MainEntry
     MainEntry --> ShopifyHandler
     MainEntry --> WmsHandler
     MainEntry --> CollectionPrepHandler
-    
+
     ShopifyHandler --> ShopifyUC
     WmsHandler --> WmsUC
     CollectionPrepHandler --> CollectionPrepUC
-    
+
     ShopifyUC --> ShopifySvc
     WmsUC --> WmsSvc
     WmsUC --> CollectionPrepSvc
     CollectionPrepUC --> CollectionPrepSvc
-    
+
     ShopifySvc --> ShopifyAPI
     WmsSvc --> WmsRepo
     CollectionPrepSvc --> WmsRepo
     WmsRepo --> WmsDB
-    
+
     MainEntry --> ValidationSvc
     MainEntry --> ParserSvc
 ```
@@ -218,7 +218,7 @@ sequenceDiagram
     Parser-->>Main: Validated SeedConfig
     Main->>Validator: Validate SKUs, customers, quantities
     Validator-->>Main: Validation passed
-    
+
     Main->>ShopifyHandler: Execute seedShopifyOrders
     ShopifyHandler->>ShopifyUC: Execute with request
     loop For each order in config
@@ -237,7 +237,7 @@ sequenceDiagram
     ShopifyAPI-->>ShopifySvc: Order details with line items
     ShopifyUC-->>ShopifyHandler: Response with order IDs
     ShopifyHandler-->>Main: Shopify seeding complete
-    
+
     Main->>WmsHandler: Execute seedWmsEntities
     WmsHandler->>WmsUC: Execute with Shopify orders
     loop For each Shopify order
@@ -265,7 +265,7 @@ sequenceDiagram
     end
     WmsUC-->>WmsHandler: Response with created entities
     WmsHandler-->>Main: WMS seeding complete
-    
+
     alt Collection prep configured
         Main->>CollectionPrepHandler: Execute createCollectionPrep
         CollectionPrepHandler->>CollectionPrepUC: Execute with order IDs
@@ -278,7 +278,7 @@ sequenceDiagram
         CollectionPrepUC-->>CollectionPrepHandler: Collection prep ID
         CollectionPrepHandler-->>Main: Collection prep created
     end
-    
+
     Main-->>User: Seeding complete with summary
 ```
 
@@ -289,22 +289,22 @@ flowchart LR
     subgraph Input["Input Data"]
         JSON[JSON Config File]
     end
-    
+
     subgraph Validation["Validation Layer"]
         ZodSchema[Zod Schema Validation]
         BusinessRules[Business Rule Validation]
     end
-    
+
     subgraph Transformation["Data Transformation"]
         ShopifyFormat[Shopify Order Format]
         WmsFormat[WMS Entity Format]
     end
-    
+
     subgraph Persistence["Persistence"]
         ShopifyAPI[(Shopify Orders)]
         WmsDB[(WMS Database)]
     end
-    
+
     JSON --> ZodSchema
     ZodSchema --> BusinessRules
     BusinessRules --> ShopifyFormat
@@ -629,16 +629,17 @@ flowchart LR
   - Example values (non-sensitive, staging-safe)
   - Comments explaining each variable
   - Format:
+
     ```
     # Database connection string (must match staging patterns: staging, stage, test, dev, uat)
     DATABASE_URL=postgresql://user:password@staging-db.example.com:5432/wms_staging
-    
+
     # Shopify store domain (must match staging patterns: staging, stage, test, dev, uat, or .myshopify.com)
     SHOPIFY_STORE_DOMAIN=staging-store.myshopify.com
-    
+
     # Shopify Admin API access token
     SHOPIFY_ACCESS_TOKEN=shpat_xxxxxxxxxxxxx
-    
+
     # Shopify API version (optional, defaults to 2024-01)
     SHOPIFY_API_VERSION=2024-01
     ```
@@ -774,7 +775,7 @@ Example `seed-config.json`:
 ### Tagging Strategy
 
 - **Shopify Orders**: Tagged with `wms_seed_<batchId>` where batchId is UUID generated per run
-- **WMS Records**: 
+- **WMS Records**:
   - Orders: `sourceName: "wms_seed"` field
   - All records can be identified by creation timestamp and source
   - Batch ID stored in Shopify order tags (can be queried)
@@ -782,7 +783,7 @@ Example `seed-config.json`:
 ### Idempotency Strategy
 
 - **Shopify**: Check for existing orders by tag before creating
-- **WMS**: 
+- **WMS**:
   - Orders: Check by `shopifyOrderId` (unique constraint)
   - Customers: Check by `email` + `region`
   - Variant orders: Check by `lineItemId` (unique constraint)
@@ -808,43 +809,43 @@ Example `seed-config.json`:
 
 ## 8. ⚠️ Risks & Mitigations
 
-| Risk | Mitigation Strategy |
-|------|---------------------|
-| **Accidental production execution** | Hard-coded staging guardrails that check DB URL and Shopify domain patterns. Execution fails immediately if production detected. |
-| **Shopify API rate limits** | Sequential processing of orders. Future: Add exponential backoff retry logic. |
-| **Database connection failures** | Prisma connection pooling. Clear error messages. Future: Add retry logic with backoff. |
-| **Missing SKUs/variants in WMS** | Validation service checks SKUs exist before seeding. Clear error messages indicating which SKU is missing. |
-| **Data inconsistency between Shopify and WMS** | Use Shopify order data as source of truth. WMS entities created from Shopify order details. |
-| **Partial failures leaving orphaned records** | Idempotent operations allow safe re-runs. Transactions ensure atomicity for related records. |
-| **Schema changes breaking seeder** | Prisma schema versioning. TypeScript compilation catches breaking changes. Tests validate schema compatibility. |
+| Risk                                           | Mitigation Strategy                                                                                                              |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Accidental production execution**            | Hard-coded staging guardrails that check DB URL and Shopify domain patterns. Execution fails immediately if production detected. |
+| **Shopify API rate limits**                    | Sequential processing of orders. Future: Add exponential backoff retry logic.                                                    |
+| **Database connection failures**               | Prisma connection pooling. Clear error messages. Future: Add retry logic with backoff.                                           |
+| **Missing SKUs/variants in WMS**               | Validation service checks SKUs exist before seeding. Clear error messages indicating which SKU is missing.                       |
+| **Data inconsistency between Shopify and WMS** | Use Shopify order data as source of truth. WMS entities created from Shopify order details.                                      |
+| **Partial failures leaving orphaned records**  | Idempotent operations allow safe re-runs. Transactions ensure atomicity for related records.                                     |
+| **Schema changes breaking seeder**             | Prisma schema versioning. TypeScript compilation catches breaking changes. Tests validate schema compatibility.                  |
 
 ---
 
 ## 9. 📊 Build Estimate
 
-| Phase/Functionality | Estimate | Start Date | End Date |
-|---------------------|----------|------------|----------|
-| **Phase 1: Foundation & Dependencies** | ✅ Complete | - | - |
-| **Phase 2: Shopify Seeding** | ✅ Complete | - | - |
-| **Phase 3: WMS Seeding** | ✅ Complete | - | - |
-| **Phase 4: Collection Prep** | ✅ Complete | - | - |
-| **Phase 5: Testing** | ✅ Complete | - | - |
-| **Phase 6: Orchestrator & CLI** | ✅ Complete | - | - |
-| **Phase 7: Documentation** | ✅ Complete | - | - |
-| **Phase 8: Polish & Quality** | 4 hours | TBD | TBD |
-| - Final testing of end-to-end flow | 2 hours | | |
-| - Error message improvements | 1 hour | | |
-| - Performance validation | 1 hour | | |
-| **Total Remaining** | **4 hours** | | |
+| Phase/Functionality                    | Estimate    | Start Date | End Date |
+| -------------------------------------- | ----------- | ---------- | -------- |
+| **Phase 1: Foundation & Dependencies** | ✅ Complete | -          | -        |
+| **Phase 2: Shopify Seeding**           | ✅ Complete | -          | -        |
+| **Phase 3: WMS Seeding**               | ✅ Complete | -          | -        |
+| **Phase 4: Collection Prep**           | ✅ Complete | -          | -        |
+| **Phase 5: Testing**                   | ✅ Complete | -          | -        |
+| **Phase 6: Orchestrator & CLI**        | ✅ Complete | -          | -        |
+| **Phase 7: Documentation**             | ✅ Complete | -          | -        |
+| **Phase 8: Polish & Quality**          | 4 hours     | TBD        | TBD      |
+| - Final testing of end-to-end flow     | 2 hours     |            |          |
+| - Error message improvements           | 1 hour      |            |          |
+| - Performance validation               | 1 hour      |            |          |
+| **Total Remaining**                    | **4 hours** |            |          |
 
-*Note: Core implementation (Phases 1-7) is complete. Remaining work focuses on final polish and quality validation.*
+_Note: Core implementation (Phases 1-7) is complete. Remaining work focuses on final polish and quality validation._
 
 ---
 
 ## 10. ✅ Sign Off
 
-| Name | Status | Date | Notes |
-|------|--------|------|-------|
-| Sam Morrison | ⏳ Pending | | Project Champion - Awaiting review |
-| Engineering Manager | ⏳ Pending | | |
-| Staff Engineer | ⏳ Pending | | |
+| Name                | Status     | Date | Notes                              |
+| ------------------- | ---------- | ---- | ---------------------------------- |
+| Sam Morrison        | ⏳ Pending |      | Project Champion - Awaiting review |
+| Engineering Manager | ⏳ Pending |      |                                    |
+| Staff Engineer      | ⏳ Pending |      |                                    |

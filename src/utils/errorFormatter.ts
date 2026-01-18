@@ -70,9 +70,9 @@ export class ErrorFormatter {
 
     if (formatted.suggestions.length > 0) {
       parts.push("\n💡 Suggestions:");
-      formatted.suggestions.forEach((suggestion) => {
+      for (const suggestion of formatted.suggestions) {
         parts.push(`   • ${suggestion}`);
-      });
+      }
     }
 
     return parts.join("\n");

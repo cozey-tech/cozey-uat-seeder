@@ -52,18 +52,14 @@ For more information, see README.md
   if (options.output) {
     const parentDir = dirname(options.output);
     if (!existsSync(parentDir)) {
-      throw new Error(
-        `Output directory does not exist: ${parentDir}. Please create it first or use a different path.`,
-      );
+      throw new Error(`Output directory does not exist: ${parentDir}. Please create it first or use a different path.`);
     }
 
     // Check if parent directory is writable
     try {
       accessSync(parentDir, constants.W_OK);
     } catch {
-      throw new Error(
-        `Output directory is not writable: ${parentDir}. Please check permissions.`,
-      );
+      throw new Error(`Output directory is not writable: ${parentDir}. Please check permissions.`);
     }
   }
 

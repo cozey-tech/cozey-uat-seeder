@@ -4,7 +4,10 @@ import type { CreateCollectionPrepResponse } from "../../shared/responses/Create
 import { CreateCollectionPrepUseCase } from "./CreateCollectionPrepUseCase";
 import { BaseHandler } from "../BaseHandler";
 
-export class CreateCollectionPrepHandler extends BaseHandler<CreateCollectionPrepRequest, CreateCollectionPrepResponse> {
+export class CreateCollectionPrepHandler extends BaseHandler<
+  CreateCollectionPrepRequest,
+  CreateCollectionPrepResponse
+> {
   constructor(private readonly useCase: CreateCollectionPrepUseCase) {
     super();
   }
@@ -12,6 +15,6 @@ export class CreateCollectionPrepHandler extends BaseHandler<CreateCollectionPre
   async execute(request: unknown): Promise<CreateCollectionPrepResponse> {
     const validatedRequest = this.validateRequest(request, createCollectionPrepRequestSchema, "CreateCollectionPrep");
 
-    return await this.useCase.execute(validatedRequest);
+    return this.useCase.execute(validatedRequest);
   }
 }

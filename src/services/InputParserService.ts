@@ -25,9 +25,7 @@ export class InputParserService {
       try {
         rawData = readJsonFile(filePath);
       } catch {
-        throw new InputValidationError(
-          `Unsupported file format. Expected .json or .csv file. Got: ${filePath}`,
-        );
+        throw new InputValidationError(`Unsupported file format. Expected .json or .csv file. Got: ${filePath}`);
       }
     }
 

@@ -104,9 +104,9 @@ export class OutputFormatter {
     lines.push(options.title);
     lines.push(this.separator());
 
-    options.items.forEach((item) => {
+    for (const item of options.items) {
       lines.push(`   ${item.label}: ${item.value}`);
-    });
+    }
 
     if (options.showSeparator !== false) {
       lines.push(this.separator());

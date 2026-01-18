@@ -11,7 +11,7 @@ export class SeedWmsEntitiesHandler extends BaseHandler<SeedWmsEntitiesRequest, 
 
   async execute(request: unknown): Promise<SeedWmsEntitiesResponse> {
     const validatedRequest = this.validateRequest(request, seedWmsEntitiesRequestSchema, "SeedWmsEntities");
-    
+
     const requestWithCallback: SeedWmsEntitiesRequest = {
       ...validatedRequest,
       ...(typeof request === "object" && request !== null && "onOrderProgress" in request
@@ -19,6 +19,6 @@ export class SeedWmsEntitiesHandler extends BaseHandler<SeedWmsEntitiesRequest, 
         : {}),
     };
 
-    return await this.useCase.execute(requestWithCallback);
+    return this.useCase.execute(requestWithCallback);
   }
 }

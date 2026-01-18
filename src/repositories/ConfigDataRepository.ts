@@ -66,28 +66,32 @@ export class ConfigDataRepository {
     // -> "3-Seater With Corner L - With Ottoman & 2 Lounging Chaises"
     // "Altitude - Dove - Storage - Modules - Wall Shelf - 1 unit (S1)"
     // -> "Storage - Modules - Wall Shelf - 1 unit (S1)"
-    
+
     let config = description;
-    
+
     // Remove color name if present
     const colorPattern = new RegExp(`\\s*-\\s*${colorId.replace(/-/g, "\\-")}\\s*-`, "i");
     config = config.replace(colorPattern, " - ");
-    
+
     // Remove model name if at the start
     const modelPattern = new RegExp(`^${modelName}\\s*-\\s*`, "i");
     config = config.replace(modelPattern, "");
-    
+
     // Remove common suffixes like " - Original", " - Square", " - REFURBISHED", etc.
     config = config.replace(/\s*-\s*(Original|Square|REFURBISHED|DONATION).*$/i, "");
-    
+
     // Remove leading/trailing dashes and whitespace
     config = config.replace(/^[\s-]+|[\s-]+$/g, "").trim();
-    
+
     // If the result is too short or just the model/color, return undefined
-    if (config.length < 10 || config.toLowerCase() === modelName.toLowerCase() || config.toLowerCase() === colorId.toLowerCase()) {
+    if (
+      config.length < 10 ||
+      config.toLowerCase() === modelName.toLowerCase() ||
+      config.toLowerCase() === colorId.toLowerCase()
+    ) {
       return undefined;
     }
-    
+
     return config;
   }
 
@@ -147,12 +151,7 @@ export class ConfigDataRepository {
         region: true,
         description: true,
       },
-      orderBy: [
-        { modelName: "asc" },
-        { colorId: "asc" },
-        { description: "asc" },
-        { sku: "asc" },
-      ],
+      orderBy: [{ modelName: "asc" }, { colorId: "asc" }, { description: "asc" }, { sku: "asc" }],
     });
 
     // Batch fetch all variantParts for all variants at once to avoid connection pool exhaustion
@@ -183,7 +182,7 @@ export class ConfigDataRepository {
       const variantParts = variantPartsByVariantId.get(v.id) || [];
       const pickType = this.getVariantPickTypeFromParts(variantParts);
       const configuration = this.extractConfiguration(v.description, v.modelName, v.colorId);
-      
+
       return {
         id: v.id,
         sku: v.sku,
@@ -221,17 +220,13 @@ export class ConfigDataRepository {
       // Filter by region if provided
       let customers = config.customers;
       if (region) {
-        customers = config.customers.filter(
-          (customer) => customer.region === region,
-        );
+        customers = config.customers.filter((customer) => customer.region === region);
       }
 
       return customers;
     } catch (error) {
       if (error instanceof Error && error.message.includes("ENOENT")) {
-        throw new Error(
-          `Customers config file not found at config/customers.json. Please create it first.`,
-        );
+        throw new Error(`Customers config file not found at config/customers.json. Please create it first.`);
       }
       throw error;
     }

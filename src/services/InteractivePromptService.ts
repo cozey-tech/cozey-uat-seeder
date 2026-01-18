@@ -128,10 +128,7 @@ export class InteractivePromptService {
    * Only shows template option if templates are available
    * If no templates available, automatically returns "custom" without prompting
    */
-  async promptOrderComposition(
-    _variants: Variant[],
-    templates: OrderTemplate[],
-  ): Promise<"template" | "custom"> {
+  async promptOrderComposition(_variants: Variant[], templates: OrderTemplate[]): Promise<"template" | "custom"> {
     // If no templates available, automatically use custom order
     if (templates.length === 0) {
       return "custom";
@@ -183,7 +180,7 @@ export class InteractivePromptService {
 
   /**
    * Prompt for variant selection with hierarchical model -> color -> configuration -> variant selection
-   * 
+   *
    * Flow:
    * 1. Search/filter models by name
    * 2. Select a model
@@ -216,9 +213,7 @@ export class InteractivePromptService {
         message: "Search and select a product/model:",
         source: async (input) => {
           const searchTerm = (input || "").toLowerCase().trim();
-          const filtered = modelNames.filter((model) =>
-            model.toLowerCase().includes(searchTerm),
-          );
+          const filtered = modelNames.filter((model) => model.toLowerCase().includes(searchTerm));
           return filtered.map((model) => ({
             name: model,
             value: model,
@@ -229,7 +224,7 @@ export class InteractivePromptService {
 
       // Step 3: Get all color variants for the selected model
       const modelVariants = variantsByModel[selectedModel];
-      
+
       // Group by color
       const variantsByColor = modelVariants.reduce(
         (acc, variant) => {
@@ -249,9 +244,7 @@ export class InteractivePromptService {
         message: `Select a color for "${selectedModel}":`,
         source: async (input) => {
           const searchTerm = (input || "").toLowerCase().trim();
-          const filtered = colors.filter((color) =>
-            color.toLowerCase().includes(searchTerm),
-          );
+          const filtered = colors.filter((color) => color.toLowerCase().includes(searchTerm));
           return filtered.map((color) => ({
             name: color,
             value: color,
@@ -261,7 +254,7 @@ export class InteractivePromptService {
 
       // Step 5: Get variants for selected model/color and group by configuration
       const colorVariants = variantsByColor[selectedColor];
-      
+
       // Group by configuration (if available)
       const variantsByConfig = colorVariants.reduce(
         (acc, variant) => {
@@ -281,15 +274,15 @@ export class InteractivePromptService {
       let selectedConfig: string;
       if (configurations.length === 1) {
         selectedConfig = configurations[0];
-        console.log(`📦 Using configuration: ${selectedConfig === "Standard" ? "Standard (no specific configuration)" : selectedConfig}`);
+        console.log(
+          `📦 Using configuration: ${selectedConfig === "Standard" ? "Standard (no specific configuration)" : selectedConfig}`,
+        );
       } else {
         selectedConfig = await search({
           message: `Select a configuration for "${selectedModel}" - "${selectedColor}":`,
           source: async (input) => {
             const searchTerm = (input || "").toLowerCase().trim();
-            const filtered = configurations.filter((cfg) =>
-              cfg.toLowerCase().includes(searchTerm),
-            );
+            const filtered = configurations.filter((cfg) => cfg.toLowerCase().includes(searchTerm));
             return filtered.map((cfg) => ({
               name: cfg === "Standard" ? "Standard (no specific configuration)" : cfg,
               value: cfg,
@@ -300,24 +293,24 @@ export class InteractivePromptService {
 
       // Step 4: Select variants for this configuration (multi-select with live filtering)
       const configVariants = variantsByConfig[selectedConfig];
-      
+
       // Use searchable multi-select: users can search and select variants one by one
       let selectedVariantSkus: string[] = [];
       let doneSelectingVariants = false;
 
       while (!doneSelectingVariants) {
         // Show current selection status
-        const statusMsg = selectedVariantSkus.length > 0 
-          ? ` (${selectedVariantSkus.length} selected - select again to deselect)` 
-          : "";
+        const statusMsg =
+          selectedVariantSkus.length > 0 ? ` (${selectedVariantSkus.length} selected - select again to deselect)` : "";
 
         const selectedSku = await search({
           message: `Search and select variants for "${selectedModel}" - "${selectedColor}"${selectedConfig !== "Standard" ? ` - "${selectedConfig}"` : ""}${statusMsg}:`,
           source: async (input) => {
             const searchTerm = (input || "").toLowerCase().trim();
-            const filtered = configVariants.filter((variant) =>
-              variant.sku.toLowerCase().includes(searchTerm) ||
-              variant.description.toLowerCase().includes(searchTerm)
+            const filtered = configVariants.filter(
+              (variant) =>
+                variant.sku.toLowerCase().includes(searchTerm) ||
+                variant.description.toLowerCase().includes(searchTerm),
             );
             return filtered.map((variant) => ({
               name: `${variant.sku} - ${variant.description} [${variant.pickType}]${selectedVariantSkus.includes(variant.sku) ? " ✓" : ""}`,
@@ -340,9 +333,10 @@ export class InteractivePromptService {
           {
             type: "confirm",
             name: "done",
-            message: selectedVariantSkus.length > 0
-              ? `Done selecting variants? (${selectedVariantSkus.length} selected)`
-              : "Please select at least one variant. Continue?",
+            message:
+              selectedVariantSkus.length > 0
+                ? `Done selecting variants? (${selectedVariantSkus.length} selected)`
+                : "Please select at least one variant. Continue?",
             default: selectedVariantSkus.length > 0,
           },
         ]);
@@ -916,7 +910,9 @@ export class InteractivePromptService {
   /**
    * Display order review summary and prompt for action
    */
-  async promptOrderReviewAction(orders: Array<{ customer: Customer; composition: OrderComposition }>): Promise<"continue" | "add-more" | "edit" | "delete" | "start-over"> {
+  async promptOrderReviewAction(
+    orders: Array<{ customer: Customer; composition: OrderComposition }>,
+  ): Promise<"continue" | "add-more" | "edit" | "delete" | "start-over"> {
     // Display summary
     console.log("\n📋 Order Review");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

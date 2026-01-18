@@ -8,23 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Data model documentation (`docs/data-model.md`)
 - Runbook with troubleshooting guide (`docs/runbook.md`)
 - Contributing guide (`CONTRIBUTING.md`)
 - Documentation inventory and classification
 
 ### Changed
+
 - Fixed broken internal links in documentation
 - Organized implementation docs (moved working notes to `ai-docs/`)
 - Updated architecture.md to reference correct technical design document
 
 ### Fixed
+
 - Fixed broken link to `docs/implementation/progress.md` (moved to `ai-docs/`)
 - Fixed architecture.md link to technical design document
 
 ## [0.1.0] - 2025-01-17
 
 ### Added
+
 - Initial release of Cozey UAT Seeder
 - Shopify order seeding via Admin GraphQL API
 - WMS entity seeding (orders, preps, collection preps, PnP entities)
@@ -38,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test coverage
 
 ### Documentation
+
 - README.md with quickstart and usage
 - AGENTS.md with engineering conventions
 - Architecture documentation

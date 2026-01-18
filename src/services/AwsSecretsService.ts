@@ -95,15 +95,12 @@ export class AwsSecretsService {
         errorMessage.includes("InvalidClientTokenId") ||
         errorMessage.includes("SignatureDoesNotMatch")
       ) {
-        Logger.error(
-          "AWS credentials error - check your credentials or profile configuration",
-          error,
-          {
-            secretName,
-            hint: "Verify AWS credentials are valid and not expired. " +
-              "If using profiles, ensure AWS_PROFILE is set correctly.",
-          },
-        );
+        Logger.error("AWS credentials error - check your credentials or profile configuration", error, {
+          secretName,
+          hint:
+            "Verify AWS credentials are valid and not expired. " +
+            "If using profiles, ensure AWS_PROFILE is set correctly.",
+        });
       } else {
         // Other errors (network, permissions, etc.)
         Logger.warn("Failed to fetch secret from AWS, will fallback to .env", {
@@ -134,15 +131,13 @@ export class AwsSecretsService {
     });
 
     // Fetch all secrets in parallel
-    const results = await Promise.allSettled(
-      secretNames.map((secretName) => this.fetchSecret(secretName)),
-    );
+    const results = await Promise.allSettled(secretNames.map((secretName) => this.fetchSecret(secretName)));
 
     // Merge successful results
     const merged: Record<string, unknown> = {};
     let hasAnySuccess = false;
 
-    results.forEach((result, index) => {
+    for (const [index, result] of results.entries()) {
       const secretName = secretNames[index];
       if (result.status === "fulfilled" && result.value !== null) {
         Object.assign(merged, result.value);
@@ -154,7 +149,7 @@ export class AwsSecretsService {
           reason: result.status === "rejected" ? result.reason?.message : "returned null",
         });
       }
-    });
+    }
 
     if (!hasAnySuccess) {
       Logger.warn("All secrets failed to fetch from AWS", { secretNames });

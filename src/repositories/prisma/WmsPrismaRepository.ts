@@ -15,21 +15,19 @@ import type {
   ICollectionPrep,
   IShipment,
 } from "../interface/WmsRepository";
+import { WmsRepositoryError } from "../errors/WmsRepositoryError";
 
 export class WmsPrismaRepository implements WmsRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   /**
-   * Handle Prisma unique constraint violation errors (P2002)
-   * @param error - The error to check
+   * Handle Prisma errors and convert them to typed WmsRepositoryError
+   * @param error - The Prisma error
    * @param context - Context message for the error (e.g., "Order with shopifyOrderId X")
-   * @throws Error with context message if P2002 error, otherwise re-throws original error
+   * @throws WmsRepositoryError with appropriate type and metadata
    */
   private handlePrismaError(error: unknown, context: string): never {
-    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
-      throw new Error(`${context} already exists`);
-    }
-    throw error;
+    throw WmsRepositoryError.fromPrismaError(error, context);
   }
 
   async createOrder(order: CreateOrderRequest): Promise<IOrder> {
@@ -131,12 +129,15 @@ export class WmsPrismaRepository implements WmsRepository {
         status: created.status,
       };
     } catch (error: unknown) {
-      this.handlePrismaError(error, `Shipment for order ${shipment.orderId} and collectionPrep ${shipment.collectionPrepId}`);
+      this.handlePrismaError(
+        error,
+        `Shipment for order ${shipment.orderId} and collectionPrep ${shipment.collectionPrepId}`,
+      );
     }
   }
 
   async createPnpPackageInfo(packageInfo: CreatePnpPackageInfoRequest): Promise<unknown> {
-    return await this.prisma.pnpPackageInfo.create({
+    return this.prisma.pnpPackageInfo.create({
       data: {
         identifier: packageInfo.identifier,
         length: packageInfo.length,
@@ -152,7 +153,7 @@ export class WmsPrismaRepository implements WmsRepository {
   }
 
   async createPnpBox(box: CreatePnpBoxRequest): Promise<unknown> {
-    return await this.prisma.pnpBox.create({
+    return this.prisma.pnpBox.create({
       data: {
         identifier: box.identifier,
         length: box.length,
@@ -167,7 +168,7 @@ export class WmsPrismaRepository implements WmsRepository {
   }
 
   async createPnpOrderBox(orderBox: CreatePnpOrderBoxRequest): Promise<unknown> {
-    return await this.prisma.pnpOrderBox.create({
+    return this.prisma.pnpOrderBox.create({
       data: {
         collectionPrepId: orderBox.collectionPrepId,
         orderId: orderBox.orderId,
@@ -247,7 +248,10 @@ export class WmsPrismaRepository implements WmsRepository {
     return partMap;
   }
 
-  async findPartsByVariantIds(variantIds: string[], region: string): Promise<Map<string, Array<{ id: string; sku: string; quantity: number }>>> {
+  async findPartsByVariantIds(
+    variantIds: string[],
+    region: string,
+  ): Promise<Map<string, Array<{ id: string; sku: string; quantity: number }>>> {
     const variantParts = await this.prisma.variantPart.findMany({
       where: {
         variantId: { in: variantIds },
@@ -278,7 +282,7 @@ export class WmsPrismaRepository implements WmsRepository {
   }
 
   async createPrepPart(prepPart: CreatePrepPartRequest): Promise<unknown> {
-    return await this.prisma.prepPart.create({
+    return this.prisma.prepPart.create({
       data: {
         prepId: prepPart.prepId,
         partId: prepPart.partId,
@@ -289,7 +293,7 @@ export class WmsPrismaRepository implements WmsRepository {
   }
 
   async createPrepPartItem(prepPartItem: CreatePrepPartItemRequest): Promise<unknown> {
-    return await this.prisma.prepPartItem.create({
+    return this.prisma.prepPartItem.create({
       data: {
         prepPartId: prepPartItem.prepPartId,
         region: (prepPartItem.region || "CA") as "CA" | "US",
@@ -320,7 +324,10 @@ export class WmsPrismaRepository implements WmsRepository {
     };
   }
 
-  async findCustomerByEmail(email: string, region: string): Promise<{ id: string; name: string; email?: string } | null> {
+  async findCustomerByEmail(
+    email: string,
+    region: string,
+  ): Promise<{ id: string; name: string; email?: string } | null> {
     const customer = await this.prisma.customer.findFirst({
       where: {
         email: email,
@@ -361,12 +368,7 @@ export class WmsPrismaRepository implements WmsRepository {
     return order;
   }
 
-  async createCustomer(customer: {
-    id: string;
-    name: string;
-    email?: string;
-    region: string;
-  }): Promise<unknown> {
+  async createCustomer(customer: { id: string; name: string; email?: string; region: string }): Promise<unknown> {
     try {
       return await this.prisma.customer.create({
         data: {
@@ -387,7 +389,7 @@ export class WmsPrismaRepository implements WmsRepository {
     order: CreateOrderRequest,
     customer: { id: string; name: string; email?: string; region: string },
   ): Promise<{ order: IOrder; customerId: string }> {
-    return await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       // Upsert customer (create if not exists, update if exists)
       const customerRecord = await tx.customer.upsert({
         where: {
@@ -438,7 +440,7 @@ export class WmsPrismaRepository implements WmsRepository {
     variantOrders: CreateVariantOrderRequest[],
     preps: CreatePrepRequest[],
   ): Promise<{ order: IOrder; variantOrderIds: string[]; prepIds: string[] }> {
-    return await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       // Create order
       const orderRecord = await tx.order.create({
         data: {

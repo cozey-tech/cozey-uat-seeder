@@ -19,11 +19,7 @@ export abstract class BaseHandler<RequestType, ResponseType> {
    * @returns The validated request object
    * @throws InputValidationError if validation fails
    */
-  protected validateRequest<T extends RequestType>(
-    request: unknown,
-    schema: z.ZodSchema<T>,
-    operationName: string,
-  ): T {
+  protected validateRequest<T extends RequestType>(request: unknown, schema: z.ZodSchema<T>, operationName: string): T {
     const result = schema.safeParse(request);
 
     if (!result.success) {

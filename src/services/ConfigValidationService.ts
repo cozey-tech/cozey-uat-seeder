@@ -40,9 +40,7 @@ export class ConfigValidationService {
     const zodResult = seedConfigSchema.safeParse(config);
     if (!zodResult.success) {
       result.valid = false;
-      result.errors.push(
-        ...zodResult.error.errors.map((e) => `Schema validation: ${e.path.join(".")} - ${e.message}`),
-      );
+      result.errors.push(...zodResult.error.errors.map((e) => `Schema validation: ${e.path.join(".")} - ${e.message}`));
       return result; // Stop here if schema is invalid
     }
 
@@ -118,10 +116,7 @@ export class ConfigValidationService {
         // This should never fail if variants are properly filtered, but validate as safety check
         try {
           const configRegion =
-            config.region ||
-            config.collectionPreps?.[0]?.region ||
-            config.collectionPrep?.region ||
-            "CA";
+            config.region || config.collectionPreps?.[0]?.region || config.collectionPrep?.region || "CA";
           const variant = await this.dataRepository.getShopifyVariantId(item.sku, configRegion);
           if (!variant) {
             result.valid = false;
@@ -160,11 +155,7 @@ export class ConfigValidationService {
     }
 
     // Validate SKUs exist in database
-    const configRegion =
-      config.region ||
-      config.collectionPreps?.[0]?.region ||
-      config.collectionPrep?.region ||
-      "CA";
+    const configRegion = config.region || config.collectionPreps?.[0]?.region || config.collectionPrep?.region || "CA";
     for (const sku of allSkus) {
       const variant = await this.prisma.variant.findFirst({
         where: {
@@ -198,18 +189,14 @@ export class ConfigValidationService {
 
         if (!location) {
           result.valid = false;
-          result.errors.push(
-            `${prepPrefix}: Location ${prep.locationId} does not exist for region ${prep.region}`,
-          );
+          result.errors.push(`${prepPrefix}: Location ${prep.locationId} does not exist for region ${prep.region}`);
         }
 
         // Validate carrier exists in enum and is available for region
         // Note: prep.carrier contains Carrier.id, which is set to carrier.code in ConfigDataRepository.getCarriers()
         // So prep.carrier should match carrier.code from the enum (case-insensitive comparison)
         const carrierCode = prep.carrier;
-        const carrier = carriers.find(
-          (c) => c.code.toLowerCase() === carrierCode.toLowerCase(),
-        );
+        const carrier = carriers.find((c) => c.code.toLowerCase() === carrierCode.toLowerCase());
 
         if (!carrier) {
           result.valid = false;
@@ -219,8 +206,7 @@ export class ConfigValidationService {
         } else {
           // Check if carrier is available for the specified region
           // Carriers with region: null are available for all regions
-          const isAvailableForRegion =
-            carrier.region === null || carrier.region === prep.region;
+          const isAvailableForRegion = carrier.region === null || carrier.region === prep.region;
 
           if (!isAvailableForRegion) {
             result.valid = false;
@@ -263,9 +249,7 @@ export class ConfigValidationService {
 
       // Validate carrier exists in enum and is available for region
       const carrierCode = config.collectionPrep.carrier;
-      const carrier = carriers.find(
-        (c) => c.code.toLowerCase() === carrierCode.toLowerCase(),
-      );
+      const carrier = carriers.find((c) => c.code.toLowerCase() === carrierCode.toLowerCase());
 
       if (!carrier) {
         result.valid = false;
@@ -275,8 +259,7 @@ export class ConfigValidationService {
       } else {
         // Check if carrier is available for the specified region
         // Carriers with region: null are available for all regions
-        const isAvailableForRegion =
-          carrier.region === null || carrier.region === config.collectionPrep.region;
+        const isAvailableForRegion = carrier.region === null || carrier.region === config.collectionPrep.region;
 
         if (!isAvailableForRegion) {
           result.valid = false;
@@ -299,29 +282,29 @@ export class ConfigValidationService {
       }
     }
 
-      // Validate region consistency
-      const regions = new Set<string>();
-      if (config.region) {
-        regions.add(config.region);
-      }
-      if (config.collectionPreps) {
-        for (const prep of config.collectionPreps) {
-          regions.add(prep.region);
-          if (config.region && prep.region !== config.region) {
-            result.warnings.push(
-              `Region mismatch: top-level region is "${config.region}" but collection prep has region "${prep.region}".`,
-            );
-          }
-        }
-      }
-      if (config.collectionPrep) {
-        regions.add(config.collectionPrep.region);
-        if (config.region && config.collectionPrep.region !== config.region) {
+    // Validate region consistency
+    const regions = new Set<string>();
+    if (config.region) {
+      regions.add(config.region);
+    }
+    if (config.collectionPreps) {
+      for (const prep of config.collectionPreps) {
+        regions.add(prep.region);
+        if (config.region && prep.region !== config.region) {
           result.warnings.push(
-            `Region mismatch: top-level region is "${config.region}" but collectionPrep.region is "${config.collectionPrep.region}". Using collectionPrep.region.`,
+            `Region mismatch: top-level region is "${config.region}" but collection prep has region "${prep.region}".`,
           );
         }
       }
+    }
+    if (config.collectionPrep) {
+      regions.add(config.collectionPrep.region);
+      if (config.region && config.collectionPrep.region !== config.region) {
+        result.warnings.push(
+          `Region mismatch: top-level region is "${config.region}" but collectionPrep.region is "${config.collectionPrep.region}". Using collectionPrep.region.`,
+        );
+      }
+    }
 
     if (regions.size > 1) {
       result.warnings.push("Multiple regions detected in config");

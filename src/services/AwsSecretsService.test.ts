@@ -120,10 +120,7 @@ describe("AwsSecretsService", () => {
           SecretString: JSON.stringify(secret2),
         });
 
-      const result = await service.fetchSecrets([
-        "dev/uat-database-url",
-        "dev/shopify-access-token",
-      ]);
+      const result = await service.fetchSecrets(["dev/uat-database-url", "dev/shopify-access-token"]);
 
       expect(result).toEqual({
         ...secret1,
@@ -140,10 +137,7 @@ describe("AwsSecretsService", () => {
         })
         .mockRejectedValueOnce(new Error("Secret not found"));
 
-      const result = await service.fetchSecrets([
-        "dev/uat-database-url",
-        "dev/nonexistent-secret",
-      ]);
+      const result = await service.fetchSecrets(["dev/uat-database-url", "dev/nonexistent-secret"]);
 
       expect(result).toEqual(secret1);
     });
@@ -153,10 +147,7 @@ describe("AwsSecretsService", () => {
         .mockRejectedValueOnce(new Error("Secret 1 not found"))
         .mockRejectedValueOnce(new Error("Secret 2 not found"));
 
-      const result = await service.fetchSecrets([
-        "dev/nonexistent-1",
-        "dev/nonexistent-2",
-      ]);
+      const result = await service.fetchSecrets(["dev/nonexistent-1", "dev/nonexistent-2"]);
 
       expect(result).toBeNull();
     });
