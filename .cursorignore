@@ -1,8 +1,13 @@
 # Allow Cursor access to key folders even if gitignored
+# Use recursive wildcards (**) to ensure contents are included
 !.cursor/
+!.cursor/**
 !ai-docs/
+!ai-docs/**
 !node_modules/
+!node_modules/**
 !logs/
+!logs/**
 !*.log
 
 # Secrets and env files should never be read by agents
