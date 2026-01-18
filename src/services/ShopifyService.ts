@@ -252,8 +252,6 @@ export class ShopifyService {
         })
         .filter((item) => item !== null && item !== undefined);
 
-      // Build shipping address if provided
-      // Determine country code from region (CA -> "CA", US -> "US", default to "CA")
       const countryCode = region === "US" ? "US" : "CA";
       
       const shippingAddress = input.customer.address &&
@@ -269,7 +267,6 @@ export class ShopifyService {
           }
         : undefined;
 
-      // Build note with collection prep name if provided
       let note = `WMS Seed Order - Batch: ${batchId}`;
       if (collectionPrepName) {
         note = `WMS Seed Order - Batch: ${batchId}\nCollection Prep: ${collectionPrepName}`;
