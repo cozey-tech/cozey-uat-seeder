@@ -20,6 +20,8 @@ config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
 import { PrismaClient } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
+import { Command } from "commander";
+import { seedVersion } from "./index";
 import { initializeEnvConfig } from "./config/env";
 import { assertStagingEnvironment, displayStagingEnvironment } from "./config/stagingGuardrails";
 import { InputParserService } from "./services/InputParserService";
@@ -47,37 +49,56 @@ interface CliOptions {
 }
 
 /**
- * Parse command line arguments
+ * Parse command line arguments using commander
  */
 function parseArgs(): CliOptions {
-  const args = process.argv.slice(2);
+  const program = new Command();
 
-  if (args.length === 0) {
-    console.error("Usage: npm run seed <config-file.json> [--validate|--dry-run] [--skip-confirmation]");
-    console.error("\nFlags:");
-    console.error("  --validate           Validate config file schema only (no DB/API calls)");
-    console.error("  --dry-run            Simulate seeding without making changes");
-    console.error("  --skip-confirmation  Skip staging confirmation prompt");
-    process.exit(1);
-  }
+  program
+    .name("seed")
+    .description("Seeder for Shopify staging orders and WMS staging entities")
+    .version(seedVersion, "-v, --version", "display version number")
+    .argument("<config-file>", "Path to seed configuration JSON file")
+    .option("--validate", "Validate config file schema only (no DB/API calls)")
+    .option("--dry-run", "Simulate seeding without making changes")
+    .option("--skip-confirmation", "Skip staging confirmation prompt")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  $ npm run seed config.json
+  $ npm run seed config.json --validate
+  $ npm run seed config.json --dry-run
+  $ npm run seed config.json --skip-confirmation
 
-  const configFile = args[0];
-  const skipConfirmation = args.includes("--skip-confirmation");
-  const validate = args.includes("--validate");
-  const dryRun = args.includes("--dry-run");
+For more information, see README.md
+      `,
+    );
+
+  program.parse();
+
+  const options = program.opts();
+  const configFile = program.args[0];
 
   // Validate flags are mutually exclusive
-  if (validate && dryRun) {
-    console.error("Error: --validate and --dry-run cannot be used together");
-    console.error("Usage: npm run seed <config-file.json> [--validate|--dry-run] [--skip-confirmation]");
-    console.error("\nFlags:");
-    console.error("  --validate           Validate config file schema only (no DB/API calls)");
-    console.error("  --dry-run            Simulate seeding without making changes");
-    console.error("  --skip-confirmation  Skip staging confirmation prompt");
+  if (options.validate && options.dryRun) {
+    console.error("Error: --validate and --dry-run cannot be used together\n");
+    program.help();
     process.exit(1);
   }
 
-  return { configFile, skipConfirmation, validate, dryRun };
+  if (!configFile) {
+    console.error("Error: config file path is required\n");
+    program.help();
+    process.exit(1);
+  }
+
+  return {
+    configFile,
+    skipConfirmation: options.skipConfirmation || false,
+    validate: options.validate || false,
+    dryRun: options.dryRun || false,
+  };
 }
 
 /**

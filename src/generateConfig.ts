@@ -19,6 +19,8 @@ config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
 import { PrismaClient } from "@prisma/client";
 import { writeFileSync, existsSync, accessSync, constants } from "fs";
+import { Command } from "commander";
+import { seedVersion } from "./index";
 import { ConfigDataRepository, type Carrier, type Customer, type Variant } from "./repositories/ConfigDataRepository";
 import { InteractivePromptService } from "./services/InteractivePromptService";
 import { OrderCompositionBuilder, type OrderComposition } from "./services/OrderCompositionBuilder";
