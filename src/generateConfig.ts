@@ -90,7 +90,16 @@ function parseArgs(): CliOptions {
     }
   }
 
-  return options;
+  // Normalize region to uppercase
+  const region = options.region ? (options.region.toUpperCase() as "CA" | "US") : undefined;
+
+  return {
+    dryRun: options.dryRun || false,
+    modifyInventory: options.modifyInventory || false,
+    skipSaveTemplate: options.skipSaveTemplate || false,
+    output: options.output,
+    region,
+  };
 }
 
 /**
