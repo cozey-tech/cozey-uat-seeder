@@ -2,6 +2,7 @@ import { createAdminApiClient } from "@shopify/admin-api-client";
 import { v4 as uuidv4 } from "uuid";
 import { getEnvConfig } from "../config/env";
 import { Logger } from "../utils/logger";
+import type { GraphQLCostInfo } from "../shared/types/PerformanceMetrics";
 
 export interface DraftOrderInput {
   customer: {
@@ -20,11 +21,19 @@ export interface DraftOrderInput {
 
 export interface DraftOrderResult {
   draftOrderId: string;
+  graphQLCost?: GraphQLCostInfo;
 }
 
 export interface OrderResult {
   orderId: string;
   orderNumber: string;
+  graphQLCost?: GraphQLCostInfo;
+  // Inspect if line items are available in the response
+  lineItems?: Array<{
+    lineItemId: string;
+    sku: string;
+    quantity: number;
+  }>;
 }
 
 export interface FulfillmentResult {
@@ -82,6 +91,58 @@ export class ShopifyService {
   }
 
   /**
+   * Extract GraphQL cost information from API response extensions
+   * @param response - GraphQL API response
+   * @returns Cost information if available, undefined otherwise
+   */
+  private extractGraphQLCost(response: unknown): GraphQLCostInfo | undefined {
+    if (!response || typeof response !== "object") {
+      return undefined;
+    }
+
+    const extensions = (response as { extensions?: unknown }).extensions;
+    if (!extensions || typeof extensions !== "object") {
+      return undefined;
+    }
+
+    const cost = (extensions as { cost?: unknown }).cost;
+    if (!cost || typeof cost !== "object") {
+      return undefined;
+    }
+
+    const costObj = cost as {
+      requestedQueryCost?: number;
+      actualQueryCost?: number;
+      throttleStatus?: {
+        maximumAvailable?: number;
+        currentlyAvailable?: number;
+        restoreRate?: number;
+      };
+    };
+
+    if (
+      typeof costObj.requestedQueryCost === "number" &&
+      typeof costObj.actualQueryCost === "number" &&
+      costObj.throttleStatus &&
+      typeof costObj.throttleStatus.maximumAvailable === "number" &&
+      typeof costObj.throttleStatus.currentlyAvailable === "number" &&
+      typeof costObj.throttleStatus.restoreRate === "number"
+    ) {
+      return {
+        requestedQueryCost: costObj.requestedQueryCost,
+        actualQueryCost: costObj.actualQueryCost,
+        throttleStatus: {
+          maximumAvailable: costObj.throttleStatus.maximumAvailable,
+          currentlyAvailable: costObj.throttleStatus.currentlyAvailable,
+          restoreRate: costObj.throttleStatus.restoreRate,
+        },
+      };
+    }
+
+    return undefined;
+  }
+
+  /**
    * Formats a batch tag for Shopify (ensures it doesn't exceed 40 character limit)
    * @param batchId - Unique batch ID
    * @returns Tag string truncated to 40 characters
@@ -105,10 +166,18 @@ export class ShopifyService {
    * @param input - Customer and line items for the draft order
    * @param batchId - Unique batch ID for tagging (format: wms_seed_<batchId>)
    * @param region - Optional region code (CA or US) for determining country code in shipping address
+   * @param collectionPrepName - Optional collection prep name to include in order notes
+   * @param variantMap - Optional pre-fetched variant map (SKU -> variant ID). If not provided, will lookup variants.
    * @returns Draft order ID
    * @throws ShopifyServiceError if variant lookup fails or API returns errors
    */
-  async createDraftOrder(input: DraftOrderInput, batchId: string, region?: string, collectionPrepName?: string): Promise<DraftOrderResult> {
+  async createDraftOrder(
+    input: DraftOrderInput,
+    batchId: string,
+    region?: string,
+    collectionPrepName?: string,
+    variantMap?: Map<string, string>,
+  ): Promise<DraftOrderResult> {
     if (this.dryRun) {
       const draftOrderId = `gid://shopify/DraftOrder/${uuidv4()}`;
       Logger.info("DRY RUN: Would create draft order", {
@@ -149,13 +218,17 @@ export class ShopifyService {
     `;
 
     try {
-      // First, get variant IDs for the SKUs
-      const variantMap = await this.findVariantIdsBySkus(input.lineItems.map((item) => item.sku));
+      // Get variant IDs for the SKUs (use provided map or lookup)
+      let resolvedVariantMap = variantMap;
+      if (!resolvedVariantMap) {
+        // Fallback: lookup variants if not provided (backward compatibility)
+        resolvedVariantMap = await this.findVariantIdsBySkus(input.lineItems.map((item) => item.sku));
+      }
 
       // Build line items with variant IDs
       const lineItems = input.lineItems
         .map((item) => {
-          const variantId = variantMap.get(item.sku);
+          const variantId = resolvedVariantMap.get(item.sku);
           if (!variantId) {
             throw new ShopifyServiceError(`Variant not found for SKU: ${item.sku}`);
           }
@@ -230,6 +303,7 @@ export class ShopifyService {
       }
 
       const response = await this.client.request(mutation, { variables });
+      const graphQLCost = this.extractGraphQLCost(response);
 
       if (response.data?.draftOrderCreate?.userErrors?.length > 0) {
         const errors = response.data.draftOrderCreate.userErrors;
@@ -246,6 +320,7 @@ export class ShopifyService {
 
       return {
         draftOrderId: draftOrder.id,
+        graphQLCost,
       };
     } catch (error) {
       if (error instanceof ShopifyServiceError) {
@@ -268,6 +343,7 @@ export class ShopifyService {
       return { orderId, orderNumber };
     }
 
+    // Inspect if line items are available in the response - query them to see
     const mutation = `
       mutation draftOrderComplete($id: ID!, $paymentPending: Boolean) {
         draftOrderComplete(id: $id, paymentPending: $paymentPending) {
@@ -276,6 +352,15 @@ export class ShopifyService {
             order {
               id
               name
+              lineItems(first: 250) {
+                edges {
+                  node {
+                    id
+                    sku
+                    quantity
+                  }
+                }
+              }
             }
           }
           userErrors {
@@ -293,6 +378,7 @@ export class ShopifyService {
 
     try {
       const response = await this.client.request(mutation, { variables });
+      const graphQLCost = this.extractGraphQLCost(response);
 
       if (response.data?.draftOrderComplete?.userErrors?.length > 0) {
         const errors = response.data.draftOrderComplete.userErrors;
@@ -307,9 +393,18 @@ export class ShopifyService {
         throw new ShopifyServiceError("Draft order completion returned no order data");
       }
 
+      // Extract line items if available in the response
+      const lineItems = order.lineItems?.edges?.map((edge: { node: { id: string; sku: string; quantity: number } }) => ({
+        lineItemId: edge.node.id,
+        sku: edge.node.sku || "",
+        quantity: edge.node.quantity,
+      }));
+
       return {
         orderId: order.id,
         orderNumber: order.name || "",
+        graphQLCost,
+        lineItems,
       };
     } catch (error) {
       if (error instanceof ShopifyServiceError) {
@@ -481,6 +576,67 @@ export class ShopifyService {
     }
   }
 
+  /**
+   * Query a single order by ID to get line items
+   * More efficient than querying all orders by tag when we only need one order
+   */
+  async queryOrderById(orderId: string): Promise<OrderQueryResult | null> {
+    if (this.dryRun) {
+      Logger.info("DRY RUN: Would query order by ID", { orderId });
+      return null;
+    }
+
+    const query = `
+      query getOrder($id: ID!) {
+        order(id: $id) {
+          id
+          name
+          lineItems(first: 250) {
+            edges {
+              node {
+                id
+                sku
+                quantity
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      id: orderId,
+    };
+
+    try {
+      const response = await this.client.request(query, { variables });
+      const graphQLCost = this.extractGraphQLCost(response);
+      if (graphQLCost) {
+        Logger.debug("GraphQL cost for queryOrderById", {
+          orderId,
+          cost: graphQLCost,
+        });
+      }
+
+      if (!response.data?.order) {
+        return null;
+      }
+
+      const order = response.data.order;
+      return {
+        orderId: order.id,
+        orderNumber: order.name || "",
+        lineItems: order.lineItems.edges.map((itemEdge: { node: { id: string; sku: string; quantity: number } }) => ({
+          lineItemId: itemEdge.node.id,
+          sku: itemEdge.node.sku || "",
+          quantity: itemEdge.node.quantity,
+        })),
+      };
+    } catch (error) {
+      throw new ShopifyServiceError(`Failed to query order by ID: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   async queryOrdersByTag(tag: string): Promise<OrderQueryResult[]> {
     if (this.dryRun) {
       // In dry-run, return empty array - the use case will construct mock data
@@ -518,6 +674,15 @@ export class ShopifyService {
 
     try {
       const response = await this.client.request(query, { variables });
+      // Note: Cost tracking for query operations - can be logged but not returned in this method
+      // since it returns OrderQueryResult[] which doesn't include cost info
+      const graphQLCost = this.extractGraphQLCost(response);
+      if (graphQLCost) {
+        Logger.debug("GraphQL cost for queryOrdersByTag", {
+          tag,
+          cost: graphQLCost,
+        });
+      }
 
       const orders = response.data?.orders?.edges || [];
       return orders.map((edge: { node: { id: string; name: string; lineItems: { edges: Array<{ node: { id: string; sku: string; quantity: number } }> } } }) => ({
@@ -575,6 +740,15 @@ export class ShopifyService {
 
     try {
       const response = await this.client.request(query, { variables });
+      // Note: Cost tracking for variant lookup - can be logged but not returned
+      // since it returns Map<string, string> which doesn't include cost info
+      const graphQLCost = this.extractGraphQLCost(response);
+      if (graphQLCost) {
+        Logger.debug("GraphQL cost for findVariantIdsBySkus", {
+          skuCount: skus.length,
+          cost: graphQLCost,
+        });
+      }
 
       const variantMap = new Map<string, string>();
       const products = response.data?.products?.edges || [];
@@ -593,5 +767,13 @@ export class ShopifyService {
     } catch (error) {
       throw new ShopifyServiceError(`Failed to find variants by SKUs: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  /**
+   * Get GraphQL cost from a response (helper for performance tracking)
+   * This is a public method to allow use cases to track costs
+   */
+  extractGraphQLCostFromResponse(response: unknown): GraphQLCostInfo | undefined {
+    return this.extractGraphQLCost(response);
   }
 }

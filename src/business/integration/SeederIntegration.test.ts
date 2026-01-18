@@ -27,6 +27,7 @@ describe("Seeder Integration", () => {
       completeDraftOrder: vi.fn(),
       fulfillOrder: vi.fn(),
       queryOrdersByTag: vi.fn(),
+      queryOrderById: vi.fn(),
       findVariantIdsBySkus: vi.fn(),
       formatBatchTag: vi.fn((batchId: string) => `seed_batch_id:${batchId.substring(0, 26)}`),
     } as unknown as ShopifyService;
@@ -61,26 +62,30 @@ describe("Seeder Integration", () => {
       // Step 1: Create Shopify orders
       const shopifyUseCase = new SeedShopifyOrdersUseCase(mockShopifyService);
 
+      // Mock variant lookup to return a Map
+      vi.mocked(mockShopifyService.findVariantIdsBySkus).mockResolvedValue(
+        new Map([["SKU-001", "gid://shopify/ProductVariant/1"]]),
+      );
+
       vi.mocked(mockShopifyService.createDraftOrder).mockResolvedValue({
         draftOrderId: "gid://shopify/DraftOrder/123",
       });
       vi.mocked(mockShopifyService.completeDraftOrder).mockResolvedValue({
         orderId: "gid://shopify/Order/456",
         orderNumber: "#1001",
+        lineItems: undefined, // Not available in response, will query
       });
       vi.mocked(mockShopifyService.fulfillOrder).mockResolvedValue({
         fulfillmentId: "fulfillment-1",
         status: "SUCCESS",
       });
-      vi.mocked(mockShopifyService.queryOrdersByTag).mockResolvedValue([
-        {
-          orderId: "gid://shopify/Order/456",
-          orderNumber: "#1001",
-          lineItems: [
-            { lineItemId: "line-1", sku: "SKU-001", quantity: 2 },
-          ],
-        },
-      ]);
+      vi.mocked(mockShopifyService.queryOrderById).mockResolvedValue({
+        orderId: "gid://shopify/Order/456",
+        orderNumber: "#1001",
+        lineItems: [
+          { lineItemId: "line-1", sku: "SKU-001", quantity: 2 },
+        ],
+      });
 
       const shopifyRequest = {
         batchId: "batch-123",
