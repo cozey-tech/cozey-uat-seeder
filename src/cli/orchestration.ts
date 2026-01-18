@@ -519,7 +519,12 @@ export async function executeSeedingFlow(
       shopifyOrders: {
         // Reuse the same logic we used when saving after Shopify seeding
         // Build successful orders array with correct orderIndex values
-        successful: (() => {
+        successful: ((): Array<{
+          orderIndex: number;
+          shopifyOrderId: string;
+          shopifyOrderNumber: string;
+          customerEmail: string;
+        }> => {
           const successful: Array<{
             orderIndex: number;
             shopifyOrderId: string;
@@ -562,7 +567,12 @@ export async function executeSeedingFlow(
         }),
       },
       wmsEntities: {
-        successful: (() => {
+        successful: ((): Array<{
+          orderIndex: number;
+          orderId: string;
+          shopifyOrderId: string;
+          prepPartItems: Array<{ prepPartItemId: string; partId: string }>;
+        }> => {
           const successful: Array<{
             orderIndex: number;
             orderId: string;
