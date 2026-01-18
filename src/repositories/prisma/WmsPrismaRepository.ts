@@ -139,7 +139,7 @@ export class WmsPrismaRepository implements WmsRepository {
   }
 
   async createPnpPackageInfo(packageInfo: CreatePnpPackageInfoRequest): Promise<unknown> {
-    return await this.prisma.pnpPackageInfo.create({
+    return this.prisma.pnpPackageInfo.create({
       data: {
         identifier: packageInfo.identifier,
         length: packageInfo.length,
@@ -155,7 +155,7 @@ export class WmsPrismaRepository implements WmsRepository {
   }
 
   async createPnpBox(box: CreatePnpBoxRequest): Promise<unknown> {
-    return await this.prisma.pnpBox.create({
+    return this.prisma.pnpBox.create({
       data: {
         identifier: box.identifier,
         length: box.length,
@@ -170,7 +170,7 @@ export class WmsPrismaRepository implements WmsRepository {
   }
 
   async createPnpOrderBox(orderBox: CreatePnpOrderBoxRequest): Promise<unknown> {
-    return await this.prisma.pnpOrderBox.create({
+    return this.prisma.pnpOrderBox.create({
       data: {
         collectionPrepId: orderBox.collectionPrepId,
         orderId: orderBox.orderId,
@@ -284,7 +284,7 @@ export class WmsPrismaRepository implements WmsRepository {
   }
 
   async createPrepPart(prepPart: CreatePrepPartRequest): Promise<unknown> {
-    return await this.prisma.prepPart.create({
+    return this.prisma.prepPart.create({
       data: {
         prepId: prepPart.prepId,
         partId: prepPart.partId,
@@ -295,7 +295,7 @@ export class WmsPrismaRepository implements WmsRepository {
   }
 
   async createPrepPartItem(prepPartItem: CreatePrepPartItemRequest): Promise<unknown> {
-    return await this.prisma.prepPartItem.create({
+    return this.prisma.prepPartItem.create({
       data: {
         prepPartId: prepPartItem.prepPartId,
         region: (prepPartItem.region || "CA") as "CA" | "US",
@@ -391,7 +391,7 @@ export class WmsPrismaRepository implements WmsRepository {
     order: CreateOrderRequest,
     customer: { id: string; name: string; email?: string; region: string },
   ): Promise<{ order: IOrder; customerId: string }> {
-    return await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       // Upsert customer (create if not exists, update if exists)
       const customerRecord = await tx.customer.upsert({
         where: {
@@ -442,7 +442,7 @@ export class WmsPrismaRepository implements WmsRepository {
     variantOrders: CreateVariantOrderRequest[],
     preps: CreatePrepRequest[],
   ): Promise<{ order: IOrder; variantOrderIds: string[]; prepIds: string[] }> {
-    return await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       // Create order
       const orderRecord = await tx.order.create({
         data: {
