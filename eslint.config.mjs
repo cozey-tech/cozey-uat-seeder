@@ -96,6 +96,15 @@ export default [
   prettierConfig,
   // Ignore patterns
   {
-    ignores: ["node_modules/**", "dist/**", "build/**", "coverage/**", "*.tsbuildinfo", ".prisma/**"],
+    ignores: [
+      "node_modules/**",
+      "dist/**",
+      "build/**",
+      "coverage/**",
+      "*.tsbuildinfo",
+      ".prisma/**",
+      "*.config.*",
+      ".prettierrc.*",
+    ],
   },
 ];
