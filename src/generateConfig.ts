@@ -72,9 +72,6 @@ For more information, see README.md
   program.parse();
 
   const options = program.opts();
-
-  // Parse --output
-  const outputIndex = args.indexOf("--output");
   if (outputIndex !== -1 && args[outputIndex + 1]) {
     options.output = args[outputIndex + 1];
   }
