@@ -22,6 +22,7 @@ import { OutputFormatter } from "../utils/outputFormatter";
 import { InteractivePromptService } from "../services/InteractivePromptService";
 import { parseAndValidateConfig, validateData } from "./validation";
 import { displaySummary } from "./output";
+import { saveProgressState, loadProgressState, deleteProgressState, type ProgressState } from "../utils/progressState";
 
 /**
  * Service dependencies container
@@ -84,6 +85,7 @@ export async function executeSeedingFlow(
   services: ServiceDependencies,
   batchId: string,
   isDryRun: boolean,
+  resumeState?: ProgressState,
 ): Promise<{
   shopifyResult: { 
     shopifyOrders: Array<{ shopifyOrderId: string; shopifyOrderNumber: string; lineItems: Array<{ lineItemId: string; sku: string }> }>;
@@ -109,16 +111,29 @@ export async function executeSeedingFlow(
   }
 
   // Step 1: Seed Shopify orders
-  const step1Label = isDryRun ? "Would seed" : "Seeding";
+  const step1Label = isDryRun ? "Would seed" : resumeState ? "Resuming" : "Seeding";
   const step1Name = `${step1Label} Shopify orders`;
   const totalSteps = config.collectionPrep ? 3 : 2;
   console.log(OutputFormatter.step(1, totalSteps, step1Name));
   
+  // Filter orders if resuming (only retry failed ones)
+  let ordersToProcess = config.orders;
+  if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
+    const successfulIndices = new Set(resumeState.shopifyOrders.successful.map((s) => s.orderIndex));
+    ordersToProcess = config.orders.filter((_, index) => !successfulIndices.has(index));
+    console.log(OutputFormatter.info(`Resuming: ${ordersToProcess.length} failed orders to retry, ${resumeState.shopifyOrders.successful.length} already successful`));
+  }
+  
   const progressTracker = new ProgressTracker();
   progressTracker.start(step1Name, config.orders.length);
   
+  // Update progress to reflect already completed orders if resuming
+  if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
+    progressTracker.update(resumeState.shopifyOrders.successful.length, "Already completed");
+  }
+  
   const shopifyRequest = {
-    orders: config.orders.map((order) => ({
+    orders: ordersToProcess.map((order) => ({
       customer: order.customer,
       lineItems: order.lineItems.map((item) => ({
         sku: item.sku,
@@ -129,34 +144,83 @@ export async function executeSeedingFlow(
     region: config.region || config.collectionPrep?.region || "CA",
     collectionPrepName,
     onOrderProgress: (current: number, total: number, customerEmail: string, _success: boolean): void => {
-      progressTracker.update(current, customerEmail);
+      // Adjust current count if resuming (add already completed count)
+      const adjustedCurrent = resumeState 
+        ? resumeState.shopifyOrders.successful.length + current 
+        : current;
+      progressTracker.update(adjustedCurrent, customerEmail);
     },
   };
 
   const shopifyResult = await services.seedShopifyOrdersHandler.execute(shopifyRequest);
+  
+  // Merge results if resuming
+  let finalShopifyResult = shopifyResult;
+  if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
+    // Merge successful orders from previous run with new results
+    // Note: We need to fetch line items from Shopify for previous orders, but for now we'll use empty array
+    // In a production system, we'd store line items in progress state or fetch them
+    const previousSuccessful = resumeState.shopifyOrders.successful.map((s) => ({
+      shopifyOrderId: s.shopifyOrderId,
+      shopifyOrderNumber: s.shopifyOrderNumber,
+      lineItems: [] as Array<{ lineItemId: string; sku: string }>, // Line items not stored in progress state
+      fulfillmentStatus: "unfulfilled" as string, // Default status
+    }));
+    finalShopifyResult = {
+      shopifyOrders: [...previousSuccessful, ...shopifyResult.shopifyOrders],
+      failures: shopifyResult.failures,
+    };
+  }
+  
+  progressTracker.update(config.orders.length);
   progressTracker.complete();
   
-  const createdLabel = isDryRun ? "Would create" : "Created";
-  const successCount = shopifyResult.shopifyOrders.length;
+  const createdLabel = isDryRun ? "Would create" : resumeState ? "Resumed" : "Created";
+  const successCount = finalShopifyResult.shopifyOrders.length;
   const totalCount = config.orders.length;
   
-  if (shopifyResult.failures && shopifyResult.failures.length > 0) {
-    console.log(OutputFormatter.warning(`${createdLabel} ${successCount}/${totalCount} Shopify order(s). ${shopifyResult.failures.length} failed.\n`));
+  if (finalShopifyResult.failures && finalShopifyResult.failures.length > 0) {
+    console.log(OutputFormatter.warning(`${createdLabel} ${successCount}/${totalCount} Shopify order(s). ${finalShopifyResult.failures.length} failed.\n`));
   } else {
     console.log(OutputFormatter.success(`${createdLabel} ${successCount} Shopify order(s)\n`));
   }
 
+  // Save progress state after Shopify seeding
+  if (!isDryRun) {
+    const progressState: ProgressState = {
+      batchId,
+      timestamp: Date.now(),
+      shopifyOrders: {
+        successful: finalShopifyResult.shopifyOrders.map((order, index) => ({
+          orderIndex: index,
+          shopifyOrderId: order.shopifyOrderId,
+          shopifyOrderNumber: order.shopifyOrderNumber,
+          customerEmail: config.orders[index]?.customer.email || "",
+        })),
+        failed: finalShopifyResult.failures || [],
+      },
+      wmsEntities: {
+        successful: [],
+        failed: [],
+      },
+    };
+    saveProgressState(progressState);
+  }
+
   // Handle partial failures from Shopify seeding
-  if (shopifyResult.failures && shopifyResult.failures.length > 0) {
+  if (finalShopifyResult.failures && finalShopifyResult.failures.length > 0) {
     console.log(OutputFormatter.section("Shopify Seeding Failures", [
-      OutputFormatter.listItem(`Failed: ${shopifyResult.failures.length} of ${totalCount} orders`),
-      ...shopifyResult.failures.map((failure) =>
+      OutputFormatter.listItem(`Failed: ${finalShopifyResult.failures.length} of ${totalCount} orders`),
+      ...finalShopifyResult.failures.map((failure) =>
         OutputFormatter.listItem(
           `Order ${failure.orderIndex + 1} (${failure.customerEmail}): ${failure.error}`,
           2,
         ),
       ),
     ]));
+    
+    console.log(OutputFormatter.info(`To resume this operation, use: --resume ${batchId}`));
+    console.log();
     
     const promptService = new InteractivePromptService();
     const shouldContinue = await promptService.promptConfirm(
@@ -201,19 +265,66 @@ export async function executeSeedingFlow(
 
   // Seed WMS entities with Shopify order data
   const wmsProgressTracker = new ProgressTracker();
-  wmsProgressTracker.start(step2Name, shopifyResult.shopifyOrders.length);
+  wmsProgressTracker.start(step2Name, finalShopifyResult.shopifyOrders.length);
+  
+  // Filter WMS orders if resuming (skip already successful ones)
+  let wmsOrdersToProcess = finalShopifyResult.shopifyOrders;
+  if (resumeState && resumeState.wmsEntities.successful.length > 0) {
+    const successfulShopifyIds = new Set(resumeState.wmsEntities.successful.map((s) => s.shopifyOrderId));
+    wmsOrdersToProcess = finalShopifyResult.shopifyOrders.filter((order) => !successfulShopifyIds.has(order.shopifyOrderId));
+    console.log(OutputFormatter.info(`Resuming WMS: ${wmsOrdersToProcess.length} orders to retry, ${resumeState.wmsEntities.successful.length} already successful`));
+  }
   
   const wmsRequest = {
-    shopifyOrders: shopifyResult.shopifyOrders.map((shopifyOrder, index) => {
-      const configOrder = config.orders[index];
-      const lineItemsWithQuantity = shopifyOrder.lineItems.map((shopifyItem) => {
-        const configItem = configOrder.lineItems.find((item) => item.sku === shopifyItem.sku);
-        return {
-          lineItemId: shopifyItem.lineItemId,
-          sku: shopifyItem.sku,
-          quantity: configItem?.quantity || 1,
-        };
-      });
+    shopifyOrders: wmsOrdersToProcess.map((shopifyOrder) => {
+      // Find the corresponding config order by matching shopifyOrderId
+      // For resumed orders, we need to find the original config order by index
+      let configOrder = config.orders[0]; // Default fallback
+      
+      if (resumeState) {
+        // Try to find by matching shopifyOrderId in previous successful orders
+        const prevSuccessIndex = resumeState.shopifyOrders.successful.findIndex(
+          (s) => s.shopifyOrderId === shopifyOrder.shopifyOrderId,
+        );
+        if (prevSuccessIndex !== -1) {
+          configOrder = config.orders[prevSuccessIndex];
+        } else {
+          // New order from current run, find by index in finalShopifyResult
+          const currentIndex = finalShopifyResult.shopifyOrders.findIndex(
+            (o) => o.shopifyOrderId === shopifyOrder.shopifyOrderId,
+          );
+          if (currentIndex !== -1) {
+            // Adjust index to account for previous successful orders
+            const adjustedIndex = currentIndex - resumeState.shopifyOrders.successful.length;
+            if (adjustedIndex >= 0 && adjustedIndex < config.orders.length) {
+              configOrder = config.orders[adjustedIndex];
+            }
+          }
+        }
+      } else {
+        // Normal flow: find by index
+        const currentIndex = finalShopifyResult.shopifyOrders.findIndex(
+          (o) => o.shopifyOrderId === shopifyOrder.shopifyOrderId,
+        );
+        if (currentIndex !== -1 && currentIndex < config.orders.length) {
+          configOrder = config.orders[currentIndex];
+        }
+      }
+      // For resumed orders, lineItems might be empty, so use config order line items
+      const lineItemsWithQuantity = shopifyOrder.lineItems.length > 0
+        ? shopifyOrder.lineItems.map((shopifyItem) => {
+            const configItem = configOrder.lineItems.find((item) => item.sku === shopifyItem.sku);
+            return {
+              lineItemId: shopifyItem.lineItemId,
+              sku: shopifyItem.sku,
+              quantity: configItem?.quantity || 1,
+            };
+          })
+        : configOrder.lineItems.map((item) => ({
+            lineItemId: `resumed-${item.sku}`, // Placeholder ID for resumed orders
+            sku: item.sku,
+            quantity: item.quantity,
+          }));
 
       return {
         shopifyOrderId: shopifyOrder.shopifyOrderId,
@@ -227,35 +338,87 @@ export async function executeSeedingFlow(
     collectionPrepId,
     region,
     onOrderProgress: (current: number, total: number, shopifyOrderId: string, _success: boolean): void => {
-      wmsProgressTracker.update(current, shopifyOrderId);
+      // Adjust current count if resuming (add already completed count)
+      const adjustedCurrent = resumeState 
+        ? resumeState.wmsEntities.successful.length + current 
+        : current;
+      wmsProgressTracker.update(adjustedCurrent, shopifyOrderId);
     },
   };
 
   const wmsResult = await services.seedWmsEntitiesHandler.execute(wmsRequest);
+  
+  // Merge results if resuming
+  let finalWmsResult = wmsResult;
+  if (resumeState && resumeState.wmsEntities.successful.length > 0) {
+    // Merge successful orders from previous run with new results
+    const previousSuccessful = resumeState.wmsEntities.successful.map((s) => ({
+      orderId: s.orderId,
+      shopifyOrderId: s.shopifyOrderId,
+    }));
+    finalWmsResult = {
+      orders: [...previousSuccessful, ...wmsResult.orders],
+      shipments: wmsResult.shipments, // Shipments are recreated, so don't merge
+      prepPartItems: wmsResult.prepPartItems,
+      failures: wmsResult.failures,
+    };
+  }
+  
+  wmsProgressTracker.update(finalShopifyResult.shopifyOrders.length);
   wmsProgressTracker.complete();
   
-  const wmsSuccessCount = wmsResult.orders.length;
-  const wmsTotalCount = shopifyResult.shopifyOrders.length;
+  const wmsSuccessCount = finalWmsResult.orders.length;
+  const wmsTotalCount = finalShopifyResult.shopifyOrders.length;
   
-  if (wmsResult.failures && wmsResult.failures.length > 0) {
-    console.log(OutputFormatter.warning(`${createdLabel} ${wmsSuccessCount}/${wmsTotalCount} WMS order(s). ${wmsResult.failures.length} failed.`));
-    console.log(OutputFormatter.warning(`${createdLabel} ${wmsResult.shipments.length} shipment(s)\n`));
+  if (finalWmsResult.failures && finalWmsResult.failures.length > 0) {
+    console.log(OutputFormatter.warning(`${createdLabel} ${wmsSuccessCount}/${wmsTotalCount} WMS order(s). ${finalWmsResult.failures.length} failed.`));
+    console.log(OutputFormatter.warning(`${createdLabel} ${finalWmsResult.shipments.length} shipment(s)\n`));
   } else {
     console.log(OutputFormatter.success(`${createdLabel} ${wmsSuccessCount} WMS order(s)`));
-    console.log(OutputFormatter.success(`${createdLabel} ${wmsResult.shipments.length} shipment(s)\n`));
+    console.log(OutputFormatter.success(`${createdLabel} ${finalWmsResult.shipments.length} shipment(s)\n`));
+  }
+  
+  // Save progress state after WMS seeding
+  if (!isDryRun) {
+    const progressState: ProgressState = {
+      batchId,
+      timestamp: Date.now(),
+      shopifyOrders: {
+        successful: finalShopifyResult.shopifyOrders.map((order, index) => ({
+          orderIndex: index,
+          shopifyOrderId: order.shopifyOrderId,
+          shopifyOrderNumber: order.shopifyOrderNumber,
+          customerEmail: config.orders[index]?.customer.email || "",
+        })),
+        failed: finalShopifyResult.failures || [],
+      },
+      wmsEntities: {
+        successful: finalWmsResult.orders.map((order) => ({
+          orderIndex: finalShopifyResult.shopifyOrders.findIndex((o) => o.shopifyOrderId === order.shopifyOrderId),
+          orderId: order.orderId,
+          shopifyOrderId: order.shopifyOrderId,
+        })),
+        failed: finalWmsResult.failures || [],
+      },
+      collectionPrep: collectionPrepId
+        ? { collectionPrepId, region: config.collectionPrep!.region }
+        : undefined,
+    };
+    saveProgressState(progressState);
   }
   
   // Handle partial failures from WMS seeding
-  if (wmsResult.failures && wmsResult.failures.length > 0) {
+  if (finalWmsResult.failures && finalWmsResult.failures.length > 0) {
     console.log(OutputFormatter.section("WMS Seeding Failures", [
-      OutputFormatter.listItem(`Failed: ${wmsResult.failures.length} of ${wmsTotalCount} orders`),
-      ...wmsResult.failures.map((failure) =>
+      OutputFormatter.listItem(`Failed: ${finalWmsResult.failures.length} of ${wmsTotalCount} orders`),
+      ...finalWmsResult.failures.map((failure) =>
         OutputFormatter.listItem(
           `Order ${failure.orderIndex + 1} (${failure.shopifyOrderId}${failure.customerEmail ? `, ${failure.customerEmail}` : ""}): ${failure.error}`,
           2,
         ),
       ),
     ]));
+    console.log(OutputFormatter.info(`To resume this operation, use: --resume ${batchId}`));
     console.log();
   }
 
@@ -263,7 +426,13 @@ export async function executeSeedingFlow(
     ? { collectionPrepId, region: config.collectionPrep!.region }
     : undefined;
 
-  return { shopifyResult, wmsResult, collectionPrepResult };
+  // Delete progress state on successful completion
+  if (!isDryRun && (!finalShopifyResult.failures || finalShopifyResult.failures.length === 0) && 
+      (!finalWmsResult.failures || finalWmsResult.failures.length === 0)) {
+    deleteProgressState(batchId);
+  }
+
+  return { shopifyResult: finalShopifyResult, wmsResult: finalWmsResult, collectionPrepResult };
 }
 
 /**

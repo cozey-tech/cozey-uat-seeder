@@ -6,10 +6,11 @@ import { Command } from "commander";
 import { seedVersion } from "../index";
 
 export interface CliOptions {
-  configFile: string;
+  configFile?: string;
   skipConfirmation: boolean;
   validate: boolean;
   dryRun: boolean;
+  resume?: string;
 }
 
 /**
@@ -22,10 +23,11 @@ export function parseArgs(): CliOptions {
     .name("seed")
     .description("Seeder for Shopify staging orders and WMS staging entities")
     .version(seedVersion, "-v, --version", "display version number")
-    .argument("<config-file>", "Path to seed configuration JSON file")
+    .argument("[config-file]", "Path to seed configuration JSON file (required unless --resume)")
     .option("--validate", "Validate config file schema only (no DB/API calls)")
     .option("--dry-run", "Simulate seeding without making changes")
     .option("--skip-confirmation", "Skip staging confirmation prompt")
+    .option("--resume <batch-id>", "Resume a failed seeding operation from batch ID")
     .addHelpText(
       "after",
       `
@@ -51,16 +53,25 @@ For more information, see README.md
     process.exit(1);
   }
 
-  if (!configFile) {
-    console.error("Error: config file path is required\n");
+  // --resume and config-file are mutually exclusive
+  if (options.resume && configFile) {
+    console.error("Error: --resume and config-file cannot be used together\n");
+    program.help();
+    process.exit(1);
+  }
+
+  // Either config-file or --resume is required
+  if (!configFile && !options.resume) {
+    console.error("Error: either config-file or --resume is required\n");
     program.help();
     process.exit(1);
   }
 
   return {
-    configFile,
+    configFile: configFile || undefined,
     skipConfirmation: options.skipConfirmation || false,
     validate: options.validate || false,
     dryRun: options.dryRun || false,
+    resume: options.resume || undefined,
   };
 }

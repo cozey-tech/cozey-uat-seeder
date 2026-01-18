@@ -27,6 +27,7 @@ import { parseArgs } from "./cli/args";
 import { validateConfig, checkStagingEnvironment, parseAndValidateConfig, validateData } from "./cli/validation";
 import { initializeServices, executeSeedingFlow, executeDryRun } from "./cli/orchestration";
 import { displaySummary } from "./cli/output";
+import { loadProgressState, listProgressStates } from "./utils/progressState";
 
 /**
  * Main orchestrator function
@@ -39,14 +40,84 @@ async function main(): Promise<void> {
     // Parse CLI arguments
     const options = parseArgs();
 
+    // Handle --resume flag
+    if (options.resume) {
+      const resumeState = loadProgressState(options.resume);
+      if (!resumeState) {
+        console.error(OutputFormatter.error(`No progress state found for batch ID: ${options.resume}`));
+        console.log(OutputFormatter.info("Available batch IDs:"));
+        const availableStates = listProgressStates();
+        if (availableStates.length === 0) {
+          console.log(OutputFormatter.info("   (none)"));
+        } else {
+          availableStates.slice(0, 10).forEach((state) => {
+            const date = new Date(state.timestamp).toISOString();
+            console.log(OutputFormatter.keyValue(state.batchId, date));
+          });
+        }
+        process.exit(1);
+      }
+
+      checkStagingEnvironment();
+
+      // Initialize services
+      console.log(OutputFormatter.info("Initializing services for resume..."));
+      const initProgress = new ProgressTracker({ showSpinner: false });
+      initProgress.start("Initializing", 4);
+      
+      initProgress.update(1, "Connecting to database...");
+      const services = initializeServices(false);
+      initProgress.update(2, "Initializing Shopify client...");
+      initProgress.update(3, "Loading reference data...");
+      initProgress.update(4, "Ready");
+      initProgress.complete("Services initialized");
+      console.log();
+
+      // Load original config from progress state (we'd need to store it, but for now we'll require it)
+      // For now, we'll require the config file even when resuming
+      if (!options.configFile) {
+        console.error(OutputFormatter.error("Config file is required when resuming (needed to reconstruct order data)"));
+        process.exit(1);
+      }
+
+      try {
+        const config = parseAndValidateConfig(options.configFile, services.inputParser);
+        await validateData(config, services.dataValidator);
+
+        console.log(OutputFormatter.keyValue("Resuming Batch ID", options.resume));
+        console.log();
+
+        const { shopifyResult, wmsResult, collectionPrepResult } = await executeSeedingFlow(
+          config,
+          services,
+          options.resume,
+          false,
+          resumeState,
+        );
+
+        displaySummary(shopifyResult, wmsResult, collectionPrepResult, false);
+      } finally {
+        await services.prisma.$disconnect();
+      }
+      process.exit(0);
+    }
+
     // Handle --validate flag (early exit, no DB/API calls)
     if (options.validate) {
+      if (!options.configFile) {
+        console.error(OutputFormatter.error("Config file is required for validation"));
+        process.exit(1);
+      }
       await validateConfig(options.configFile);
       process.exit(0);
     }
 
     // Handle --dry-run flag
     if (options.dryRun) {
+      if (!options.configFile) {
+        console.error(OutputFormatter.error("Config file is required for dry-run"));
+        process.exit(1);
+      }
       checkStagingEnvironment();
 
       // Initialize services with dryRun=true
@@ -87,6 +158,11 @@ async function main(): Promise<void> {
     console.log();
     
     try {
+      if (!options.configFile) {
+        console.error(OutputFormatter.error("Config file is required"));
+        process.exit(1);
+      }
+      
       const config = parseAndValidateConfig(options.configFile, services.inputParser);
       await validateData(config, services.dataValidator);
 
