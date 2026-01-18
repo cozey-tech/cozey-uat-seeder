@@ -166,10 +166,18 @@ export class ShopifyService {
    * @param input - Customer and line items for the draft order
    * @param batchId - Unique batch ID for tagging (format: wms_seed_<batchId>)
    * @param region - Optional region code (CA or US) for determining country code in shipping address
+   * @param collectionPrepName - Optional collection prep name to include in order notes
+   * @param variantMap - Optional pre-fetched variant map (SKU -> variant ID). If not provided, will lookup variants.
    * @returns Draft order ID
    * @throws ShopifyServiceError if variant lookup fails or API returns errors
    */
-  async createDraftOrder(input: DraftOrderInput, batchId: string, region?: string, collectionPrepName?: string): Promise<DraftOrderResult> {
+  async createDraftOrder(
+    input: DraftOrderInput,
+    batchId: string,
+    region?: string,
+    collectionPrepName?: string,
+    variantMap?: Map<string, string>,
+  ): Promise<DraftOrderResult> {
     if (this.dryRun) {
       const draftOrderId = `gid://shopify/DraftOrder/${uuidv4()}`;
       Logger.info("DRY RUN: Would create draft order", {
@@ -210,13 +218,17 @@ export class ShopifyService {
     `;
 
     try {
-      // First, get variant IDs for the SKUs
-      const variantMap = await this.findVariantIdsBySkus(input.lineItems.map((item) => item.sku));
+      // Get variant IDs for the SKUs (use provided map or lookup)
+      let resolvedVariantMap = variantMap;
+      if (!resolvedVariantMap) {
+        // Fallback: lookup variants if not provided (backward compatibility)
+        resolvedVariantMap = await this.findVariantIdsBySkus(input.lineItems.map((item) => item.sku));
+      }
 
       // Build line items with variant IDs
       const lineItems = input.lineItems
         .map((item) => {
-          const variantId = variantMap.get(item.sku);
+          const variantId = resolvedVariantMap.get(item.sku);
           if (!variantId) {
             throw new ShopifyServiceError(`Variant not found for SKU: ${item.sku}`);
           }

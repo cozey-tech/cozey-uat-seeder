@@ -38,21 +38,38 @@ export class SeedShopifyOrdersUseCase {
     let totalActualCost = 0;
     const throttleStatuses: Array<{ currentlyAvailable: number; maximumAvailable: number }> = [];
 
+    // Phase 2: Batch variant lookup - extract all unique SKUs upfront
+    const allSkus = new Set<string>();
+    for (const orderInput of request.orders) {
+      for (const lineItem of orderInput.lineItems) {
+        allSkus.add(lineItem.sku);
+      }
+    }
+    const uniqueSkus = Array.from(allSkus);
+
+    // Perform single batched variant lookup for all orders
+    Logger.info("Batching variant lookup for all orders", {
+      batchId: request.batchId,
+      totalOrders: request.orders.length,
+      uniqueSkuCount: uniqueSkus.length,
+      totalSkuReferences: request.orders.reduce((sum, order) => sum + order.lineItems.length, 0),
+    });
+
+    const { result: variantMap, metrics: variantLookupMetrics } = await this.measureOperation(
+      "findVariantIdsBySkus",
+      () => this.shopifyService.findVariantIdsBySkus(uniqueSkus),
+    );
+
+    // Track variant lookup cost if available (from service logging)
+    totalApiCalls += variantLookupMetrics.apiCallCount;
+
     // Process orders sequentially to avoid rate limits
     for (let orderIndex = 0; orderIndex < request.orders.length; orderIndex++) {
       const orderInput = request.orders[orderIndex];
       const orderStartTime = Date.now();
 
       try {
-        // Variant lookup (happens inside createDraftOrder, but we'll track it separately if possible)
-        // For now, we track it as part of createDraftOrder since it's called internally
-        const variantLookupMetrics: OperationMetrics = {
-          operation: "findVariantIdsBySkus",
-          durationMs: 0, // Will be part of createDraftOrder timing
-          apiCallCount: 1,
-        };
-
-        // Create draft order
+        // Create draft order (variant map is now pre-fetched and passed in)
         const { result: draftOrderResult, metrics: createMetrics } = await this.measureOperation(
           "createDraftOrder",
           () =>
@@ -64,12 +81,9 @@ export class SeedShopifyOrdersUseCase {
               request.batchId,
               request.region,
               request.collectionPrepName,
+              variantMap, // Pass pre-fetched variant map
             ),
         );
-
-        // Update variant lookup metrics (it's part of createDraftOrder)
-        variantLookupMetrics.durationMs = createMetrics.durationMs * 0.3; // Estimate: variant lookup is ~30% of create time
-        variantLookupMetrics.graphQLCost = draftOrderResult.graphQLCost;
 
         createMetrics.graphQLCost = draftOrderResult.graphQLCost;
         if (draftOrderResult.graphQLCost) {
@@ -155,10 +169,17 @@ export class SeedShopifyOrdersUseCase {
         totalApiCalls += createMetrics.apiCallCount + completeMetrics.apiCallCount + queryMetrics.apiCallCount;
 
         // Record order metrics
+        // Note: variantLookup is batched, so all orders share the same metrics
+        // We divide the API call count by number of orders for per-order tracking
+        const perOrderVariantMetrics: OperationMetrics = {
+          ...variantLookupMetrics,
+          apiCallCount: orderIndex === 0 ? variantLookupMetrics.apiCallCount : 0, // Only count once for first order
+        };
+
         orderMetrics.push({
           orderIndex,
           customerEmail: orderInput.customer.email,
-          variantLookup: variantLookupMetrics,
+          variantLookup: perOrderVariantMetrics,
           draftOrderCreate: createMetrics,
           draftOrderComplete: completeMetrics,
           orderQuery: queryMetrics,
