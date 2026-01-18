@@ -12,6 +12,7 @@ describe("WmsPrismaRepository", () => {
     mockPrisma = {
       order: {
         create: vi.fn(),
+        findUnique: vi.fn(),
       },
       variantOrder: {
         create: vi.fn(),
@@ -42,9 +43,11 @@ describe("WmsPrismaRepository", () => {
       },
       part: {
         findFirst: vi.fn(),
+        findMany: vi.fn(),
       },
       variant: {
         findFirst: vi.fn(),
+        findMany: vi.fn(),
       },
       customer: {
         findUnique: vi.fn(),
@@ -168,6 +171,72 @@ describe("WmsPrismaRepository", () => {
     });
   });
 
+  describe("createPnpPackageInfo", () => {
+    it("should create PnP package info", async () => {
+      const packageInfo = {
+        identifier: "pkg-123",
+        length: 10,
+        width: 8,
+        height: 6,
+        weight: 5,
+        lengthUnit: "IN" as const,
+        widthUnit: "IN" as const,
+        heightUnit: "IN" as const,
+        weightUnit: "LB" as const,
+      };
+
+      vi.mocked(mockPrisma.pnpPackageInfo.create).mockResolvedValue({ id: "pkg-123" } as never);
+
+      await repository.createPnpPackageInfo(packageInfo);
+
+      expect(mockPrisma.pnpPackageInfo.create).toHaveBeenCalledWith({
+        data: packageInfo,
+      });
+    });
+  });
+
+  describe("createPnpBox", () => {
+    it("should create PnP box", async () => {
+      const box = {
+        identifier: "box-123",
+        length: 10,
+        width: 8,
+        height: 6,
+        region: "CA",
+        lengthUnit: "IN" as const,
+        widthUnit: "IN" as const,
+        heightUnit: "IN" as const,
+      };
+
+      vi.mocked(mockPrisma.pnpBox.create).mockResolvedValue({ id: "box-123" } as never);
+
+      await repository.createPnpBox(box);
+
+      expect(mockPrisma.pnpBox.create).toHaveBeenCalledWith({
+        data: box,
+      });
+    });
+  });
+
+  describe("createPrepPart", () => {
+    it("should create prep part", async () => {
+      const prepPart = {
+        prepId: "prep-123",
+        partId: "part-456",
+        quantity: 2,
+        region: "CA",
+      };
+
+      vi.mocked(mockPrisma.prepPart.create).mockResolvedValue({ id: "prepPart-123" } as never);
+
+      await repository.createPrepPart(prepPart);
+
+      expect(mockPrisma.prepPart.create).toHaveBeenCalledWith({
+        data: prepPart,
+      });
+    });
+  });
+
   describe("findPartBySku", () => {
     it("should find part by SKU and region", async () => {
       const mockPart = {
@@ -198,6 +267,158 @@ describe("WmsPrismaRepository", () => {
       const result = await repository.findPartBySku("SKU-999", "CA");
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe("findVariantBySku", () => {
+    it("should find variant by SKU and region", async () => {
+      const mockVariant = { id: "variant-123", sku: "VARIANT-SKU-001" };
+      vi.mocked(mockPrisma.variant.findFirst).mockResolvedValue(mockVariant as never);
+
+      const result = await repository.findVariantBySku("VARIANT-SKU-001", "CA");
+
+      expect(result).toEqual(mockVariant);
+      expect(mockPrisma.variant.findFirst).toHaveBeenCalledWith({
+        where: {
+          sku: "VARIANT-SKU-001",
+          region: "CA",
+        },
+        select: {
+          id: true,
+          sku: true,
+        },
+      });
+    });
+
+    it("should return null if variant not found", async () => {
+      vi.mocked(mockPrisma.variant.findFirst).mockResolvedValue(null);
+
+      const result = await repository.findVariantBySku("SKU-999", "CA");
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("findVariantsBySkus", () => {
+    it("should find multiple variants by SKUs and region", async () => {
+      const mockVariants = [
+        { id: "variant-1", sku: "SKU-001" },
+        { id: "variant-2", sku: "SKU-002" },
+      ];
+      vi.mocked(mockPrisma.variant.findMany).mockResolvedValue(mockVariants as never);
+
+      const result = await repository.findVariantsBySkus(["SKU-001", "SKU-002"], "CA");
+
+      expect(result.size).toBe(2);
+      expect(result.get("SKU-001")).toEqual({ id: "variant-1", sku: "SKU-001" });
+      expect(result.get("SKU-002")).toEqual({ id: "variant-2", sku: "SKU-002" });
+    });
+
+    it("should return empty map if no variants found", async () => {
+      vi.mocked(mockPrisma.variant.findMany).mockResolvedValue([]);
+
+      const result = await repository.findVariantsBySkus(["SKU-999"], "CA");
+
+      expect(result.size).toBe(0);
+    });
+  });
+
+  describe("findPartsBySkus", () => {
+    it("should find multiple parts by SKUs and region", async () => {
+      const mockParts = [
+        { id: "part-1", sku: "PART-SKU-001" },
+        { id: "part-2", sku: "PART-SKU-002" },
+      ];
+      vi.mocked(mockPrisma.part.findMany).mockResolvedValue(mockParts as never);
+
+      const result = await repository.findPartsBySkus(["PART-SKU-001", "PART-SKU-002"], "CA");
+
+      expect(result.size).toBe(2);
+      expect(result.get("PART-SKU-001")).toEqual({ id: "part-1", sku: "PART-SKU-001" });
+      expect(result.get("PART-SKU-002")).toEqual({ id: "part-2", sku: "PART-SKU-002" });
+    });
+
+    it("should return empty map if no parts found", async () => {
+      vi.mocked(mockPrisma.part.findMany).mockResolvedValue([]);
+
+      const result = await repository.findPartsBySkus(["SKU-999"], "CA");
+
+      expect(result.size).toBe(0);
+    });
+  });
+
+  describe("findOrderByShopifyId", () => {
+    it("should find order by Shopify ID", async () => {
+      const mockOrder = {
+        id: "order-123",
+        shopifyOrderId: "gid://shopify/Order/456",
+        shopifyOrderNumber: "#1001",
+        status: "fulfilled",
+        region: "CA",
+      };
+      vi.mocked(mockPrisma.order.findUnique).mockResolvedValue(mockOrder as never);
+
+      const result = await repository.findOrderByShopifyId("gid://shopify/Order/456");
+
+      expect(result).toEqual(mockOrder);
+      expect(mockPrisma.order.findUnique).toHaveBeenCalledWith({
+        where: {
+          shopifyOrderId: "gid://shopify/Order/456",
+        },
+        select: {
+          id: true,
+          shopifyOrderId: true,
+          shopifyOrderNumber: true,
+          status: true,
+          region: true,
+        },
+      });
+    });
+
+    it("should return null if order not found", async () => {
+      vi.mocked(mockPrisma.order.findUnique).mockResolvedValue(null);
+
+      const result = await repository.findOrderByShopifyId("gid://shopify/Order/999");
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("findCustomerById", () => {
+    it("should find customer by ID", async () => {
+      const mockCustomer = { id: "customer-123", name: "Test Customer", email: "test@example.com" };
+      vi.mocked(mockPrisma.customer.findUnique).mockResolvedValue(mockCustomer as never);
+
+      const result = await repository.findCustomerById("customer-123");
+
+      expect(result).toEqual(mockCustomer);
+      expect(mockPrisma.customer.findUnique).toHaveBeenCalledWith({
+        where: {
+          id: "customer-123",
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      });
+    });
+
+    it("should return null if customer not found", async () => {
+      vi.mocked(mockPrisma.customer.findUnique).mockResolvedValue(null);
+
+      const result = await repository.findCustomerById("customer-999");
+
+      expect(result).toBeNull();
+    });
+
+    it("should handle customer with no email", async () => {
+      const mockCustomer = { id: "customer-123", name: "Test Customer", email: null };
+      vi.mocked(mockPrisma.customer.findUnique).mockResolvedValue(mockCustomer as never);
+
+      const result = await repository.findCustomerById("customer-123");
+
+      expect(result).toEqual({ id: "customer-123", name: "Test Customer", email: undefined });
     });
   });
 
