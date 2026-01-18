@@ -140,7 +140,8 @@ export async function executeSeedingFlow(
   }
   
   const progressTracker = new ProgressTracker();
-  progressTracker.start(step1Name, config.orders.length);
+  const totalOrders = config.orders.length;
+  progressTracker.start(step1Name, totalOrders);
   
   // Update progress to reflect already completed orders if resuming
   if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
@@ -160,6 +161,9 @@ export async function executeSeedingFlow(
     collectionPrepName,
     onOrderProgress: (current: number, total: number, customerEmail: string, _success: boolean): void => {
       // Adjust current count if resuming (add already completed count)
+      // Note: 'current' and 'total' are relative to ordersToProcess, not config.orders
+      // When resuming, 'current' represents progress through only the orders being retried,
+      // so we add the count of previously successful orders to get the total progress.
       const adjustedCurrent = resumeState 
         ? resumeState.shopifyOrders.successful.length + current 
         : current;
@@ -216,13 +220,35 @@ export async function executeSeedingFlow(
     }
     
     // Add newly successful orders, mapping their filtered indices back to original indices
+    // Note: shopifyResult.shopifyOrders only contains successful orders, so we need to
+    // determine which orders from ordersToProcess succeeded by reconstructing the mapping.
+    // We know which orders failed (from failures array with orderIndex relative to ordersToProcess),
+    // so successful orders are the ones that didn't fail.
+    
+    // Build set of failed indices (relative to ordersToProcess)
+    const failedIndices = new Set((shopifyResult.failures || []).map(f => f.orderIndex));
+    
+    // Build map of shopifyOrderId to index in ordersToProcess
+    // Since orders are processed sequentially, we can match successful orders by position
+    const successfulOrderIdToProcessedIndex = new Map<string, number>();
+    let successfulOrderIndex = 0;
+    for (let processedIndex = 0; processedIndex < ordersToProcess.length; processedIndex++) {
+      if (!failedIndices.has(processedIndex)) {
+        // This order succeeded - match it to the successful order at this position
+        if (successfulOrderIndex < shopifyResult.shopifyOrders.length) {
+          const successfulOrder = shopifyResult.shopifyOrders[successfulOrderIndex];
+          successfulOrderIdToProcessedIndex.set(successfulOrder.shopifyOrderId, processedIndex);
+          successfulOrderIndex++;
+        }
+      }
+    }
+    
+    // Now map successful orders using their position in ordersToProcess
     for (const order of shopifyResult.shopifyOrders) {
-      // Find the order in shopifyResult to get its filtered index
-      const filteredIndex = shopifyResult.shopifyOrders.findIndex((o) => o.shopifyOrderId === order.shopifyOrderId);
-      if (filteredIndex !== -1) {
-        const originalIndex = filteredToOriginalIndexMap.get(filteredIndex);
+      const processedIndex = successfulOrderIdToProcessedIndex.get(order.shopifyOrderId);
+      if (processedIndex !== undefined) {
+        const originalIndex = filteredToOriginalIndexMap.get(processedIndex);
         if (originalIndex !== undefined) {
-          // Find customer email from original config
           const customerEmail = config.orders[originalIndex]?.customer.email || "";
           successfulOrders.push({
             orderIndex: originalIndex,
@@ -301,7 +327,7 @@ export async function executeSeedingFlow(
     const creatingLabel = isDryRun ? "Would create" : "Creating";
     console.log(OutputFormatter.step(step2aNumber, totalSteps, `${creatingLabel} collection prep`));
     const collectionPrepRequest = {
-      orderIds: shopifyResult.shopifyOrders.map((o) => o.shopifyOrderId),
+      orderIds: finalShopifyResult.shopifyOrders.map((o) => o.shopifyOrderId),
       carrier: config.collectionPrep.carrier,
       locationId: config.collectionPrep.locationId,
       region: config.collectionPrep.region,
@@ -417,6 +443,9 @@ export async function executeSeedingFlow(
     region,
     onOrderProgress: (current: number, total: number, shopifyOrderId: string, _success: boolean): void => {
       // Adjust current count if resuming (add already completed count)
+      // Note: 'current' and 'total' are relative to wmsOrdersToProcess, not finalShopifyResult
+      // When resuming, 'current' represents progress through only the orders being retried,
+      // so we add the count of previously successful orders to get the total progress.
       const adjustedCurrent = resumeState 
         ? resumeState.wmsEntities.successful.length + current 
         : current;
