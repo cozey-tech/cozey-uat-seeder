@@ -261,7 +261,7 @@ export class InventoryService {
       }
 
       // Re-check after modification
-      return await this.checkInventoryAvailability(variants, locationId, region, variantQuantities);
+      return this.checkInventoryAvailability(variants, locationId, region, variantQuantities);
     }
 
     return checkResult;
