@@ -44,7 +44,7 @@ export class ProgressTracker {
     this.showTimeEstimate = options.showTimeEstimate !== false;
     this.formatMessage =
       options.formatMessage ||
-      ((current: number, total: number, message?: string) => {
+      ((current: number, total: number, message?: string): string => {
         const base = `${current}/${total}`;
         const messagePart = message ? ` - ${message}` : "";
         return `${base}${messagePart}`;

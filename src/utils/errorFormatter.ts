@@ -119,27 +119,27 @@ export class ErrorFormatter {
 
     // Handle specific error types
     if (error instanceof InputValidationError) {
-      return this.formatInputValidationError(error, context);
+      return this.formatInputValidationError(error);
     }
 
     if (error instanceof DataValidationError) {
-      return this.formatDataValidationError(error, context);
+      return this.formatDataValidationError(error);
     }
 
     if (error instanceof StagingGuardrailError) {
-      return this.formatStagingGuardrailError(error, context);
+      return this.formatStagingGuardrailError(error);
     }
 
     if (error instanceof ShopifyServiceError) {
-      return this.formatShopifyServiceError(error, context);
+      return this.formatShopifyServiceError(error);
     }
 
     if (error instanceof WmsServiceError) {
-      return this.formatWmsServiceError(error, context);
+      return this.formatWmsServiceError(error);
     }
 
     if (error instanceof CollectionPrepValidationError) {
-      return this.formatCollectionPrepValidationError(error, context);
+      return this.formatCollectionPrepValidationError(error);
     }
 
     return message;
@@ -242,7 +242,7 @@ export class ErrorFormatter {
   /**
    * Format InputValidationError
    */
-  private static formatInputValidationError(error: InputValidationError, context?: ErrorContext): string {
+  private static formatInputValidationError(error: InputValidationError): string {
     let message = "Configuration file validation failed";
 
     if (error.message.includes("file")) {
@@ -263,7 +263,7 @@ export class ErrorFormatter {
   /**
    * Format DataValidationError
    */
-  private static formatDataValidationError(error: DataValidationError, context?: ErrorContext): string {
+  private static formatDataValidationError(error: DataValidationError): string {
     let message = "Data validation failed";
 
     if (error.message.includes("SKU")) {
@@ -286,14 +286,14 @@ export class ErrorFormatter {
   /**
    * Format StagingGuardrailError
    */
-  private static formatStagingGuardrailError(error: StagingGuardrailError, _context?: ErrorContext): string {
+  private static formatStagingGuardrailError(error: StagingGuardrailError): string {
     return `Staging environment check failed: ${error.message}`;
   }
 
   /**
    * Format ShopifyServiceError
    */
-  private static formatShopifyServiceError(error: ShopifyServiceError, context?: ErrorContext): string {
+  private static formatShopifyServiceError(error: ShopifyServiceError): string {
     let message = "Shopify API operation failed";
 
     if (error.message.includes("variant")) {
@@ -321,7 +321,7 @@ export class ErrorFormatter {
   /**
    * Format WmsServiceError
    */
-  private static formatWmsServiceError(error: WmsServiceError, context?: ErrorContext): string {
+  private static formatWmsServiceError(error: WmsServiceError): string {
     let message = "WMS database operation failed";
 
     if (error.message.includes("already exists")) {
@@ -340,10 +340,7 @@ export class ErrorFormatter {
   /**
    * Format CollectionPrepValidationError
    */
-  private static formatCollectionPrepValidationError(
-    error: CollectionPrepValidationError,
-    context?: ErrorContext,
-  ): string {
+  private static formatCollectionPrepValidationError(error: CollectionPrepValidationError): string {
     let message = "Collection prep validation failed";
 
     if (error.message.includes("order mix")) {

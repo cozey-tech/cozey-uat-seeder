@@ -41,7 +41,7 @@ interface CliOptions {
 }
 
 /**
- * Parse command line arguments
+ * Parse command line arguments using commander
  */
 function parseArgs(): CliOptions {
   const args = process.argv.slice(2);
