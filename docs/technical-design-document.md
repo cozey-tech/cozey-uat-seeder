@@ -16,7 +16,9 @@ Cozey UAT Seeder - Staging Order and WMS Entity Seeding Tool
 - **Repository**: `cozey-uat-seeder`
 - **Architecture Documentation**: `docs/architecture.md`
 - **Agent Instructions**: `AGENTS.md` (engineering conventions and quickstart)
-- **Implementation Progress**: `docs/implementation/progress.md`
+- **Data Model Documentation**: `docs/data-model.md`
+- **Runbook**: `docs/runbook.md`
+- **Contributing Guide**: `CONTRIBUTING.md`
 
 ---
 
