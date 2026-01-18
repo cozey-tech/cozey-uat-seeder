@@ -119,6 +119,7 @@ For local development or when AWS is unavailable, use `.env` files:
    - `--validate`: Validate configuration file against schema only (no DB/API calls)
    - `--dry-run`: Simulate the full seeding flow without making actual changes
    - `--skip-confirmation`: Bypass staging confirmation prompt (not recommended)
+   - `--resume <batch-id>`: Resume a failed seeding operation from a previous batch ID
 
 ### Validation and Dry-Run Modes
 
@@ -178,6 +179,31 @@ npm run seed config.json --dry-run
 **Note:** `--dry-run` requires a database connection for SKU validation (read-only operations) and performs staging environment checks (same safety as normal run).
 
 **Important:** The `--validate` and `--dry-run` flags are mutually exclusive and cannot be used together.
+
+#### `--resume` Flag
+
+Resume a previously failed seeding operation by batch ID. The seeder will:
+- Load progress state from the previous run
+- Skip orders that were successfully created
+- Retry only failed orders
+- Continue from where it left off
+
+```bash
+npm run seed -- --resume <batch-id>
+```
+
+**Example:**
+```bash
+# First run fails after creating 5 of 10 orders
+npm run seed config.json
+# Output shows batch ID: abc-123-def
+
+# Resume from batch ID
+npm run seed -- --resume abc-123-def
+# Only retries the 5 failed orders
+```
+
+**Note:** Progress state files are stored in `.progress/` directory. List available batch IDs by checking the directory or looking at previous run output.
 
 ### Configuration Format
 
@@ -256,12 +282,15 @@ Example `seed-config.json`:
 ```
 src/
 ├── business/          # Business logic (handlers, use cases)
+├── cli/               # Seeding CLI modules (args, validation, orchestration, output)
 ├── config/            # Configuration (env, staging guardrails)
+├── generateConfig/    # Config generator modules (args, flows, initialization, output)
 ├── repositories/      # Data access layer (Prisma)
 ├── services/          # External integrations (Shopify, WMS)
 ├── shared/            # Shared types, enums, validation
-├── utils/             # Utilities (file reader, logger)
-└── cli.ts             # CLI entry point
+├── utils/             # Utilities (progress, error formatting, output formatting, logger, progress state)
+├── cli.ts             # Seeding CLI entry point
+└── generateConfig.ts  # Config generator entry point
 ```
 
 ## Documentation
@@ -281,6 +310,33 @@ src/
 - **Validation**: Comprehensive validation of SKUs, customers, and configuration
 - **Dry-Run Mode**: Preview changes before execution with `--dry-run` flag
 - **Offline Validation**: Validate config files without database connection using `--validate` flag
+- **Resume/Retry**: Resume failed operations with `--resume` flag, only retrying failed orders
+
+## User Experience Features
+
+### Progress Tracking
+
+The seeder provides real-time progress feedback:
+- **Step-level progress**: Shows progress for each major step (Shopify orders, WMS entities, collection prep)
+- **Order-by-order progress**: Real-time updates as each order is processed
+- **Time estimates**: Estimated time remaining based on current progress
+- **Initialization feedback**: Progress indicators during service initialization
+
+### Error Handling
+
+All errors include:
+- **Actionable messages**: Clear description of what went wrong
+- **Recovery suggestions**: Specific steps to fix the issue
+- **Context information**: Relevant details (SKU, order index, etc.)
+- **Partial failure handling**: Continue or abort when some orders fail
+
+### Output Formatting
+
+Consistent, readable output:
+- **Structured summaries**: Key-value pairs for easy scanning
+- **Visual separators**: Clear section boundaries
+- **Status indicators**: Emoji-based status (✅ success, ❌ error, ⚠️ warning)
+- **Detailed order lists**: For small batches, shows individual order details
 
 ## Troubleshooting
 

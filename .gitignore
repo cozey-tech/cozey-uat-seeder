@@ -33,3 +33,6 @@ output/
 
 # Generated config files (from generate-config)
 *-config.json
+
+# Progress state files (resume/retry)
+.progress/

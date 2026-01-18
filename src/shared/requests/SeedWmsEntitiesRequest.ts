@@ -21,4 +21,10 @@ export const seedWmsEntitiesRequestSchema = z.object({
   region: z.string(),
 });
 
-export type SeedWmsEntitiesRequest = z.infer<typeof seedWmsEntitiesRequestSchema>;
+export type SeedWmsEntitiesRequest = z.infer<typeof seedWmsEntitiesRequestSchema> & {
+  /**
+   * Optional progress callback for order-by-order updates
+   * Called when each order completes (success or failure)
+   */
+  onOrderProgress?: (current: number, total: number, shopifyOrderId: string, success: boolean) => void;
+};

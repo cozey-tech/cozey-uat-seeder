@@ -24,4 +24,10 @@ export const seedShopifyOrdersRequestSchema = z.object({
   collectionPrepName: z.string().optional(), // Collection prep name to include in order notes
 });
 
-export type SeedShopifyOrdersRequest = z.infer<typeof seedShopifyOrdersRequestSchema>;
+export type SeedShopifyOrdersRequest = z.infer<typeof seedShopifyOrdersRequestSchema> & {
+  /**
+   * Optional progress callback for order-by-order updates
+   * Called when each order completes (success or failure)
+   */
+  onOrderProgress?: (current: number, total: number, customerEmail: string, success: boolean) => void;
+};

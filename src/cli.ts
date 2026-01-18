@@ -18,405 +18,16 @@ import { resolve } from "path";
 config({ path: resolve(process.cwd(), ".env") });
 config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
-import { PrismaClient } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import { initializeEnvConfig } from "./config/env";
-import { assertStagingEnvironment, displayStagingEnvironment } from "./config/stagingGuardrails";
-import { InputParserService } from "./services/InputParserService";
-import { DataValidationService } from "./services/DataValidationService";
-import { ShopifyService } from "./services/ShopifyService";
-import { WmsService } from "./services/WmsService";
-import { CollectionPrepService } from "./services/CollectionPrepService";
-import { WmsPrismaRepository } from "./repositories/prisma/WmsPrismaRepository";
-import { SeedShopifyOrdersHandler } from "./business/seedShopifyOrders/SeedShopifyOrdersHandler";
-import { SeedShopifyOrdersUseCase } from "./business/seedShopifyOrders/SeedShopifyOrdersUseCase";
-import { SeedWmsEntitiesHandler } from "./business/seedWmsEntities/SeedWmsEntitiesHandler";
-import { SeedWmsEntitiesUseCase } from "./business/seedWmsEntities/SeedWmsEntitiesUseCase";
-import { CreateCollectionPrepHandler } from "./business/createCollectionPrep/CreateCollectionPrepHandler";
-import { CreateCollectionPrepUseCase } from "./business/createCollectionPrep/CreateCollectionPrepUseCase";
-import { StagingGuardrailError } from "./shared/errors/StagingGuardrailError";
-import { InputValidationError } from "./services/InputParserService";
-import { DataValidationError } from "./services/DataValidationService";
-import type { SeedConfig } from "./shared/types/SeedConfig";
-
-interface CliOptions {
-  configFile: string;
-  skipConfirmation: boolean;
-  validate: boolean;
-  dryRun: boolean;
-}
-
-/**
- * Parse command line arguments
- */
-function parseArgs(): CliOptions {
-  const args = process.argv.slice(2);
-
-  if (args.length === 0) {
-    console.error("Usage: npm run seed <config-file.json> [--validate|--dry-run] [--skip-confirmation]");
-    console.error("\nFlags:");
-    console.error("  --validate           Validate config file schema only (no DB/API calls)");
-    console.error("  --dry-run            Simulate seeding without making changes");
-    console.error("  --skip-confirmation  Skip staging confirmation prompt");
-    process.exit(1);
-  }
-
-  const configFile = args[0];
-  const skipConfirmation = args.includes("--skip-confirmation");
-  const validate = args.includes("--validate");
-  const dryRun = args.includes("--dry-run");
-
-  // Validate flags are mutually exclusive
-  if (validate && dryRun) {
-    console.error("Error: --validate and --dry-run cannot be used together");
-    console.error("Usage: npm run seed <config-file.json> [--validate|--dry-run] [--skip-confirmation]");
-    console.error("\nFlags:");
-    console.error("  --validate           Validate config file schema only (no DB/API calls)");
-    console.error("  --dry-run            Simulate seeding without making changes");
-    console.error("  --skip-confirmation  Skip staging confirmation prompt");
-    process.exit(1);
-  }
-
-  return { configFile, skipConfirmation, validate, dryRun };
-}
-
-/**
- * Validate configuration file against schema
- */
-async function validateConfig(configFilePath: string): Promise<void> {
-  const inputParser = new InputParserService();
-
-  try {
-    const config = inputParser.parseInputFile(configFilePath);
-
-    // Note: pnpConfig is optional - boxes already exist in the database
-    // If pnpConfig is provided, validate it, but don't require it for PnP items
-    if (config.pnpConfig) {
-      if (!config.pnpConfig.packageInfo || config.pnpConfig.packageInfo.length === 0) {
-        throw new InputValidationError("pnpConfig provided but no packageInfo defined");
-      }
-      if (!config.pnpConfig.boxes || config.pnpConfig.boxes.length === 0) {
-        throw new InputValidationError("pnpConfig provided but no boxes defined");
-      }
-    }
-
-    // Display validation results
-    console.log("✅ Configuration file validation passed");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log(`   Schema: Valid`);
-    console.log(`   Orders: ${config.orders.length}`);
-    console.log(`   Collection Prep: ${config.collectionPrep ? "Configured" : "Not configured"}`);
-    if (config.pnpConfig) {
-      console.log(`   PnP Config: Present`);
-    }
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  } catch (error) {
-    if (error instanceof InputValidationError) {
-      console.error("❌ Configuration file validation failed:");
-      console.error(`   ${error.message}`);
-      process.exit(1);
-    }
-    // Handle file I/O errors, permission errors, etc.
-    console.error("❌ Failed to read configuration file:");
-    console.error(`   ${error instanceof Error ? error.message : String(error)}`);
-    process.exit(1);
-  }
-}
-
-/**
- * Service dependencies container
- */
-interface ServiceDependencies {
-  prisma: PrismaClient;
-  wmsRepository: WmsPrismaRepository;
-  shopifyService: ShopifyService;
-  wmsService: WmsService;
-  collectionPrepService: CollectionPrepService;
-  inputParser: InputParserService;
-  dataValidator: DataValidationService;
-  seedShopifyOrdersHandler: SeedShopifyOrdersHandler;
-  seedWmsEntitiesHandler: SeedWmsEntitiesHandler;
-  createCollectionPrepHandler: CreateCollectionPrepHandler;
-  createCollectionPrepUseCase: CreateCollectionPrepUseCase;
-}
-
-/**
- * Initialize all services and handlers
- */
-function initializeServices(dryRun: boolean): ServiceDependencies {
-  const prisma = new PrismaClient();
-  const wmsRepository = new WmsPrismaRepository(prisma);
-  const shopifyService = new ShopifyService(dryRun);
-  const wmsService = new WmsService(wmsRepository, dryRun);
-  const collectionPrepService = new CollectionPrepService(wmsRepository, dryRun);
-  const inputParser = new InputParserService();
-  const dataValidator = new DataValidationService(prisma);
-
-  const seedShopifyOrdersUseCase = new SeedShopifyOrdersUseCase(shopifyService);
-  const seedShopifyOrdersHandler = new SeedShopifyOrdersHandler(seedShopifyOrdersUseCase);
-
-  const seedWmsEntitiesUseCase = new SeedWmsEntitiesUseCase(wmsService);
-  const seedWmsEntitiesHandler = new SeedWmsEntitiesHandler(seedWmsEntitiesUseCase);
-
-  const createCollectionPrepUseCase = new CreateCollectionPrepUseCase(collectionPrepService, prisma);
-  const createCollectionPrepHandler = new CreateCollectionPrepHandler(createCollectionPrepUseCase);
-
-  return {
-    prisma,
-    wmsRepository,
-    shopifyService,
-    wmsService,
-    collectionPrepService,
-    inputParser,
-    dataValidator,
-    seedShopifyOrdersHandler,
-    seedWmsEntitiesHandler,
-    createCollectionPrepHandler,
-    createCollectionPrepUseCase,
-  };
-}
-
-/**
- * Parse and validate configuration file
- */
-function parseAndValidateConfig(
-  configFilePath: string,
-  inputParser: InputParserService,
-): SeedConfig {
-  console.log(`📄 Parsing configuration file: ${configFilePath}`);
-  try {
-    return inputParser.parseInputFile(configFilePath);
-  } catch (error) {
-    if (error instanceof InputValidationError) {
-      console.error(`❌ Configuration file validation failed:\n${error instanceof Error ? error.message : String(error)}\n`);
-      process.exit(1);
-    }
-    throw error;
-  }
-}
-
-/**
- * Validate data (SKUs, customers, etc.)
- */
-async function validateData(
-  config: SeedConfig,
-  dataValidator: DataValidationService,
-): Promise<void> {
-  console.log("🔍 Validating data...");
-  try {
-    await dataValidator.validateSeedConfig(config);
-  } catch (error) {
-    if (error instanceof DataValidationError) {
-      console.error(`❌ Data validation failed:\n${error instanceof Error ? error.message : String(error)}\n`);
-      process.exit(1);
-    }
-    throw error;
-  }
-  console.log("✅ Data validation passed\n");
-}
-
-/**
- * Execute the seeding flow (shared between normal and dry-run)
- */
-async function executeSeedingFlow(
-  config: SeedConfig,
-  services: ServiceDependencies,
-  batchId: string,
-  isDryRun: boolean,
-): Promise<{
-  shopifyResult: { shopifyOrders: Array<{ shopifyOrderId: string; shopifyOrderNumber: string; lineItems: Array<{ lineItemId: string; sku: string }> }> };
-  wmsResult: { orders: Array<{ orderId: string }>; shipments: Array<{ shipmentId: string }> };
-  collectionPrepResult?: { collectionPrepId: string; region: string };
-}> {
-  // Generate collection prep name early if collection prep is configured
-  // This allows us to include it in Shopify order notes
-  let collectionPrepName: string | undefined;
-  if (config.collectionPrep) {
-    collectionPrepName = await services.createCollectionPrepUseCase.generateCollectionPrepName(
-      config.collectionPrep.testTag,
-      config.collectionPrep.carrier,
-      config.collectionPrep.locationId,
-      config.collectionPrep.region,
-    );
-  }
-
-  // Step 1: Seed Shopify orders
-  const step1Label = isDryRun ? "Would seed" : "Seeding";
-  console.log(`🛒 Step 1: ${step1Label} Shopify orders...`);
-  const shopifyRequest = {
-    orders: config.orders.map((order) => ({
-      customer: order.customer,
-      lineItems: order.lineItems.map((item) => ({
-        sku: item.sku,
-        quantity: item.quantity,
-      })),
-    })),
-    batchId,
-    region: config.region || config.collectionPrep?.region || "CA",
-    collectionPrepName,
-  };
-
-  const shopifyResult = await services.seedShopifyOrdersHandler.execute(shopifyRequest);
-  const createdLabel = isDryRun ? "Would create" : "Created";
-  console.log(`✅ ${createdLabel} ${shopifyResult.shopifyOrders.length} Shopify order(s)\n`);
-
-  // Step 2: Seed WMS entities
-  console.log(`🗄️  Step 2: ${step1Label} WMS entities...`);
-  const region = config.collectionPrep?.region || "CA";
-  let collectionPrepId: string | undefined;
-
-  // Create collection prep if configured (using pre-generated name)
-  if (config.collectionPrep) {
-    const creatingLabel = isDryRun ? "Would create" : "Creating";
-    console.log(`📋 ${creatingLabel} collection prep...`);
-    const collectionPrepRequest = {
-      orderIds: shopifyResult.shopifyOrders.map((o) => o.shopifyOrderId),
-      carrier: config.collectionPrep.carrier,
-      locationId: config.collectionPrep.locationId,
-      region: config.collectionPrep.region,
-      prepDate: config.collectionPrep.prepDate,
-      testTag: config.collectionPrep.testTag,
-      collectionPrepName, // Use pre-generated name
-    };
-
-    const collectionPrepResult = await services.createCollectionPrepHandler.execute(collectionPrepRequest);
-    collectionPrepId = collectionPrepResult.collectionPrepId;
-    console.log(`✅ ${createdLabel} collection prep: ${collectionPrepId}\n`);
-  }
-
-  // Seed WMS entities with Shopify order data
-  const wmsRequest = {
-    shopifyOrders: shopifyResult.shopifyOrders.map((shopifyOrder, index) => {
-      const configOrder = config.orders[index];
-      const lineItemsWithQuantity = shopifyOrder.lineItems.map((shopifyItem) => {
-        const configItem = configOrder.lineItems.find((item) => item.sku === shopifyItem.sku);
-        return {
-          lineItemId: shopifyItem.lineItemId,
-          sku: shopifyItem.sku,
-          quantity: configItem?.quantity || 1,
-        };
-      });
-
-      return {
-        shopifyOrderId: shopifyOrder.shopifyOrderId,
-        shopifyOrderNumber: shopifyOrder.shopifyOrderNumber,
-        status: "paid", // Orders are paid but not fulfilled during seeding
-        customerName: configOrder.customer.name,
-        customerEmail: configOrder.customer.email,
-        lineItems: lineItemsWithQuantity,
-      };
-    }),
-    collectionPrepId,
-    region,
-  };
-
-  const wmsResult = await services.seedWmsEntitiesHandler.execute(wmsRequest);
-  console.log(`✅ ${createdLabel} ${wmsResult.orders.length} WMS order(s)`);
-  console.log(`✅ ${createdLabel} ${wmsResult.shipments.length} shipment(s)\n`);
-
-  const collectionPrepResult = collectionPrepId
-    ? { collectionPrepId, region: config.collectionPrep!.region }
-    : undefined;
-
-  return { shopifyResult, wmsResult, collectionPrepResult };
-}
-
-/**
- * Display summary of seeding results
- */
-function displaySummary(
-  shopifyResult: { shopifyOrders: Array<{ shopifyOrderId: string; shopifyOrderNumber: string }> },
-  wmsResult: { orders: Array<{ orderId: string }>; shipments: Array<{ shipmentId: string }> },
-  collectionPrepResult?: { collectionPrepId: string; region: string },
-  isDryRun = false,
-): void {
-  if (isDryRun) {
-    console.log("\n🔍 DRY RUN MODE - No changes will be made");
-  } else {
-    console.log("\n✅ Seeding Complete!");
-  }
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log(`📦 Shopify Orders ${isDryRun ? "Would Be" : "Created"}: ${shopifyResult.shopifyOrders.length}`);
-  shopifyResult.shopifyOrders.forEach((order) => {
-    console.log(`   - Order #${order.shopifyOrderNumber} (ID: ${order.shopifyOrderId})`);
-  });
-
-  console.log(`\n🗄️  WMS Entities ${isDryRun ? "Would Be" : "Created"}:`);
-  console.log(`   - Orders: ${wmsResult.orders.length}`);
-  console.log(`   - Shipments: ${wmsResult.shipments.length}`);
-
-  if (collectionPrepResult) {
-    console.log(`\n📋 Collection Prep ${isDryRun ? "Would Be" : "Created"}:`);
-    console.log(`   - ID: ${collectionPrepResult.collectionPrepId}`);
-    console.log(`   - Region: ${collectionPrepResult.region}`);
-  }
-
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  if (isDryRun) {
-    console.log("⚠️  DRY RUN - No actual changes were made");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-  } else {
-    console.log();
-  }
-}
-
-/**
- * Check and display staging environment
- */
-function checkStagingEnvironment(): void {
-  const envInfo = displayStagingEnvironment();
-  console.log("🔒 Staging Environment Check");
-  console.log(`   Database: ${envInfo.databaseUrl}`);
-  console.log(`   Shopify: ${envInfo.shopifyDomain}`);
-  console.log(`   Status: ${envInfo.isStaging ? "✅ Staging" : "❌ Not Staging"}\n`);
-
-  try {
-    assertStagingEnvironment();
-  } catch (error) {
-    if (error instanceof StagingGuardrailError) {
-      console.error("❌ Staging Guardrail Violation:");
-      console.error(`   ${error.message}\n`);
-      console.error("This tool can only run against staging environments.");
-      process.exit(1);
-    }
-    throw error;
-  }
-}
-
-/**
- * Execute dry-run mode: simulate full flow without making actual changes
- */
-async function executeDryRun(configFilePath: string): Promise<void> {
-  console.log("🔍 DRY RUN MODE - No changes will be made");
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
-  // Config is already initialized in main(), so staging check can proceed
-  checkStagingEnvironment();
-
-  // Initialize services with dryRun=true
-  console.log("🔧 Initializing services (DRY RUN mode)...");
-  const services = initializeServices(true);
-  try {
-    const config = parseAndValidateConfig(configFilePath, services.inputParser);
-    await validateData(config, services.dataValidator);
-
-    // Generate batch ID for this run
-    const batchId = uuidv4();
-    console.log(`🆔 Batch ID: ${batchId}\n`);
-
-    const { shopifyResult, wmsResult, collectionPrepResult } = await executeSeedingFlow(
-      config,
-      services,
-      batchId,
-      true,
-    );
-
-    displaySummary(shopifyResult, wmsResult, collectionPrepResult, true);
-  } finally {
-    // Cleanup
-    await services.prisma.$disconnect();
-  }
-}
+import { ProgressTracker } from "./utils/progress";
+import { ErrorFormatter } from "./utils/errorFormatter";
+import { OutputFormatter } from "./utils/outputFormatter";
+import { parseArgs } from "./cli/args";
+import { validateConfig, checkStagingEnvironment, parseAndValidateConfig, validateData } from "./cli/validation";
+import { initializeServices, executeSeedingFlow, executeDryRun } from "./cli/orchestration";
+import { displaySummary } from "./cli/output";
+import { loadProgressState, listProgressStates } from "./utils/progressState";
 
 /**
  * Main orchestrator function
@@ -429,30 +40,136 @@ async function main(): Promise<void> {
     // Parse CLI arguments
     const options = parseArgs();
 
+    // Handle --resume flag
+    if (options.resume) {
+      const resumeState = loadProgressState(options.resume);
+      if (!resumeState) {
+        console.error(OutputFormatter.error(`No progress state found for batch ID: ${options.resume}`));
+        console.log(OutputFormatter.info("Available batch IDs:"));
+        const availableStates = listProgressStates();
+        if (availableStates.length === 0) {
+          console.log(OutputFormatter.info("   (none)"));
+        } else {
+          availableStates.slice(0, 10).forEach((state) => {
+            const date = new Date(state.timestamp).toISOString();
+            console.log(OutputFormatter.keyValue(state.batchId, date));
+          });
+        }
+        process.exit(1);
+      }
+
+      checkStagingEnvironment();
+
+      // Initialize services
+      console.log(OutputFormatter.info("Initializing services for resume..."));
+      const initProgress = new ProgressTracker({ showSpinner: false });
+      initProgress.start("Initializing", 4);
+      
+      initProgress.update(1, "Connecting to database...");
+      const services = initializeServices(false);
+      initProgress.update(2, "Initializing Shopify client...");
+      initProgress.update(3, "Loading reference data...");
+      initProgress.update(4, "Ready");
+      initProgress.complete("Services initialized");
+      console.log();
+
+      // Load original config from progress state (we'd need to store it, but for now we'll require it)
+      // For now, we'll require the config file even when resuming
+      if (!options.configFile) {
+        console.error(OutputFormatter.error("Config file is required when resuming (needed to reconstruct order data)"));
+        process.exit(1);
+      }
+
+      try {
+        const config = parseAndValidateConfig(options.configFile, services.inputParser);
+        await validateData(config, services.dataValidator);
+
+        console.log(OutputFormatter.keyValue("Resuming Batch ID", options.resume));
+        console.log();
+
+        const { shopifyResult, wmsResult, collectionPrepResult } = await executeSeedingFlow(
+          config,
+          services,
+          options.resume,
+          false,
+          resumeState,
+        );
+
+        displaySummary(shopifyResult, wmsResult, collectionPrepResult, false);
+      } finally {
+        await services.prisma.$disconnect();
+      }
+      process.exit(0);
+    }
+
     // Handle --validate flag (early exit, no DB/API calls)
     if (options.validate) {
+      if (!options.configFile) {
+        console.error(OutputFormatter.error("Config file is required for validation"));
+        process.exit(1);
+      }
       await validateConfig(options.configFile);
       process.exit(0);
     }
 
     // Handle --dry-run flag
     if (options.dryRun) {
-      await executeDryRun(options.configFile);
+      if (!options.configFile) {
+        console.error(OutputFormatter.error("Config file is required for dry-run"));
+        process.exit(1);
+      }
+      checkStagingEnvironment();
+
+      // Initialize services with dryRun=true
+      console.log(OutputFormatter.info("Initializing services (DRY RUN mode)..."));
+      const initProgress = new ProgressTracker({ showSpinner: false });
+      initProgress.start("Initializing", 4);
+      
+      initProgress.update(1, "Connecting to database...");
+      const services = initializeServices(true);
+      initProgress.update(2, "Initializing Shopify client...");
+      initProgress.update(3, "Loading reference data...");
+      initProgress.update(4, "Ready");
+      initProgress.complete("Services initialized");
+      console.log();
+      
+      try {
+        await executeDryRun(options.configFile, services);
+      } finally {
+        // Cleanup
+        await services.prisma.$disconnect();
+      }
       process.exit(0);
     }
 
     checkStagingEnvironment();
 
     // Initialize services
-    console.log("🔧 Initializing services...");
+    console.log(OutputFormatter.info("Initializing services..."));
+    const initProgress = new ProgressTracker({ showSpinner: false });
+    initProgress.start("Initializing", 4);
+    
+    initProgress.update(1, "Connecting to database...");
     const services = initializeServices(false);
+    initProgress.update(2, "Initializing Shopify client...");
+    initProgress.update(3, "Loading reference data...");
+    initProgress.update(4, "Ready");
+    initProgress.complete("Services initialized");
+    console.log();
+    
     try {
+      if (!options.configFile) {
+        console.error(OutputFormatter.error("Config file is required"));
+        process.exit(1);
+      }
+      
       const config = parseAndValidateConfig(options.configFile, services.inputParser);
       await validateData(config, services.dataValidator);
 
       // Generate batch ID for this run
       const batchId = uuidv4();
-      console.log(`🆔 Batch ID: ${batchId}\n`);
+      console.log(OutputFormatter.keyValue("Batch ID", batchId));
+      console.log();
 
       const { shopifyResult, wmsResult, collectionPrepResult } = await executeSeedingFlow(
         config,
@@ -467,15 +184,17 @@ async function main(): Promise<void> {
       await services.prisma.$disconnect();
     }
   } catch (error) {
-    console.error("\n❌ Seeding failed:");
-    if (error instanceof Error) {
-      console.error(`   ${error.message}`);
-      if (error.stack && process.env.NODE_ENV === "development") {
-        console.error(`\nStack trace:\n${error.stack}`);
-      }
-    } else {
-      console.error(`   ${String(error)}`);
+    const errorContext = { step: "Seeding operation" };
+    const formattedError = ErrorFormatter.formatAsString(
+      error instanceof Error ? error : new Error(String(error)),
+      errorContext,
+    );
+    console.error(`\n${formattedError}\n`);
+    
+    if (error instanceof Error && error.stack && process.env.NODE_ENV === "development") {
+      console.error(`Stack trace:\n${error.stack}\n`);
     }
+    
     process.exit(1);
   }
 }

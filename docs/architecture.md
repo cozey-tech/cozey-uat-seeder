@@ -54,6 +54,72 @@ The system follows a clean architecture pattern with clear separation of concern
 └─────────────────────────────────────────────────────────┘
 ```
 
+## Utility Layer
+
+The system includes several utility modules for consistent behavior:
+
+### Progress Tracking (`src/utils/progress.ts`)
+
+`ProgressTracker` provides:
+- Step-level progress tracking with time estimation
+- Spinner support for visual feedback
+- Percentage calculation and elapsed time tracking
+- Customizable message formatting
+
+### Error Formatting (`src/utils/errorFormatter.ts`)
+
+`ErrorFormatter` standardizes error messages:
+- Type-specific formatting for different error classes
+- Recovery suggestions based on error type
+- Context-aware messages with relevant details
+- Consistent formatting across the application
+
+### Output Formatting (`src/utils/outputFormatter.ts`)
+
+`OutputFormatter` ensures consistent CLI output:
+- Headers, separators, and summaries
+- Status messages (success, error, warning, info)
+- Key-value pairs and lists
+- Duration formatting and percentages
+
+### Progress State (`src/utils/progressState.ts`)
+
+File-based storage for resume/retry capability:
+- Saves progress state after each major step
+- Tracks successful and failed operations
+- Enables resuming from batch ID
+- Stores in `.progress/` directory
+
+### Structured Logging (`src/utils/logger.ts`)
+
+Enhanced logger with:
+- Operation tracking (start/end operations)
+- Performance logging helpers
+- Context helpers for consistent logging
+- Log level filtering (via `LOG_LEVEL` env var)
+- PII masking (email addresses)
+
+## Config Generator Architecture
+
+The config generator (`src/generateConfig.ts`) is an interactive CLI tool for creating seed configuration files:
+
+**Structure** (refactored for maintainability):
+- `src/generateConfig/args.ts`: Command-line argument parsing
+- `src/generateConfig/initialization.ts`: Reference data loading and template management
+- `src/generateConfig/flow/orderCreation.ts`: Order creation flows (individual, bulk-template, quick-duplicate)
+- `src/generateConfig/flow/review.ts`: Order review and editing loop
+- `src/generateConfig/flow/collectionPrep.ts`: Collection prep configuration flows
+- `src/generateConfig/flow/validation.ts`: Incremental validation feedback
+- `src/generateConfig/output.ts`: Config saving and performance summary display
+
+**Features**:
+- **Incremental validation**: Validates orders as they're created, shows warnings immediately
+- **Progress tracking**: Detailed loading feedback with timing and counts
+- **Template management**: Save and reuse order templates
+- **Review step**: Edit, add, or delete orders before finalizing
+- **Collection prep builder**: Multiple modes for configuring collection preps
+- **Performance metrics**: Tracks and displays timing for each phase
+
 ## Component Relationships
 
 ### CLI Orchestrator (`src/cli.ts`)
@@ -65,10 +131,18 @@ The main entry point that:
 - Orchestrates the full seeding workflow
 - Provides user feedback and error handling
 
+**Structure** (refactored for maintainability):
+- `src/cli/args.ts`: Command-line argument parsing using `commander.js`
+- `src/cli/validation.ts`: Configuration and data validation
+- `src/cli/orchestration.ts`: Service initialization and workflow orchestration
+- `src/cli/output.ts`: Summary display and output formatting
+
 **Dependencies**:
 - All handlers (Shopify, WMS, Collection Prep)
 - Input parser and data validator
 - Staging guardrails
+- Progress tracking utilities
+- Error formatting utilities
 
 ### Handler Layer
 

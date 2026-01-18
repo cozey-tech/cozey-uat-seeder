@@ -36,6 +36,12 @@ export class SeedShopifyOrdersUseCase {
       throw new Error("Cannot seed orders: orders array is empty");
     }
 
+    const operationId = Logger.startOperation("seedShopifyOrders", {
+      batchId: request.batchId,
+      orderCount: request.orders.length,
+      region: request.region,
+    });
+
     const shopifyOrders: SeedShopifyOrdersResponse["shopifyOrders"] = [];
     const orderMetrics: OrderMetrics[] = [];
     const batchStartTime = Date.now();
@@ -205,7 +211,12 @@ export class SeedShopifyOrdersUseCase {
           apiCallCount: orderIndex === 0 ? variantLookupMetrics.apiCallCount : 0, // Only count once for first order
         };
 
-        return {
+          // Notify progress callback of success
+          if (request.onOrderProgress) {
+            request.onOrderProgress(orderIndex + 1, request.orders.length, orderInput.customer.email, true);
+          }
+
+          return {
             success: true as const,
             order: {
               shopifyOrderId: orderResult.orderId,
@@ -237,6 +248,11 @@ export class SeedShopifyOrdersUseCase {
             customerEmail: orderInput.customer.email,
             error: error instanceof Error ? error : new Error(errorMessage),
           });
+
+          // Notify progress callback of failure
+          if (request.onOrderProgress) {
+            request.onOrderProgress(orderIndex + 1, request.orders.length, orderInput.customer.email, false);
+          }
 
           return {
             success: false as const,
@@ -356,13 +372,40 @@ export class SeedShopifyOrdersUseCase {
       throttleStatus,
     };
 
+    Logger.performance({
+      operation: "seedShopifyOrders",
+      duration: totalDurationMs,
+      itemCount: request.orders.length,
+      successfulCount: shopifyOrders.length,
+      failedCount: errors.length,
+      totalApiCalls,
+      totalRequestedCost,
+      totalActualCost,
+      averageOrderDurationMs,
+    });
+
     Logger.info("Shopify order seeding performance metrics", {
       batchId: request.batchId,
       metrics: batchMetrics,
     });
 
-    return {
+    const result = {
       shopifyOrders,
+      failures: errors.length > 0
+        ? errors.map((e) => ({
+            orderIndex: e.orderIndex,
+            customerEmail: e.customerEmail,
+            error: e.error.message,
+          }))
+        : undefined,
     };
+
+    Logger.endOperation(operationId, errors.length === 0, {
+      successfulOrders: shopifyOrders.length,
+      failedOrders: errors.length,
+      totalApiCalls,
+    });
+
+    return result;
   }
 }
