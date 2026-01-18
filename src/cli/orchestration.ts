@@ -277,9 +277,10 @@ export async function executeSeedingFlow(
         successful: successfulOrders,
         failed: failedOrders,
       },
-      wmsEntities: {
+      wmsEntities: resumeState?.wmsEntities || {
         successful: [],
         failed: [],
+        shipments: [],
       },
     };
     saveProgressState(progressState);

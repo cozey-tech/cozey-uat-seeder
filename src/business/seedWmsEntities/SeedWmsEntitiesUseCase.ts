@@ -36,6 +36,39 @@ export class SeedWmsEntitiesUseCase {
           shopifyOrderId: existingOrder.shopifyOrderId,
         });
         
+        // Check if shipment exists for this order and collection prep (if collection prep is configured)
+        // If not, create it to ensure idempotent orders have shipments when resuming
+        if (request.collectionPrepId) {
+          try {
+            // Try to create shipment - will throw if it already exists (P2002)
+            const shipmentId = await this.wmsService.createShipmentForOrder(
+              request.collectionPrepId,
+              existingOrder.id, // Use WMS database order ID, not Shopify order ID
+              request.region,
+            );
+            shipments.push({
+              shipmentId: shipmentId,
+              orderId: existingOrder.id,
+            });
+          } catch (error: unknown) {
+            // Shipment may already exist (unique constraint violation P2002)
+            // This is expected for idempotent orders that already have shipments
+            // Check if it's a P2002 error (unique constraint) - if so, shipment already exists, which is fine
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.includes("already exists")) {
+              Logger.info("Shipment already exists for idempotent order", {
+                shopifyOrderId: shopifyOrder.shopifyOrderId,
+                orderId: existingOrder.id,
+                collectionPrepId: request.collectionPrepId,
+              });
+              // Shipment already exists - this is fine, continue
+            } else {
+              // Re-throw unexpected errors
+              throw error;
+            }
+          }
+        }
+        
         // Notify progress callback of success (idempotent order)
         if (request.onOrderProgress) {
           request.onOrderProgress(orderIndex + 1, request.shopifyOrders.length, shopifyOrder.shopifyOrderId, true);
