@@ -44,13 +44,34 @@ interface CliOptions {
  * Parse command line arguments using commander
  */
 function parseArgs(): CliOptions {
-  const args = process.argv.slice(2);
+  const program = new Command();
 
-  const options: CliOptions = {
-    dryRun: args.includes("--dry-run"),
-    modifyInventory: args.includes("--modify-inventory"),
-    skipSaveTemplate: args.includes("--skip-save-template"),
-  };
+  program
+    .name("generate-config")
+    .description("Interactive config generator for seed configuration files")
+    .version(seedVersion, "-v, --version", "display version number")
+    .option("--dry-run", "Preview generated config without saving")
+    .option("--modify-inventory", "Enable inventory modification during order creation")
+    .option("--skip-save-template", "Skip prompt to save custom orders as templates")
+    .option("--output <path>", "Output file path (default: output/seed-config.json)")
+    .option("--region <region>", "Region (CA or US)", /^(CA|US)$/i)
+    .addHelpText(
+      "after",
+      `
+Examples:
+  $ npm run generate-config
+  $ npm run generate-config -- --region CA
+  $ npm run generate-config -- --output custom-config.json
+  $ npm run generate-config -- --dry-run
+  $ npm run generate-config -- --modify-inventory
+
+For more information, see README.md
+      `,
+    );
+
+  program.parse();
+
+  const options = program.opts();
 
   // Parse --output
   const outputIndex = args.indexOf("--output");
