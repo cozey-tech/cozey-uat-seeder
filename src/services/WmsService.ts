@@ -59,7 +59,7 @@ export class WmsService {
     customerEmail: string,
     locationId?: string,
   ): Promise<{ orderDbId: string; shopifyOrderId: string; customerId: string }> {
-    // Check if order already exists (idempotency) - still run in dry-run
+    // Idempotency check - still run in dry-run for validation
     const existingOrder = await this.repository.findOrderByShopifyId(shopifyOrderId);
     if (existingOrder) {
       return {
@@ -86,7 +86,7 @@ export class WmsService {
       return { orderDbId, shopifyOrderId, customerId };
     }
 
-    // Find or create customer by email (idempotency)
+    // Idempotency: reuse existing customer if found
     let customer = await this.repository.findCustomerByEmail(customerEmail, region);
     const customerId = customer?.id || uuidv4();
 
@@ -251,7 +251,6 @@ export class WmsService {
         throw new WmsServiceError(`Line item not found: ${prep.lineItemId}`);
       }
 
-      // Get all parts associated with this variant
       const variantParts = partsByVariantId.get(prep.variantId) || [];
       if (variantParts.length === 0) {
         throw new WmsServiceError(`No parts found for variant ID: ${prep.variantId} (SKU: ${lineItem.sku})`);
