@@ -72,22 +72,6 @@ For more information, see README.md
   program.parse();
 
   const options = program.opts();
-  if (outputIndex !== -1 && args[outputIndex + 1]) {
-    options.output = args[outputIndex + 1];
-  }
-
-  // Parse --region
-  const regionIndex = args.indexOf("--region");
-  if (regionIndex !== -1 && args[regionIndex + 1]) {
-    const region = args[regionIndex + 1] as "CA" | "US";
-    if (region === "CA" || region === "US") {
-      options.region = region;
-    } else {
-      throw new Error(
-        `Invalid region: ${region}. Must be "CA" or "US". Use --region CA or --region US`,
-      );
-    }
-  }
 
   // Validate --output path if provided
   if (options.output) {
