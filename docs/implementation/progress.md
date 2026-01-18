@@ -54,9 +54,16 @@
   - Commit: `668766d`
   - Status: ✅ Complete - initialization progress tracking added
 
-#### ⏳ NOT STARTED (Phase 2+)
-- Task 2.5: Add Progress Within Seeding Steps (order-by-order)
-- Task 2.6: Add Detailed Loading Feedback in Config Generator
+#### ✅ COMPLETED (Phase 2)
+- **Task 2.5**: Add Progress Within Seeding Steps (order-by-order)
+  - Commit: `[latest]`
+  - Status: ✅ Complete - order-by-order progress callbacks added, real-time updates
+
+- **Task 2.6**: Add Detailed Loading Feedback in Config Generator
+  - Commit: `[latest]`
+  - Status: ✅ Complete - detailed loading progress with timing and counts
+
+#### ⏳ NOT STARTED (Phase 3+)
 - Task 3.1: Refactor Seeding CLI Structure
 - Task 3.2: Refactor Config Generator Structure
 - Task 3.3: Add Resume/Retry Capability
