@@ -942,7 +942,8 @@ async function main(): Promise<void> {
 
       // Generate config
       const configGenStart = Date.now();
-      console.log("\n⚙️  Generating configuration...");
+      console.log();
+      console.log(OutputFormatter.info("Generating configuration..."));
       const config = await generatorService.generateConfig({
         orders,
         collectionPreps,
@@ -985,12 +986,67 @@ async function main(): Promise<void> {
 
       // Save or preview
       if (options.dryRun) {
-        console.log("\n📄 Generated Config (Preview):");
-        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log();
+        console.log(OutputFormatter.header("Generated Config (Preview)", "📄"));
+        console.log(OutputFormatter.separator());
         console.log(JSON.stringify(config, null, 2));
       } else {
         const defaultPath = options.output || "output/seed-config.json";
+        
+        // Show preview option
+        const showPreview = await promptService.promptConfirm(
+          "Preview config summary before saving?",
+          false,
+        );
+        
+        if (showPreview) {
+          const previewItems: Array<{ label: string; value: string | number }> = [
+            { label: "Orders", value: config.orders.length },
+          ];
+          
+          if (config.collectionPreps && config.collectionPreps.length > 0) {
+            previewItems.push({ label: "Collection Preps", value: config.collectionPreps.length });
+          } else if (config.collectionPrep) {
+            previewItems.push({ 
+              label: "Collection Prep", 
+              value: `${config.collectionPrep.carrier} at ${config.collectionPrep.locationId}`,
+            });
+          }
+          
+          console.log();
+          console.log(OutputFormatter.summary({
+            title: OutputFormatter.header("Config Preview", "📄"),
+            items: previewItems,
+          }));
+          console.log();
+        }
+        
+        // Get output path
         const outputPath = options.output || (await promptService.promptSaveLocation(defaultPath));
+        
+        // Check if file exists and warn
+        if (existsSync(outputPath)) {
+          const shouldOverwrite = await promptService.promptConfirm(
+            `File exists: ${outputPath}\nOverwrite?`,
+            false,
+          );
+          
+          if (!shouldOverwrite) {
+            console.log(OutputFormatter.info("Save cancelled."));
+            process.exit(0);
+          }
+        }
+        
+        // Final confirmation
+        const shouldSave = await promptService.promptConfirm(
+          `Save config to ${outputPath}?`,
+          true,
+        );
+        
+        if (!shouldSave) {
+          console.log(OutputFormatter.info("Save cancelled."));
+          process.exit(0);
+        }
         
         // Ensure output directory exists
         const outputDir = dirname(outputPath);
