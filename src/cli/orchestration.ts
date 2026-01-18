@@ -115,14 +115,11 @@ export async function executeSeedingFlow(
   const totalSteps = config.collectionPrep ? 3 : 2;
   console.log(OutputFormatter.step(1, totalSteps, step1Name));
   
-  // Filter orders if resuming (only retry failed ones)
-  // Also create a mapping from filtered array index to original config.orders index
   let ordersToProcess = config.orders;
-  const filteredToOriginalIndexMap = new Map<number, number>(); // Maps filtered array index -> original config.orders index
+  const filteredToOriginalIndexMap = new Map<number, number>();
   if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
     const successfulIndices = new Set(resumeState.shopifyOrders.successful.map((s) => s.orderIndex));
     ordersToProcess = config.orders.filter((_, index) => !successfulIndices.has(index));
-    // Build mapping: for each filtered order, map its position in filtered array to original index
     let filteredIndex = 0;
     for (let originalIndex = 0; originalIndex < config.orders.length; originalIndex++) {
       if (!successfulIndices.has(originalIndex)) {
@@ -132,7 +129,6 @@ export async function executeSeedingFlow(
     }
     console.log(OutputFormatter.info(`Resuming: ${ordersToProcess.length} failed orders to retry, ${resumeState.shopifyOrders.successful.length} already successful`));
   } else {
-    // Normal flow: filtered array is same as original, so indices map 1:1
     for (let i = 0; i < config.orders.length; i++) {
       filteredToOriginalIndexMap.set(i, i);
     }
@@ -142,7 +138,6 @@ export async function executeSeedingFlow(
   const totalOrders = config.orders.length;
   progressTracker.start(step1Name, totalOrders);
   
-  // Update progress to reflect already completed orders if resuming
   if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
     progressTracker.update(resumeState.shopifyOrders.successful.length, "Already completed");
   }
