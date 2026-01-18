@@ -97,12 +97,12 @@
 
 #### ✅ COMPLETED (Phase 5)
 - **Task 5.1**: Add Tests for New Utilities
-  - Commit: `[pending]`
+  - Commit: `0cfd7e8`, `80b18c9`
   - Files: `src/utils/progressState.test.ts`, `src/utils/logger.test.ts`
   - Status: ✅ Complete - Added comprehensive tests for ProgressState utility (save, load, delete, list) and Logger utility (basic logging, operation tracking, performance logging, context helpers, log level filtering, trackOperation)
 
 - **Task 5.2**: Update Documentation
-  - Commit: `[pending]`
+  - Commit: `0cfd7e8`
   - Files: `README.md`, `docs/architecture.md`
   - Status: ✅ Complete - Updated README with new UX features (progress tracking, error handling, output formatting, resume/retry), updated architecture docs with new structure (CLI modules, config generator modules, utility layer), added examples and feature descriptions
 
