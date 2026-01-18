@@ -108,7 +108,7 @@ export class SeedWmsEntitiesUseCase {
 
         shipments.push({
           shipmentId: shipmentId,
-          orderId: shopifyOrder.shopifyOrderId,
+          orderId: orderDbId, // Use WMS database order ID, not Shopify order ID
         });
       }
       

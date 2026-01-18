@@ -283,11 +283,12 @@ export async function executeSeedingFlow(
       
       if (resumeState) {
         // Try to find by matching shopifyOrderId in previous successful orders
-        const prevSuccessIndex = resumeState.shopifyOrders.successful.findIndex(
+        const prevSuccess = resumeState.shopifyOrders.successful.find(
           (s) => s.shopifyOrderId === shopifyOrder.shopifyOrderId,
         );
-        if (prevSuccessIndex !== -1) {
-          configOrder = config.orders[prevSuccessIndex];
+        if (prevSuccess) {
+          // Use the stored orderIndex from progress state, not the array index
+          configOrder = config.orders[prevSuccess.orderIndex];
         } else {
           // New order from current run, find by index in finalShopifyResult
           const currentIndex = finalShopifyResult.shopifyOrders.findIndex(
@@ -356,12 +357,51 @@ export async function executeSeedingFlow(
       orderId: s.orderId,
       shopifyOrderId: s.shopifyOrderId,
     }));
+    // Merge prepPartItems from previous successful run with new ones
+    const previousPrepPartItems = resumeState.wmsEntities.successful.flatMap((s) => s.prepPartItems);
     finalWmsResult = {
       orders: [...previousSuccessful, ...wmsResult.orders],
       shipments: wmsResult.shipments, // Shipments are recreated, so don't merge
-      prepPartItems: wmsResult.prepPartItems,
+      prepPartItems: [...previousPrepPartItems, ...wmsResult.prepPartItems],
       failures: wmsResult.failures,
     };
+  }
+  
+  // Track prepPartItems per order for progress state
+  // Since prepPartItems are created sequentially per order in the use case,
+  // we need to map them back to orders. For resumed orders, we have them stored.
+  // For new orders, we need to track them as they're created.
+  // Note: This is a limitation - we don't have exact mapping without modifying the use case.
+  // For now, we'll store prepPartItems from resumed orders and track new ones by order index.
+  const prepPartItemsByOrder = new Map<string, Array<{ prepPartItemId: string; partId: string }>>();
+  
+  // Add prepPartItems from resumed orders (they're already stored per order)
+  if (resumeState) {
+    for (const resumedOrder of resumeState.wmsEntities.successful) {
+      prepPartItemsByOrder.set(resumedOrder.shopifyOrderId, resumedOrder.prepPartItems);
+    }
+  }
+  
+  // For new orders, prepPartItems are in wmsResult in sequential order
+  // We need to map them to orders. Since we don't know the exact count per order,
+  // we'll use the order index in wmsOrdersToProcess to map them.
+  // This assumes prepPartItems are created in the same order as orders.
+  let prepPartItemOffset = 0;
+  for (let i = 0; i < wmsResult.orders.length; i++) {
+    const order = wmsResult.orders[i];
+    // Get the corresponding shopifyOrder to find line items count
+    const shopifyOrder = wmsOrdersToProcess[i];
+    if (shopifyOrder) {
+      // Estimate prepPartItems: roughly one per line item (simplified)
+      // In reality, prepPartItems depend on parts per variant, but this is a reasonable approximation
+      const estimatedItemsPerOrder = shopifyOrder.lineItems.length;
+      const orderPrepPartItems = wmsResult.prepPartItems.slice(
+        prepPartItemOffset,
+        prepPartItemOffset + estimatedItemsPerOrder,
+      );
+      prepPartItemOffset += estimatedItemsPerOrder;
+      prepPartItemsByOrder.set(order.shopifyOrderId, orderPrepPartItems);
+    }
   }
   
   wmsProgressTracker.update(finalShopifyResult.shopifyOrders.length);
@@ -393,11 +433,18 @@ export async function executeSeedingFlow(
         failed: finalShopifyResult.failures || [],
       },
       wmsEntities: {
-        successful: finalWmsResult.orders.map((order) => ({
-          orderIndex: finalShopifyResult.shopifyOrders.findIndex((o) => o.shopifyOrderId === order.shopifyOrderId),
-          orderId: order.orderId,
-          shopifyOrderId: order.shopifyOrderId,
-        })),
+        successful: finalWmsResult.orders.map((order) => {
+          const orderIndex = finalShopifyResult.shopifyOrders.findIndex((o) => o.shopifyOrderId === order.shopifyOrderId);
+          // Get prepPartItems for this order from our tracking map
+          const prepPartItemsForOrder = prepPartItemsByOrder.get(order.shopifyOrderId) || [];
+          
+          return {
+            orderIndex,
+            orderId: order.orderId,
+            shopifyOrderId: order.shopifyOrderId,
+            prepPartItems: prepPartItemsForOrder,
+          };
+        }),
         failed: finalWmsResult.failures || [],
       },
       collectionPrep: collectionPrepId

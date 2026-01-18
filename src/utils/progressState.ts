@@ -29,6 +29,10 @@ export interface ProgressState {
       orderIndex: number;
       orderId: string;
       shopifyOrderId: string;
+      prepPartItems: Array<{
+        prepPartItemId: string;
+        partId: string;
+      }>;
     }>;
     failed: Array<{
       orderIndex: number;
