@@ -1,17 +1,22 @@
 import { z } from "zod";
 
-export const cleanupRequestSchema = z
-  .object({
-    batchId: z.string().uuid().optional(),
-    collectionPrepName: z.string().optional(),
-    tag: z.string().optional(),
-    dryRun: z.boolean().default(false),
-    skipConfirmation: z.boolean().default(false),
-  })
-  .refine((data) => data.batchId || data.collectionPrepName || data.tag, {
-    message: "Must provide one of: batchId, collectionPrepName, or tag",
-  });
+const baseCleanupRequestSchema = z.object({
+  batchId: z.string().uuid().optional(),
+  collectionPrepName: z.string().optional(),
+  tag: z.string().optional(),
+  dryRun: z.boolean().default(false),
+  skipConfirmation: z.boolean().default(false),
+});
 
-export type CleanupRequest = z.infer<typeof cleanupRequestSchema> & {
+export const cleanupRequestSchema = baseCleanupRequestSchema.refine(
+  (data) => data.batchId || data.collectionPrepName || data.tag,
+  {
+    message: "Must provide one of: batchId, collectionPrepName, or tag",
+  },
+);
+
+export type CleanupRequestBase = z.output<typeof cleanupRequestSchema>;
+
+export type CleanupRequest = CleanupRequestBase & {
   onProgress?: (current: number, total: number, entityType: string) => void;
 };
