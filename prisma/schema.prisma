@@ -338,6 +338,7 @@ model order {
 
   @@unique([shopifyOrderNumber, region])
   @@index([customerId], name: "idx_order_customerid")
+  @@index([sourceName, region], name: "idx_order_sourcename_region")
 }
 
 model variantOrder {
@@ -738,6 +739,7 @@ model shipment {
 
   @@unique([collectionPrepId, orderId])
   @@index([orderId], name: "idx_shipment_orderid")
+  @@index([collectionPrepId, region], name: "idx_shipment_collectionprepid_region")
 }
 
 model purchaseOrderCountry {
