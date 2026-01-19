@@ -315,6 +315,120 @@ To add or update customer addresses:
 
 For detailed information on configuration file formats, validation rules, and maintenance, see [`config/README.md`](config/README.md).
 
+## Cleanup Test Data
+
+The seeder provides a comprehensive cleanup feature to delete seeded test data from both Shopify and the WMS database.
+
+### Usage
+
+```bash
+# Cleanup by batch ID (recommended)
+npm run cleanup -- --batch-id <batch-id>
+
+# Cleanup by collection prep name
+npm run cleanup -- --collection-prep <prep-name>
+
+# Cleanup by custom tag
+npm run cleanup -- --tag <tag-name>
+
+# Dry-run (preview without deleting)
+npm run cleanup -- --batch-id <batch-id> --dry-run
+
+# Skip confirmation prompt (use with caution)
+npm run cleanup -- --batch-id <batch-id> --skip-confirmation
+```
+
+### What Gets Deleted
+
+Cleanup removes **all entities** associated with the specified tag:
+
+**Shopify:**
+
+- Orders (deleted if manual payment, archived if online gateway)
+
+**WMS Database:**
+
+- Orders
+- Variant orders (line items)
+- Preps
+- Prep parts
+- Prep part items
+- Shipments
+- Collection preps (if no longer referenced)
+- PnP entities (pnpOrderBox, associated pnpBox records)
+
+### Safety Features
+
+- **Confirmation Prompt**: Shows preview of entities to be deleted, requires explicit confirmation
+- **Dry-Run Mode**: Preview deletions without making changes
+- **Staging-Only**: Hard-coded guardrails prevent production cleanup
+- **Tag Validation**: Only allows cleanup of test tags (wms_seed, seed_batch_id, collection_prep)
+- **Transaction Safety**: WMS deletions use database transactions for atomicity
+- **Idempotent**: Safe to re-run if cleanup partially fails
+- **Hybrid Cleanup**: Deletes orders when possible (manual payment), archives when restricted (online gateway)
+
+### Examples
+
+**Cleanup a single batch:**
+
+```bash
+# Find batch ID from seeding output
+npm run seed my-config.json
+# Output: Batch ID: abc-123-def-456
+
+# Preview cleanup
+npm run cleanup -- --batch-id abc-123-def-456 --dry-run
+# Output: Would delete: 10 Shopify orders, 50 WMS entities
+
+# Confirm and delete
+npm run cleanup -- --batch-id abc-123-def-456
+# Prompts: Delete 10 Shopify orders and 50 WMS entities? [y/N]
+```
+
+**Cleanup by collection prep:**
+
+```bash
+# Use collection prep name from seeding output
+npm run cleanup -- --collection-prep Test-Canpar-Langley-1234 --dry-run
+```
+
+**Cleanup all seed data (use with caution):**
+
+```bash
+# Delete ALL orders tagged with wms_seed
+npm run cleanup -- --tag wms_seed --dry-run
+# Review carefully before confirming
+```
+
+### Troubleshooting
+
+**"No orders found with tag X"**
+
+- Verify tag exists in Shopify Admin → Orders → Filter by tag
+- Check for typos in batch ID or collection prep name
+
+**"Cleanup failed: Connection timeout"**
+
+- Database may be overloaded, retry in a few minutes
+- Check DATABASE_URL is accessible
+
+**"Some entities failed to delete"**
+
+- Cleanup uses continue-on-error pattern, check output for specific failures
+- Re-run cleanup command to retry failed entities (idempotent)
+
+**Partial cleanup (Shopify deleted, WMS remains):**
+
+1. Check cleanup logs for error details
+2. Re-run cleanup with same batch ID (will skip Shopify, retry WMS)
+3. If issues persist, contact database admin
+
+**Orders archived instead of deleted:**
+
+- This is expected for orders paid via online gateways (Shopify API restriction)
+- Archived orders are hidden from active orders list but remain in Shopify
+- All new seeded orders use manual payment and can be fully deleted
+
 ## Development
 
 ### Available Scripts
@@ -325,6 +439,12 @@ For detailed information on configuration file formats, validation rules, and ma
 - `npm run format`: Format code with Prettier
 - `npm run typecheck`: Type check without emitting files
 - `npm run seed <config-file.json>`: Run the seeder
+- `npm run cleanup -- [options]`: Delete seeded test data
+  - `--batch-id <id>`: Cleanup by batch ID
+  - `--collection-prep <name>`: Cleanup by collection prep name
+  - `--tag <tag>`: Cleanup by custom tag
+  - `--dry-run`: Preview without deleting
+  - `--skip-confirmation`: Skip confirmation prompt
 
 ### Project Structure
 
@@ -355,11 +475,12 @@ src/
 
 - **Staging-Only**: Hard-coded guardrails prevent production execution
 - **Idempotent**: Safe to re-run without creating duplicates
-- **Tagging**: All seed records tagged with batch IDs for easy cleanup
+- **Tagging**: All seed records tagged with batch IDs and collection prep names for easy cleanup
 - **Validation**: Comprehensive validation of SKUs, customers, and configuration
 - **Dry-Run Mode**: Preview changes before execution with `--dry-run` flag
 - **Offline Validation**: Validate config files without database connection using `--validate` flag
 - **Resume/Retry**: Resume failed operations with `--resume` flag, only retrying failed orders
+- **Manual Payment**: Orders use manual payment method, ensuring they can be deleted via Shopify API
 
 ## User Experience Features
 
