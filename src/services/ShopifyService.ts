@@ -1,5 +1,6 @@
 import { createAdminApiClient } from "@shopify/admin-api-client";
 import { v4 as uuidv4 } from "uuid";
+import pLimit from "p-limit";
 import { getEnvConfig } from "../config/env";
 import { Logger } from "../utils/logger";
 import type { GraphQLCostInfo } from "../shared/types/PerformanceMetrics";
@@ -796,5 +797,250 @@ export class ShopifyService {
         `Failed to find variants by SKUs: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
+
+  async cancelOrder(orderId: string): Promise<void> {
+    if (this.dryRun) {
+      Logger.info("DRY RUN: Would cancel order", { orderId });
+      return;
+    }
+
+    const mutation = `
+      mutation orderCancel($orderId: ID!) {
+        orderCancel(orderId: $orderId) {
+          order { id }
+          userErrors { message field }
+        }
+      }
+    `;
+
+    const variables = { orderId };
+
+    try {
+      const response = await this.client.request(mutation, { variables });
+
+      if (response.data?.orderCancel?.userErrors?.length > 0) {
+        const errors = response.data.orderCancel.userErrors;
+        throw new ShopifyServiceError(
+          `Failed to cancel order: ${errors.map((e: { message: string }) => e.message).join(", ")}`,
+          errors,
+        );
+      }
+
+      Logger.info("Order cancelled successfully", { orderId });
+    } catch (error) {
+      if (error instanceof ShopifyServiceError) {
+        throw error;
+      }
+      throw new ShopifyServiceError(
+        `Failed to cancel order: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  async archiveOrder(orderId: string): Promise<void> {
+    if (this.dryRun) {
+      Logger.info("DRY RUN: Would archive order", { orderId });
+      return;
+    }
+
+    const mutation = `
+      mutation orderUpdate($input: OrderInput!) {
+        orderUpdate(input: $input) {
+          order { id }
+          userErrors { message field }
+        }
+      }
+    `;
+
+    const variables = {
+      input: {
+        id: orderId,
+        archived: true,
+      },
+    };
+
+    try {
+      const response = await this.client.request(mutation, { variables });
+
+      if (response.data?.orderUpdate?.userErrors?.length > 0) {
+        const errors = response.data.orderUpdate.userErrors;
+        throw new ShopifyServiceError(
+          `Failed to archive order: ${errors.map((e: { message: string }) => e.message).join(", ")}`,
+          errors,
+        );
+      }
+
+      Logger.info("Order archived successfully", { orderId });
+    } catch (error) {
+      if (error instanceof ShopifyServiceError) {
+        throw error;
+      }
+      throw new ShopifyServiceError(
+        `Failed to archive order: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  async deleteOrder(orderId: string): Promise<void> {
+    if (this.dryRun) {
+      Logger.info("DRY RUN: Would delete order", { orderId });
+      return;
+    }
+
+    const mutation = `
+      mutation orderDelete($input: OrderDeleteInput!) {
+        orderDelete(input: $input) {
+          deletedOrderId
+          userErrors { message field code }
+        }
+      }
+    `;
+
+    const variables = { input: { id: orderId } };
+
+    try {
+      const response = await this.client.request(mutation, { variables });
+
+      if (response.data?.orderDelete?.userErrors?.length > 0) {
+        const errors = response.data.orderDelete.userErrors;
+        throw new ShopifyServiceError(
+          `Failed to delete order: ${errors.map((e: { message: string }) => e.message).join(", ")}`,
+          errors,
+        );
+      }
+
+      if (!response.data?.orderDelete?.deletedOrderId) {
+        throw new ShopifyServiceError("Order deletion returned no data");
+      }
+
+      Logger.info("Order deleted successfully", { orderId });
+    } catch (error) {
+      if (error instanceof ShopifyServiceError) {
+        throw error;
+      }
+      throw new ShopifyServiceError(
+        `Failed to delete order: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  async cleanupOrder(orderId: string): Promise<{
+    orderId: string;
+    method: "deleted" | "archived";
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      await this.deleteOrder(orderId);
+      return { orderId, method: "deleted", success: true };
+    } catch (deleteError) {
+      const errorMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
+
+      const isDeletionRestricted =
+        errorMessage.includes("cannot be deleted") ||
+        errorMessage.includes("payment") ||
+        errorMessage.includes("gateway") ||
+        errorMessage.toLowerCase().includes("delete");
+
+      if (isDeletionRestricted) {
+        Logger.warn("Order cannot be deleted (payment restriction), falling back to cancel + archive", {
+          orderId,
+          error: errorMessage,
+        });
+
+        try {
+          await this.cancelOrder(orderId);
+          await this.archiveOrder(orderId);
+
+          Logger.info("Order cancelled and archived successfully", { orderId });
+          return { orderId, method: "archived", success: true };
+        } catch (archiveError) {
+          const archiveErrorMessage = archiveError instanceof Error ? archiveError.message : String(archiveError);
+          Logger.error("Failed to cancel + archive order", archiveError, { orderId });
+          return {
+            orderId,
+            method: "archived",
+            success: false,
+            error: archiveErrorMessage,
+          };
+        }
+      }
+
+      Logger.error("Failed to delete order", deleteError, { orderId });
+      return {
+        orderId,
+        method: "deleted",
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  private async cleanupOrderWithRetry(
+    orderId: string,
+    maxRetries: number,
+  ): Promise<{
+    orderId: string;
+    method: "deleted" | "archived";
+    success: boolean;
+    error?: string;
+  }> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await this.cleanupOrder(orderId);
+        return result;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isRateLimit = errorMessage.includes("429") || errorMessage.includes("throttle");
+        const shouldRetry = isRateLimit && attempt < maxRetries;
+
+        if (shouldRetry) {
+          const delayMs = Math.pow(2, attempt) * 1000;
+          Logger.warn("Shopify rate limit hit, retrying", {
+            orderId,
+            attempt: attempt + 1,
+            maxRetries,
+            delayMs,
+          });
+          await this.sleep(delayMs);
+          continue;
+        }
+
+        return {
+          orderId,
+          method: "deleted",
+          success: false,
+          error: errorMessage,
+        };
+      }
+    }
+    throw new Error("Unreachable");
+  }
+
+  async cleanupOrders(orderIds: string[]): Promise<
+    Array<{
+      orderId: string;
+      method: "deleted" | "archived";
+      success: boolean;
+      error?: string;
+    }>
+  > {
+    const limit = pLimit(2);
+    const results = [];
+
+    for (const orderId of orderIds) {
+      results.push(
+        limit(async () => {
+          return this.cleanupOrderWithRetry(orderId, 3);
+        }),
+      );
+    }
+
+    return Promise.all(results);
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
