@@ -19,6 +19,7 @@
     "prisma:generate": "prisma generate",
     "seed": "tsx src/cli.ts",
     "generate-config": "tsx src/generateConfig.ts",
+    "cleanup": "tsx src/cleanup.ts",
     "prepare": "husky"
   },
   "devDependencies": {

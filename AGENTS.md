@@ -33,20 +33,27 @@ Project status: active development. Core seeder functionality is implemented and
 - DB/schema/migrations: `npm run prisma:generate`
 - Seed: `npm run seed <config-file.json>`
 - Generate config: `npm run generate-config`
+- Cleanup: `npm run cleanup -- --batch-id <id>` Delete test data by batch ID
 
 ## 3) Repository Map
 
 **Source Code:**
 
 - `src/` - Main source code
-  - `business/` - Business logic (handlers, use cases)
-  - `config/` - Configuration (env, staging guardrails)
-  - `repositories/` - Data access layer (Prisma)
-  - `services/` - External integrations (Shopify, WMS)
-  - `shared/` - Shared types, enums, validation
-  - `utils/` - Utilities (file reader, logger)
-  - `cli.ts` - CLI entry point
-  - `generateConfig.ts` - Interactive config generator
+- `business/` - Business logic (handlers, use cases)
+  - `cleanup/` - Cleanup feature (handlers, use cases)
+- `cli/` - CLI modules (args, validation, orchestration, output)
+  - `cleanupArgs.ts` - Cleanup argument parsing
+  - `cleanupOrchestration.ts` - Cleanup flow orchestration
+- `config/` - Configuration (env, staging guardrails)
+- `repositories/` - Data access layer (Prisma)
+- `services/` - External integrations (Shopify, WMS)
+  - `WmsCleanupService.ts` - WMS cleanup coordination
+- `shared/` - Shared types, enums, validation
+- `utils/` - Utilities (file reader, logger)
+- `cli.ts` - Seeding CLI entry point
+- `cleanup.ts` - Cleanup CLI entry point
+- `generateConfig.ts` - Interactive config generator
 
 **Configuration:**
 
@@ -116,6 +123,15 @@ Project status: active development. Core seeder functionality is implemented and
 - Do prefer declarative array methods and safe async patterns (`for...of` or `Promise.all`).
 - Don't hardcode secrets; use environment variables and keep `.env` files out of git.
 - Don't use async callbacks in `forEach`.
+
+### Cleanup Operations
+
+- Do use transactions for WMS entity deletions (atomicity).
+- Do validate tags before cleanup (only test tags allowed: wms_seed, seed_batch_id, collection_prep).
+- Do implement continue-on-error pattern (collect failures, don't abort).
+- Do use hybrid cleanup for Shopify (delete manual payment orders, archive online gateway orders).
+- Don't delete collection preps if still referenced by other batches (safety check required).
+- Don't bypass staging guardrails (cleanup is staging-only).
 
 ### Documentation Standards (Website Rebuild)
 
