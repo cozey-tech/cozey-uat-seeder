@@ -282,6 +282,7 @@ export class ShopifyService {
             },
           ],
           lineItems: lineItems,
+          useCustomerDefaultAddress: false, // Force manual payment for deletable test orders
           ...(shippingAddress && { shippingAddress }),
         },
       };
@@ -381,7 +382,7 @@ export class ShopifyService {
 
     const variables = {
       id: draftOrderId,
-      paymentPending: false, // Mark as paid immediately so fulfillment can proceed
+      paymentPending: false, // Mark as paid via manual payment (no gateway = deletable order)
     };
 
     try {
