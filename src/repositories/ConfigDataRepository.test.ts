@@ -176,6 +176,10 @@ describe("ConfigDataRepository", () => {
           id: "customer-1",
           name: "Test Customer",
           email: "test@example.com",
+          address: "123 Main St",
+          city: "Vancouver",
+          province: "BC",
+          postalCode: "V6C 1S4",
           region: "CA",
           locationId: "langley",
         },
@@ -215,6 +219,46 @@ describe("ConfigDataRepository", () => {
       vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ customers: invalidCustomers }));
 
       await expect(repository.getCustomers()).rejects.toThrow("Customer customer-1 is missing locationId");
+    });
+
+    it("should throw error if customer missing address fields", async () => {
+      const invalidCustomers = [
+        {
+          id: "customer-1",
+          name: "Test Customer",
+          email: "test@example.com",
+          region: "CA",
+          locationId: "langley",
+          // Missing address, city, province, postalCode
+        },
+      ];
+
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ customers: invalidCustomers }));
+
+      await expect(repository.getCustomers()).rejects.toThrow(
+        "Customer customer-1 is missing required address fields: address, city, province, postalCode",
+      );
+    });
+
+    it("should throw error if customer missing some address fields", async () => {
+      const invalidCustomers = [
+        {
+          id: "customer-1",
+          name: "Test Customer",
+          email: "test@example.com",
+          address: "123 Main St",
+          city: "Vancouver",
+          region: "CA",
+          locationId: "langley",
+          // Missing province and postalCode
+        },
+      ];
+
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ customers: invalidCustomers }));
+
+      await expect(repository.getCustomers()).rejects.toThrow(
+        "Customer customer-1 is missing required address fields: province, postalCode",
+      );
     });
   });
 

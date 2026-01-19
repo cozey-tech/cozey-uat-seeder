@@ -210,10 +210,21 @@ export class ConfigDataRepository {
       const fileContent = readFileSync(configPath, "utf-8");
       const config: CustomersConfig = JSON.parse(fileContent);
 
-      // Validate that all customers have locationId
+      // Validate that all customers have required fields
       for (const customer of config.customers) {
         if (!customer.locationId) {
           throw new Error(`Customer ${customer.id} is missing locationId`);
+        }
+
+        // Validate address fields (required for order creation)
+        const missingFields: string[] = [];
+        if (!customer.address) missingFields.push("address");
+        if (!customer.city) missingFields.push("city");
+        if (!customer.province) missingFields.push("province");
+        if (!customer.postalCode) missingFields.push("postalCode");
+
+        if (missingFields.length > 0) {
+          throw new Error(`Customer ${customer.id} is missing required address fields: ${missingFields.join(", ")}`);
         }
       }
 
