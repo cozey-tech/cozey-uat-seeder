@@ -156,6 +156,17 @@ export interface WmsRepository {
   findCollectionPrepById(id: string, region: string): Promise<ICollectionPrep | null>;
   findCollectionPrepsByIds(ids: string[], region: string): Promise<ICollectionPrep[]>;
   previewBatchDeletion(shopifyOrderIds: string[]): Promise<Map<string, IDeletionPreview>>;
+  // Delete methods
+  deleteOrderEntitiesTransaction(shopifyOrderId: string): Promise<{
+    deletedPnpOrderBoxes: number;
+    deletedPrepPartItems: number;
+    deletedPrepParts: number;
+    deletedPreps: number;
+    deletedShipments: number;
+    deletedVariantOrders: number;
+    deletedOrder: boolean;
+  }>;
+  deleteCollectionPrep(id: string, region: string): Promise<boolean>;
   // Transaction methods
   createOrderWithCustomerTransaction(
     order: CreateOrderRequest,

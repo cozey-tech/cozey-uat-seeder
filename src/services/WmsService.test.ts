@@ -34,6 +34,8 @@ describe("WmsService", () => {
       findCollectionPrepById: vi.fn(),
       findCollectionPrepsByIds: vi.fn(),
       previewBatchDeletion: vi.fn(),
+      deleteOrderEntitiesTransaction: vi.fn(),
+      deleteCollectionPrep: vi.fn(),
       createCustomer: vi.fn(),
       createOrderWithCustomerTransaction: vi.fn(),
       createOrderEntitiesTransaction: vi.fn(),

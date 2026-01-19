@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import type {
   WmsRepository,
   CreateOrderRequest,
@@ -18,6 +18,7 @@ import type {
   IDeletionPreview,
 } from "../interface/WmsRepository";
 import { WmsRepositoryError } from "../errors/WmsRepositoryError";
+import { Logger } from "../../utils/logger";
 
 export class WmsPrismaRepository implements WmsRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -521,6 +522,156 @@ export class WmsPrismaRepository implements WmsRepository {
         },
       ]),
     );
+  }
+
+  private async executeWithRetry<T>(operation: () => Promise<T>, context: string, maxRetries: number = 3): Promise<T> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: unknown) {
+        const prismaError = error as { code?: string };
+        const isRetryable =
+          prismaError.code === "P2034" || // Transaction conflict
+          prismaError.code === "P2024" || // Connection timeout
+          prismaError.code === "P1001"; // Connection refused
+
+        if (isRetryable && attempt < maxRetries) {
+          const delayMs = Math.pow(2, attempt) * 1000;
+          Logger.warn("Retrying transient error", {
+            context,
+            attempt: attempt + 1,
+            maxRetries,
+            delayMs,
+            errorCode: prismaError.code,
+          });
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error("Unreachable");
+  }
+
+  async deleteOrderEntitiesTransaction(shopifyOrderId: string): Promise<{
+    deletedPnpOrderBoxes: number;
+    deletedPrepPartItems: number;
+    deletedPrepParts: number;
+    deletedPreps: number;
+    deletedShipments: number;
+    deletedVariantOrders: number;
+    deletedOrder: boolean;
+  }> {
+    return this.executeWithRetry(
+      () =>
+        this.prisma.$transaction(
+          async (tx) => {
+            const order = await tx.order.findUnique({ where: { shopifyOrderId } });
+            if (!order) {
+              return {
+                deletedPnpOrderBoxes: 0,
+                deletedPrepPartItems: 0,
+                deletedPrepParts: 0,
+                deletedPreps: 0,
+                deletedShipments: 0,
+                deletedVariantOrders: 0,
+                deletedOrder: false,
+              };
+            }
+
+            const preps = await tx.prep.findMany({
+              where: { orderId: shopifyOrderId },
+              select: { prep: true, region: true },
+            });
+            const prepIds = preps.map((p) => p.prep);
+
+            const prepParts = await tx.prepPart.findMany({
+              where: {
+                prepId: { in: prepIds },
+                region: order.region,
+              },
+              select: { id: true },
+            });
+            const prepPartIds = prepParts.map((pp) => pp.id);
+
+            const pnpOrderBoxIds = await tx.prepPartItem
+              .findMany({
+                where: { prepPartId: { in: prepPartIds } },
+                select: { pnpOrderBoxId: true },
+              })
+              .then((items) => items.map((i) => i.pnpOrderBoxId).filter((id): id is string => id !== null));
+
+            const deletedPnpOrderBoxes = await tx.pnpOrderBox.deleteMany({
+              where: { id: { in: pnpOrderBoxIds } },
+            });
+
+            const deletedPrepPartItems = await tx.prepPartItem.deleteMany({
+              where: { prepPartId: { in: prepPartIds } },
+            });
+
+            const deletedPrepParts = await tx.prepPart.deleteMany({
+              where: { prepId: { in: prepIds }, region: order.region },
+            });
+
+            const deletedPreps = await tx.prep.deleteMany({
+              where: {
+                OR: preps.map((p) => ({
+                  prep: p.prep,
+                  region: p.region,
+                })),
+              },
+            });
+
+            const deletedShipments = await tx.shipment.deleteMany({
+              where: { orderId: shopifyOrderId },
+            });
+
+            const deletedVariantOrders = await tx.variantOrder.deleteMany({
+              where: { orderId: shopifyOrderId },
+            });
+
+            await tx.order.delete({ where: { shopifyOrderId } });
+
+            return {
+              deletedPnpOrderBoxes: deletedPnpOrderBoxes.count,
+              deletedPrepPartItems: deletedPrepPartItems.count,
+              deletedPrepParts: deletedPrepParts.count,
+              deletedPreps: deletedPreps.count,
+              deletedShipments: deletedShipments.count,
+              deletedVariantOrders: deletedVariantOrders.count,
+              deletedOrder: true,
+            };
+          },
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            maxWait: 5000,
+            timeout: 30000,
+          },
+        ),
+      `deleteOrderEntities:${shopifyOrderId}`,
+    );
+  }
+
+  async deleteCollectionPrep(id: string, region: string): Promise<boolean> {
+    const referencingPreps = await this.prisma.prep.count({
+      where: { collectionPrepId: id, region },
+    });
+
+    if (referencingPreps > 0) {
+      Logger.warn("Collection prep still referenced, skipping deletion", {
+        collectionPrepId: id,
+        region,
+        referencingPreps,
+      });
+      return false;
+    }
+
+    await this.prisma.collectionPrep.delete({
+      where: { id_region: { id, region } },
+    });
+
+    Logger.info("Collection prep deleted", { collectionPrepId: id, region });
+    return true;
   }
 
   async createCustomer(customer: { id: string; name: string; email?: string; region: string }): Promise<unknown> {
