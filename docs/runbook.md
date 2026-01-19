@@ -55,6 +55,112 @@ The seeder enforces staging-only execution via hard-coded guardrails:
 
 ## Common Issues & Solutions
 
+### Address Validation Failures
+
+**Symptom:**
+
+```
+Error: Customer <id> has invalid postal code format: "<code>"
+Error: Customer <id> is missing required address fields: <fields>
+```
+
+Or Shopify API errors during draft order creation related to shipping address.
+
+**Causes:**
+
+- Customer address fields missing in `config/customers.json`
+- Postal code format doesn't match CA (A1A 1A1) or US (12345) format
+- Address doesn't pass Shopify's address validation
+- Postal code doesn't match any carrier routing rules
+
+**Diagnosis:**
+
+1. **Check customer data in `config/customers.json`:**
+
+   ```bash
+   cat config/customers.json | jq '.customers[] | select(.id=="<customer-id>")'
+   ```
+
+2. **Verify postal code format:**
+   - **Canadian**: Must match `A1A 1A1` or `A1A1A1` (letter-number-letter space? number-letter-number)
+   - **US**: Must match `12345` or `12345-6789` (5 or 9 digits)
+
+3. **Verify all required address fields present:**
+   - `address` (street address)
+   - `city`
+   - `province` (2-letter code)
+   - `postalCode`
+
+4. **Validate postal code against carriers:**
+
+   ```bash
+   npx tsx scripts/validate-customer-postal-codes.ts
+   ```
+
+   This checks if the postal code prefix matches any carrier's routing rules.
+
+**Solution:**
+
+1. Update address in `config/customers.json` with valid format (see `config/README.md` for guidelines)
+2. Ensure postal code matches correct format for region
+3. Verify postal code appears in at least one carrier's list (or use addresses serviced by national carriers)
+4. Validate changes:
+   ```bash
+   npx tsx scripts/validate-customer-postal-codes.ts
+   npm run seed <config> --validate
+   npm run seed <config> --dry-run
+   ```
+
+**Prevention:**
+
+- Use real addresses from public buildings or government facilities
+- Validate postal codes against carrier lists before committing changes (run validation script)
+- Run `--validate` and `--dry-run` after any address updates
+- See `config/README.md` for address selection guidelines
+
+### Configuration File Issues
+
+**Symptom:**
+
+```
+Error: Customers config file not found at config/customers.json
+Error: Customer X is missing locationId
+JSON parsing errors
+```
+
+**Causes:**
+
+- `config/customers.json` file missing or corrupted
+- Invalid JSON syntax
+- Required fields missing from customer records
+- Location IDs don't match WMS database locations
+
+**Diagnosis:**
+
+1. Verify file exists:
+
+   ```bash
+   ls -la config/customers.json
+   ```
+
+2. Check JSON syntax:
+
+   ```bash
+   jq . config/customers.json
+   ```
+
+3. Verify required fields present (see `config/README.md`)
+4. Check location IDs match WMS database
+
+**Solution:**
+
+1. If file missing: Copy from template or restore from git history
+2. If JSON invalid: Fix syntax errors (missing commas, quotes, brackets)
+3. If fields missing: Add required fields following format in `config/README.md`
+4. If location IDs invalid: Update to match WMS database or add locations to DB
+
+For configuration file format details, see [`config/README.md`](../config/README.md).
+
 ### Staging Guardrail Violation
 
 **Symptom:**
