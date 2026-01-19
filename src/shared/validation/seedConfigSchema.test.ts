@@ -195,5 +195,149 @@ describe("seedConfigSchema", () => {
       const result = seedConfigSchema.safeParse(invalidConfig);
       expect(result.success).toBe(false);
     });
+
+    it("should reject invalid Canadian postal code format", () => {
+      const invalidConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test Customer",
+              email: "test@example.com",
+              postalCode: "123456", // Invalid format
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 1,
+                pickType: "Regular" as const,
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = seedConfigSchema.safeParse(invalidConfig);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject invalid US ZIP code format", () => {
+      const invalidConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test Customer",
+              email: "test@example.com",
+              postalCode: "1234", // Too short
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 1,
+                pickType: "Regular" as const,
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = seedConfigSchema.safeParse(invalidConfig);
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept valid Canadian postal codes with space", () => {
+      const validConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test Customer",
+              email: "test@example.com",
+              postalCode: "V6C 1S4", // Valid with space
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 1,
+                pickType: "Regular" as const,
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = seedConfigSchema.safeParse(validConfig);
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept valid Canadian postal codes without space", () => {
+      const validConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test Customer",
+              email: "test@example.com",
+              postalCode: "V6C1S4", // Valid without space
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 1,
+                pickType: "Regular" as const,
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = seedConfigSchema.safeParse(validConfig);
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept valid US ZIP codes (5-digit)", () => {
+      const validConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test Customer",
+              email: "test@example.com",
+              postalCode: "90001", // Valid 5-digit
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 1,
+                pickType: "Regular" as const,
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = seedConfigSchema.safeParse(validConfig);
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept valid US ZIP codes (9-digit)", () => {
+      const validConfig = {
+        orders: [
+          {
+            customer: {
+              name: "Test Customer",
+              email: "test@example.com",
+              postalCode: "90001-1234", // Valid 9-digit
+            },
+            lineItems: [
+              {
+                sku: "SKU-001",
+                quantity: 1,
+                pickType: "Regular" as const,
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = seedConfigSchema.safeParse(validConfig);
+      expect(result.success).toBe(true);
+    });
   });
 });

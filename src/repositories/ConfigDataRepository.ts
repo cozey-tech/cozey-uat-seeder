@@ -2,6 +2,10 @@ import { PrismaClient } from "@prisma/client";
 import { readFileSync } from "fs";
 import { join } from "path";
 
+// Postal code format validation patterns
+const CA_POSTAL_CODE_REGEX = /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/i; // A1A 1A1 or A1A1A1
+const US_ZIP_CODE_REGEX = /^\d{5}(-\d{4})?$/; // 12345 or 12345-6789
+
 export interface Customer {
   id: string;
   name: string;
@@ -210,10 +214,34 @@ export class ConfigDataRepository {
       const fileContent = readFileSync(configPath, "utf-8");
       const config: CustomersConfig = JSON.parse(fileContent);
 
-      // Validate that all customers have locationId
+      // Validate that all customers have required fields
       for (const customer of config.customers) {
         if (!customer.locationId) {
           throw new Error(`Customer ${customer.id} is missing locationId`);
+        }
+
+        // Validate address fields (required for order creation)
+        const missingFields: string[] = [];
+        if (!customer.address) missingFields.push("address");
+        if (!customer.city) missingFields.push("city");
+        if (!customer.province) missingFields.push("province");
+        if (!customer.postalCode) missingFields.push("postalCode");
+
+        if (missingFields.length > 0) {
+          throw new Error(`Customer ${customer.id} is missing required address fields: ${missingFields.join(", ")}`);
+        }
+
+        // Validate postal code format
+        const isValidPostalCode =
+          customer.region === "CA"
+            ? CA_POSTAL_CODE_REGEX.test(customer.postalCode!)
+            : US_ZIP_CODE_REGEX.test(customer.postalCode!);
+
+        if (!isValidPostalCode) {
+          const expectedFormat = customer.region === "CA" ? "A1A 1A1 or A1A1A1" : "12345 or 12345-6789";
+          throw new Error(
+            `Customer ${customer.id} has invalid postal code format: "${customer.postalCode}". Expected format for ${customer.region}: ${expectedFormat}`,
+          );
         }
       }
 

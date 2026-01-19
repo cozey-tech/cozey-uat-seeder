@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+// Postal code format validation patterns
+const CA_POSTAL_CODE_REGEX = /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/i; // A1A 1A1 or A1A1A1
+const US_ZIP_CODE_REGEX = /^\d{5}(-\d{4})?$/; // 12345 or 12345-6789
+
 const collectionPrepSchema = z.object({
   carrier: z.string(),
   locationId: z.string(),
@@ -22,7 +26,20 @@ export const seedConfigSchema = z.object({
         address: z.string().optional(),
         city: z.string().optional(),
         province: z.string().optional(),
-        postalCode: z.string().optional(),
+        postalCode: z
+          .string()
+          .refine(
+            (code) => {
+              if (!code) return true; // Allow missing (validated elsewhere)
+              // Detect region based on format (rough heuristic: letters = CA, numbers = US)
+              const hasLetters = /[A-Z]/i.test(code);
+              return hasLetters ? CA_POSTAL_CODE_REGEX.test(code) : US_ZIP_CODE_REGEX.test(code);
+            },
+            {
+              message: "Invalid postal code format (expected: A1A 1A1 or A1A1A1 for CA, 12345 or 12345-6789 for US)",
+            },
+          )
+          .optional(),
       }),
       lineItems: z.array(
         z.object({
