@@ -280,6 +280,41 @@ Example `seed-config.json`:
 }
 ```
 
+## Configuration Files
+
+The seeder uses JSON configuration files in the `config/` directory for pre-defined reference data:
+
+### config/customers.json
+
+Pre-defined customer data for each warehouse location (15 customers across 5 fulfillment centers). Each customer has a validated address near their assigned warehouse location.
+
+**Structure**: Each customer includes id, name, email, address, city, province, postalCode, region, and locationId.
+
+**Validation**: All addresses are real public building addresses that pass Shopify validation and match carrier routing rules.
+
+### config/carriers.json
+
+Carrier definitions and postal code routing rules. Includes both national carriers (FedEx, Nationex, Puro, Canpar) that serve all postal codes, and regional carriers (GoBolt variants, GLS) that serve specific postal code ranges.
+
+### config/orderTemplates.json
+
+Optional file created by the config generator when saving order templates. Allows quick reuse of common order configurations.
+
+### Modifying Customer Data
+
+To add or update customer addresses:
+
+1. Edit `config/customers.json` following the format guidelines in [`config/README.md`](config/README.md)
+2. Ensure addresses are real (Shopify validates addresses)
+3. Verify postal codes match format requirements:
+   - Canadian: `A1A 1A1` or `A1A1A1`
+   - US: `12345` or `12345-6789`
+4. Validate postal codes against carrier routing: `npx tsx scripts/validate-customer-postal-codes.ts`
+5. Test configuration: `npm run seed <config> --validate`
+6. Test in dry-run mode: `npm run seed <config> --dry-run`
+
+For detailed information on configuration file formats, validation rules, and maintenance, see [`config/README.md`](config/README.md).
+
 ## Development
 
 ### Available Scripts
