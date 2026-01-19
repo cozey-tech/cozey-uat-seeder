@@ -68,7 +68,7 @@ export class WmsCleanupService {
 
   async deleteOrdersWithEntities(
     shopifyOrderIds: string[],
-    onProgress?: (current: number, total: number) => void,
+    onProgress?: (current: number, total: number, entityType: string) => void,
   ): Promise<{
     successful: Array<{
       shopifyOrderId: string;
@@ -121,7 +121,7 @@ export class WmsCleanupService {
       }
 
       completed++;
-      onProgress?.(completed, total);
+      onProgress?.(completed, total, "wms_order");
     }
 
     return { successful, failed };
