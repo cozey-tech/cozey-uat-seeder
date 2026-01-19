@@ -109,6 +109,22 @@ export interface IShipment {
   status: string;
 }
 
+export interface IPrep {
+  prep: string;
+  region: string;
+  orderId: string;
+  collectionPrepId: string | null;
+}
+
+export interface IDeletionPreview {
+  prepPartItems: number;
+  prepParts: number;
+  preps: number;
+  shipments: number;
+  variantOrders: number;
+  pnpOrderBoxes: number;
+}
+
 export interface WmsRepository {
   createOrder(order: CreateOrderRequest): Promise<IOrder>;
   createVariantOrder(variantOrder: CreateVariantOrderRequest): Promise<unknown>;
@@ -132,6 +148,14 @@ export interface WmsRepository {
   findCustomerByEmail(email: string, region: string): Promise<{ id: string; name: string; email?: string } | null>;
   createCustomer(customer: { id: string; name: string; email?: string; region: string }): Promise<unknown>;
   findOrderByShopifyId(shopifyOrderId: string): Promise<IOrder | null>;
+  // Query methods for cleanup
+  findOrdersByShopifyIds(shopifyOrderIds: string[]): Promise<IOrder[]>;
+  findOrdersBySourceName(sourceName: string, region?: string): Promise<IOrder[]>;
+  findPrepsByOrderIds(orderIds: string[], region: string): Promise<IPrep[]>;
+  findShipmentsByOrderIds(orderIds: string[]): Promise<IShipment[]>;
+  findCollectionPrepById(id: string, region: string): Promise<ICollectionPrep | null>;
+  findCollectionPrepsByIds(ids: string[], region: string): Promise<ICollectionPrep[]>;
+  previewBatchDeletion(shopifyOrderIds: string[]): Promise<Map<string, IDeletionPreview>>;
   // Transaction methods
   createOrderWithCustomerTransaction(
     order: CreateOrderRequest,

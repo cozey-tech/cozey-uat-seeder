@@ -14,6 +14,8 @@ import type {
   IOrder,
   ICollectionPrep,
   IShipment,
+  IPrep,
+  IDeletionPreview,
 } from "../interface/WmsRepository";
 import { WmsRepositoryError } from "../errors/WmsRepositoryError";
 
@@ -366,6 +368,159 @@ export class WmsPrismaRepository implements WmsRepository {
     });
 
     return order;
+  }
+
+  async findOrdersByShopifyIds(shopifyOrderIds: string[]): Promise<IOrder[]> {
+    const orders = await this.prisma.order.findMany({
+      where: {
+        shopifyOrderId: { in: shopifyOrderIds },
+      },
+      select: {
+        id: true,
+        shopifyOrderId: true,
+        shopifyOrderNumber: true,
+        status: true,
+        region: true,
+      },
+    });
+
+    return orders;
+  }
+
+  async findOrdersBySourceName(sourceName: string, region?: string): Promise<IOrder[]> {
+    const orders = await this.prisma.order.findMany({
+      where: {
+        sourceName,
+        ...(region && { region }),
+      },
+      select: {
+        id: true,
+        shopifyOrderId: true,
+        shopifyOrderNumber: true,
+        status: true,
+        region: true,
+      },
+    });
+
+    return orders;
+  }
+
+  async findPrepsByOrderIds(orderIds: string[], region: string): Promise<IPrep[]> {
+    const preps = await this.prisma.prep.findMany({
+      where: {
+        orderId: { in: orderIds },
+        region,
+      },
+      select: {
+        prep: true,
+        region: true,
+        orderId: true,
+        collectionPrepId: true,
+      },
+    });
+
+    return preps;
+  }
+
+  async findShipmentsByOrderIds(orderIds: string[]): Promise<IShipment[]> {
+    const shipments = await this.prisma.shipment.findMany({
+      where: {
+        orderId: { in: orderIds },
+      },
+      select: {
+        id: true,
+        collectionPrepId: true,
+        orderId: true,
+        status: true,
+      },
+    });
+
+    return shipments;
+  }
+
+  async findCollectionPrepById(id: string, region: string): Promise<ICollectionPrep | null> {
+    const collectionPrep = await this.prisma.collectionPrep.findUnique({
+      where: {
+        id_region: { id, region },
+      },
+      select: {
+        id: true,
+        region: true,
+        carrier: true,
+        locationId: true,
+        prepDate: true,
+        boxes: true,
+      },
+    });
+
+    return collectionPrep;
+  }
+
+  async findCollectionPrepsByIds(ids: string[], region: string): Promise<ICollectionPrep[]> {
+    const collectionPreps = await this.prisma.collectionPrep.findMany({
+      where: {
+        id: { in: ids },
+        region,
+      },
+      select: {
+        id: true,
+        region: true,
+        carrier: true,
+        locationId: true,
+        prepDate: true,
+        boxes: true,
+      },
+    });
+
+    return collectionPreps;
+  }
+
+  async previewBatchDeletion(shopifyOrderIds: string[]): Promise<Map<string, IDeletionPreview>> {
+    const orders = await this.prisma.order.findMany({
+      where: {
+        shopifyOrderId: { in: shopifyOrderIds },
+      },
+      include: {
+        preps: {
+          include: {
+            prepPart: {
+              include: {
+                prepPartItem: {
+                  select: {
+                    id: true,
+                    pnpOrderBoxId: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        variantOrder: { select: { lineItemId: true } },
+        shipments: { select: { id: true } },
+      },
+    });
+
+    return new Map(
+      orders.map((order) => [
+        order.shopifyOrderId,
+        {
+          preps: order.preps.length,
+          prepParts: order.preps.reduce((sum, p) => sum + p.prepPart.length, 0),
+          prepPartItems: order.preps.reduce(
+            (sum, p) => sum + p.prepPart.reduce((s2, pp) => s2 + pp.prepPartItem.length, 0),
+            0,
+          ),
+          pnpOrderBoxes: order.preps.reduce(
+            (sum, p) =>
+              sum +
+              p.prepPart.reduce((s2, pp) => s2 + pp.prepPartItem.filter((ppi) => ppi.pnpOrderBoxId !== null).length, 0),
+            0,
+          ),
+          variantOrders: order.variantOrder.length,
+          shipments: order.shipments.length,
+        },
+      ]),
+    );
   }
 
   async createCustomer(customer: { id: string; name: string; email?: string; region: string }): Promise<unknown> {
