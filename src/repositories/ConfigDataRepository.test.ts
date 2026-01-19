@@ -260,6 +260,114 @@ describe("ConfigDataRepository", () => {
         "Customer customer-1 is missing required address fields: province, postalCode",
       );
     });
+
+    it("should throw error if Canadian postal code has invalid format", async () => {
+      const invalidCustomers = [
+        {
+          id: "customer-1",
+          name: "Test Customer",
+          email: "test@example.com",
+          address: "123 Main St",
+          city: "Vancouver",
+          province: "BC",
+          postalCode: "123456", // Invalid format
+          region: "CA",
+          locationId: "langley",
+        },
+      ];
+
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ customers: invalidCustomers }));
+
+      await expect(repository.getCustomers()).rejects.toThrow(
+        'Customer customer-1 has invalid postal code format: "123456". Expected format for CA: A1A 1A1 or A1A1A1',
+      );
+    });
+
+    it("should throw error if US ZIP code has invalid format", async () => {
+      const invalidCustomers = [
+        {
+          id: "customer-1",
+          name: "Test Customer",
+          email: "test@example.com",
+          address: "123 Main St",
+          city: "Los Angeles",
+          province: "CA",
+          postalCode: "1234", // Invalid format (too short)
+          region: "US",
+          locationId: "moreno",
+        },
+      ];
+
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ customers: invalidCustomers }));
+
+      await expect(repository.getCustomers()).rejects.toThrow(
+        'Customer customer-1 has invalid postal code format: "1234". Expected format for US: 12345 or 12345-6789',
+      );
+    });
+
+    it("should accept valid Canadian postal codes (with and without space)", async () => {
+      const validCustomers = [
+        {
+          id: "customer-1",
+          name: "Test Customer",
+          email: "test@example.com",
+          address: "123 Main St",
+          city: "Vancouver",
+          province: "BC",
+          postalCode: "V6C 1S4", // With space
+          region: "CA",
+          locationId: "langley",
+        },
+        {
+          id: "customer-2",
+          name: "Test Customer 2",
+          email: "test2@example.com",
+          address: "456 Oak St",
+          city: "Toronto",
+          province: "ON",
+          postalCode: "M5H2N2", // Without space
+          region: "CA",
+          locationId: "windsor",
+        },
+      ];
+
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ customers: validCustomers }));
+
+      const result = await repository.getCustomers();
+      expect(result).toHaveLength(2);
+    });
+
+    it("should accept valid US ZIP codes (5 and 9 digit)", async () => {
+      const validCustomers = [
+        {
+          id: "customer-1",
+          name: "Test Customer",
+          email: "test@example.com",
+          address: "123 Main St",
+          city: "Los Angeles",
+          province: "CA",
+          postalCode: "90001", // 5 digit
+          region: "US",
+          locationId: "moreno",
+        },
+        {
+          id: "customer-2",
+          name: "Test Customer 2",
+          email: "test2@example.com",
+          address: "456 Oak St",
+          city: "Dayton",
+          province: "NJ",
+          postalCode: "08810-1234", // 9 digit
+          region: "US",
+          locationId: "dayton",
+        },
+      ];
+
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ customers: validCustomers }));
+
+      const result = await repository.getCustomers();
+      expect(result).toHaveLength(2);
+    });
   });
 
   describe("getLocations", () => {
