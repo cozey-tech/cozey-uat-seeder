@@ -1,0 +1,48 @@
+{
+  "region": "CA",
+  "collectionPrep": {
+    "carrier": "FedEx",
+    "locationId": "langley",
+    "region": "CA",
+    "prepDate": "2026-01-20T10:00:00Z",
+    "testTag": "address-validation-test"
+  },
+  "orders": [
+    {
+      "orderType": "regular-only",
+      "customer": {
+        "name": "Test Customer Langley 1",
+        "email": "test-langley-1@example.com",
+        "address": "200 Granville Street",
+        "city": "Vancouver",
+        "province": "BC",
+        "postalCode": "V6C 1S4"
+      },
+      "lineItems": [
+        {
+          "sku": "SOFA-001",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ]
+    },
+    {
+      "orderType": "regular-only",
+      "customer": {
+        "name": "Test Customer Windsor 1",
+        "email": "test-windsor-1@example.com",
+        "address": "350 City Hall Square West",
+        "city": "Windsor",
+        "province": "ON",
+        "postalCode": "N9A 6S1"
+      },
+      "lineItems": [
+        {
+          "sku": "SOFA-002",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ]
+    }
+  ]
+}
