@@ -176,6 +176,21 @@ export class ShopifyService {
     return `${prefix}${truncatedBatchId}`;
   }
 
+  formatCollectionPrepTag(collectionPrepName: string): string {
+    const prefix = "collection_prep:";
+    const maxTagLength = 40;
+    const maxNameLength = maxTagLength - prefix.length;
+
+    // Replace each space with underscore for tag compatibility (preserve multiple spaces)
+    const sanitizedName = collectionPrepName.replace(/\s/g, "_");
+
+    // Truncate if needed to fit within 40 character limit
+    const truncatedName =
+      sanitizedName.length > maxNameLength ? sanitizedName.substring(0, maxNameLength) : sanitizedName;
+
+    return `${prefix}${truncatedName}`;
+  }
+
   /**
    * @param input - Customer and line items for the draft order
    * @param batchId - Unique batch ID for tagging (format: wms_seed_<batchId>)
@@ -270,11 +285,17 @@ export class ShopifyService {
         note = `WMS Seed Order - Batch: ${batchId}\nCollection Prep: ${collectionPrepName}`;
       }
 
+      // Build tags array: always include wms_seed and batch ID, optionally add collection prep tag
+      const tags = [`wms_seed`, this.formatBatchTag(batchId)];
+      if (collectionPrepName) {
+        tags.push(this.formatCollectionPrepTag(collectionPrepName));
+      }
+
       const variables = {
         input: {
           email: input.customer.email,
           note,
-          tags: [`wms_seed`, this.formatBatchTag(batchId)],
+          tags,
           customAttributes: [
             {
               key: "seed_batch_id",

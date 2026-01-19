@@ -327,6 +327,39 @@ describe("ShopifyService", () => {
     });
   });
 
+  describe("formatCollectionPrepTag", () => {
+    it("should format collection prep tag correctly", () => {
+      const tag = service.formatCollectionPrepTag("Test-Canpar-Langley-1234");
+      expect(tag).toBe("collection_prep:Test-Canpar-Langley-1234");
+    });
+
+    it("should replace spaces with underscores", () => {
+      const tag = service.formatCollectionPrepTag("Test Canpar Langley 1234");
+      expect(tag).toBe("collection_prep:Test_Canpar_Langley_1234");
+    });
+
+    it("should truncate long collection prep names to fit 40 character limit", () => {
+      const longName = "VeryLongCollectionPrepName-WithCarrier-Location-UUID-12345678";
+      const tag = service.formatCollectionPrepTag(longName);
+      expect(tag.length).toBe(40);
+      expect(tag.startsWith("collection_prep:")).toBe(true);
+      // Prefix is 16 chars, so name gets 24 chars
+      expect(tag).toBe("collection_prep:VeryLongCollectionPrepNa");
+    });
+
+    it("should handle collection prep names with multiple spaces", () => {
+      const tag = service.formatCollectionPrepTag("Test  Multiple   Spaces");
+      expect(tag).toBe("collection_prep:Test__Multiple___Spaces");
+    });
+
+    it("should handle collection prep names exactly at the limit", () => {
+      const prepName = "a".repeat(24); // 24 chars (prefix is 16, total = 40)
+      const tag = service.formatCollectionPrepTag(prepName);
+      expect(tag).toBe(`collection_prep:${prepName}`);
+      expect(tag.length).toBe(40);
+    });
+  });
+
   describe("queryOrdersByTag", () => {
     it("should return orders with line items", async () => {
       mockClient.request.mockResolvedValueOnce({
