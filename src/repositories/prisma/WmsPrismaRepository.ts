@@ -417,6 +417,7 @@ export class WmsPrismaRepository implements WmsRepository {
         region: true,
         orderId: true,
         collectionPrepId: true,
+        lineItemId: true,
       },
     });
 

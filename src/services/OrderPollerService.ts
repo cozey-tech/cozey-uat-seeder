@@ -120,10 +120,12 @@ export class OrderPollerService {
 
             foundOrders.set(shopifyOrderId, {
               wmsOrderId: order.id,
-              preps: preps.map((prep) => ({
-                prepId: prep.prep,
-                lineItemId: prep.lineItemId,
-              })),
+              preps: preps
+                .filter((prep) => prep.lineItemId) // Only include preps with line item IDs
+                .map((prep) => ({
+                  prepId: prep.prep,
+                  lineItemId: prep.lineItemId!,
+                })),
             });
 
             Logger.info("Order and preps found", {

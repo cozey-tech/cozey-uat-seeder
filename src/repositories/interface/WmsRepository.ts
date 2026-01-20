@@ -91,6 +91,7 @@ export interface IOrder {
   shopifyOrderNumber: string;
   status: string;
   region: string;
+  customerId?: string | null;
 }
 
 export interface ICollectionPrep {
@@ -114,6 +115,7 @@ export interface IPrep {
   region: string;
   orderId: string;
   collectionPrepId: string | null;
+  lineItemId: string | null;
 }
 
 export interface IDeletionPreview {

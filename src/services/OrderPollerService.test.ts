@@ -52,6 +52,7 @@ describe("OrderPollerService", () => {
       const order1 = {
         id: "wms-order-1",
         shopifyOrderId: "shopify-order-1",
+        shopifyOrderNumber: "#12345",
         status: "ACTIVE",
         customerId: "customer-1",
         region: "CA",
@@ -83,6 +84,7 @@ describe("OrderPollerService", () => {
       const order = {
         id: "wms-order-1",
         shopifyOrderId: "shopify-order-1",
+        shopifyOrderNumber: "#12345",
         status: "ACTIVE",
         customerId: "customer-1",
         region: "CA",
@@ -113,6 +115,7 @@ describe("OrderPollerService", () => {
       const order = {
         id: "wms-order-1",
         shopifyOrderId: "shopify-order-1",
+        shopifyOrderNumber: "#12345",
         status: "ACTIVE",
         customerId: "customer-1",
         region: "CA",
@@ -144,6 +147,7 @@ describe("OrderPollerService", () => {
       const order1 = {
         id: "wms-order-1",
         shopifyOrderId: "shopify-order-1",
+        shopifyOrderNumber: "#12345",
         status: "ACTIVE",
         customerId: "customer-1",
         region: "CA",
@@ -152,6 +156,7 @@ describe("OrderPollerService", () => {
       const order2 = {
         id: "wms-order-2",
         shopifyOrderId: "shopify-order-2",
+        shopifyOrderNumber: "#12346",
         status: "ACTIVE",
         customerId: "customer-2",
         region: "CA",
@@ -213,6 +218,7 @@ describe("OrderPollerService", () => {
       const order1 = {
         id: "wms-order-1",
         shopifyOrderId: "shopify-order-1",
+        shopifyOrderNumber: "#12345",
         status: "ACTIVE",
         customerId: "customer-1",
         region: "CA",
@@ -258,6 +264,7 @@ describe("OrderPollerService", () => {
       const order1 = {
         id: "wms-order-1",
         shopifyOrderId: "shopify-order-1",
+        shopifyOrderNumber: "#12345",
         status: "ACTIVE",
         customerId: "customer-1",
         region: "CA",
@@ -290,14 +297,16 @@ describe("OrderPollerService", () => {
       const incompleteOrder = {
         id: "wms-order-1",
         shopifyOrderId: "shopify-order-1",
-        status: null, // Not yet populated by COS
-        customerId: null, // Not yet populated by COS
+        shopifyOrderNumber: "#12345",
+        status: "",
+        customerId: null,
         region: "CA",
       };
 
       const completeOrder = {
         id: "wms-order-1",
         shopifyOrderId: "shopify-order-1",
+        shopifyOrderNumber: "#12345",
         status: "ACTIVE",
         customerId: "customer-1",
         region: "CA",
@@ -328,6 +337,7 @@ describe("OrderPollerService", () => {
       const order1 = {
         id: "wms-order-1",
         shopifyOrderId: "shopify-order-1",
+        shopifyOrderNumber: "#12345",
         status: "ACTIVE",
         customerId: "customer-1",
         region: "CA",
@@ -336,6 +346,7 @@ describe("OrderPollerService", () => {
       const order2 = {
         id: "wms-order-2",
         shopifyOrderId: "shopify-order-2",
+        shopifyOrderNumber: "#12346",
         status: "ACTIVE",
         customerId: "customer-2",
         region: "CA",
@@ -380,6 +391,7 @@ describe("OrderPollerService", () => {
       const order = {
         id: "wms-order-1",
         shopifyOrderId: "shopify-order-1",
+        shopifyOrderNumber: "#12345",
         status: "ACTIVE",
         customerId: "customer-1",
         region: "CA",
