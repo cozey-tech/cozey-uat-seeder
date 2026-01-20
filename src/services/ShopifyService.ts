@@ -668,13 +668,9 @@ export class ShopifyService {
   }
 
   async queryOrdersByTag(tag: string): Promise<OrderQueryResult[]> {
-    if (this.dryRun) {
-      // In dry-run, return empty array - the use case will construct mock data
-      // This is called after order creation, so we return empty and let the use case
-      // construct the response from the input data
-      Logger.info("DRY RUN: Would query orders by tag", { tag });
-      return [];
-    }
+    // Note: This is a read-only query operation, so it's safe to execute even in dry-run mode.
+    // Dry-run protection only applies to write operations (create, delete, cancel, archive).
+    // For cleanup dry-run, we need to query actual orders to preview what would be deleted.
 
     const query = `
       query getOrdersByTag($query: String!) {
