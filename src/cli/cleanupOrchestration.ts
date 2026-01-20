@@ -24,14 +24,21 @@ export async function executeCleanup(args: CleanupArgs, services: CleanupService
   console.log(OutputFormatter.success("Staging environment verified"));
   console.log(OutputFormatter.separator());
 
-  const tag = determineTag(args, services.shopifyService);
-  // Log info for custom tags (not wms_seed or seed_batch_id:*)
-  if (!isValidCleanupTag(tag)) {
-    console.log(OutputFormatter.info(`Cleaning up by custom tag: ${tag}`));
-  }
+  // For collection prep cleanup, we query WMS directly in the use case
+  // For tag/batch cleanup, we query Shopify by tag
+  if (args.collectionPrepName) {
+    console.log(OutputFormatter.header("Querying Entities", "🔍"));
+    console.log(`Collection Prep: ${args.collectionPrepName}`);
+  } else {
+    const tag = determineTag(args, services.shopifyService);
+    // Log info for custom tags (not wms_seed or seed_batch_id:*)
+    if (!isValidCleanupTag(tag)) {
+      console.log(OutputFormatter.info(`Cleaning up by custom tag: ${tag}`));
+    }
 
-  console.log(OutputFormatter.header("Querying Entities", "🔍"));
-  console.log(`Tag: ${tag}`);
+    console.log(OutputFormatter.header("Querying Entities", "🔍"));
+    console.log(`Tag: ${tag}`);
+  }
 
   const preview = await queryEntitiesForPreview(args, services);
 
@@ -92,6 +99,23 @@ async function queryEntitiesForPreview(
   wmsEntityCount: number;
   totalEntities: number;
 }> {
+  // For collection prep cleanup, we can't easily preview without querying WMS
+  // So we'll return a placeholder and let dry-run show the real counts
+  if (args.collectionPrepName) {
+    Logger.info("Preview for collection prep cleanup", {
+      collectionPrepName: args.collectionPrepName,
+      note: "Actual counts determined during cleanup execution",
+    });
+
+    // Return placeholders - dry-run will show actual counts
+    return {
+      shopifyOrderCount: 0,
+      wmsEntityCount: 0,
+      totalEntities: 0,
+    };
+  }
+
+  // For tag-based cleanup, query Shopify
   const tag = determineTag(args, services.shopifyService);
   const shopifyOrders = await services.shopifyService.queryOrdersByTag(tag);
 

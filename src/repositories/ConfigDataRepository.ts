@@ -137,21 +137,6 @@ export class ConfigDataRepository {
    * Note: shopifyIds are not required - ShopifyService queries Shopify API directly by SKU
    */
   async getAvailableVariants(region: string): Promise<Variant[]> {
-    // #region agent log
-    fetch("http://127.0.0.1:7250/ingest/4a3b661a-4368-4076-baf3-0dcc0b914dfc", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "ConfigDataRepository.ts:139",
-        message: "getAvailableVariants called",
-        data: { region },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        runId: "post-fix",
-        hypothesisId: "FIX",
-      }),
-    }).catch(() => {});
-    // #endregion
     const variants = await this.prisma.variant.findMany({
       where: {
         region,
@@ -170,27 +155,6 @@ export class ConfigDataRepository {
       },
       orderBy: [{ modelName: "asc" }, { colorId: "asc" }, { description: "asc" }, { sku: "asc" }],
     });
-
-    // #region agent log
-    fetch("http://127.0.0.1:7250/ingest/4a3b661a-4368-4076-baf3-0dcc0b914dfc", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "ConfigDataRepository.ts:160",
-        message: "Variants fetched",
-        data: {
-          region,
-          totalCount: variants.length,
-          withShopifyIds: variants.filter((v) => v.shopifyIds && v.shopifyIds.length > 0).length,
-          withoutShopifyIds: variants.filter((v) => !v.shopifyIds || v.shopifyIds.length === 0).length,
-        },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        runId: "post-fix",
-        hypothesisId: "FIX",
-      }),
-    }).catch(() => {});
-    // #endregion
 
     // Batch fetch all variantParts for all variants at once to avoid connection pool exhaustion
     const variantIds = variants.map((v) => v.id);

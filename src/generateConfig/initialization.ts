@@ -82,22 +82,6 @@ export function filterValidTemplates(
   templates: OrderTemplate[],
   variants: Array<{ sku: string; pickType: "Regular" | "Pick and Pack" }>,
 ): OrderTemplate[] {
-  // #region agent log
-  fetch("http://127.0.0.1:7250/ingest/4a3b661a-4368-4076-baf3-0dcc0b914dfc", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location: "initialization.ts:81",
-      message: "filterValidTemplates called",
-      data: { templateCount: templates.length, variantCount: variants.length },
-      timestamp: Date.now(),
-      sessionId: "debug-session",
-      runId: "post-fix",
-      hypothesisId: "FIX",
-    }),
-  }).catch(() => {});
-  // #endregion
-
   // Create a set of valid SKUs for quick lookup
   const validSkus = new Set(variants.map((v) => v.sku));
 
@@ -120,30 +104,6 @@ export function filterValidTemplates(
       invalidTemplates.push({ template, reasons });
     }
   }
-
-  // #region agent log
-  fetch("http://127.0.0.1:7250/ingest/4a3b661a-4368-4076-baf3-0dcc0b914dfc", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location: "initialization.ts:111",
-      message: "filterValidTemplates result",
-      data: {
-        validCount: validTemplates.length,
-        invalidCount: invalidTemplates.length,
-        invalidTemplates: invalidTemplates.map((t) => ({
-          id: t.template.id,
-          name: t.template.name,
-          reasons: t.reasons,
-        })),
-      },
-      timestamp: Date.now(),
-      sessionId: "debug-session",
-      runId: "post-fix",
-      hypothesisId: "FIX",
-    }),
-  }).catch(() => {});
-  // #endregion
 
   // Report invalid templates with detailed error messages
   if (invalidTemplates.length > 0) {
