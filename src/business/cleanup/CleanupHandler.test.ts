@@ -77,35 +77,6 @@ describe("CleanupHandler", () => {
       await expect(handler.execute(request)).rejects.toThrow(InputValidationError);
     });
 
-    it("should accept collectionPrepName as identifier", async () => {
-      const request = {
-        collectionPrepName: "Test-Canpar-Langley-1234",
-        dryRun: false,
-        skipConfirmation: false,
-      };
-
-      const expectedResponse: CleanupResponse = {
-        shopifyOrders: { deleted: [], archived: [], failed: [] },
-        wmsEntities: {
-          orders: { deleted: 0, failed: 0 },
-          preps: { deleted: 0, failed: 0 },
-          shipments: { deleted: 0, failed: 0 },
-          collectionPreps: { deleted: 0, failed: 0 },
-        },
-        summary: { totalDeleted: 0, totalArchived: 0, totalFailed: 0, durationMs: 100 },
-      };
-
-      vi.mocked(mockUseCase.execute).mockResolvedValue(expectedResponse);
-
-      await handler.execute(request);
-
-      expect(mockUseCase.execute).toHaveBeenCalledWith(
-        expect.objectContaining({
-          collectionPrepName: "Test-Canpar-Langley-1234",
-        }),
-      );
-    });
-
     it("should accept custom tag as identifier", async () => {
       const request = {
         tag: "wms_seed",

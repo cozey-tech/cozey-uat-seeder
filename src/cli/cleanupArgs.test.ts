@@ -22,15 +22,6 @@ describe("parseCleanupArgs", () => {
     expect(args.skipConfirmation).toBe(false);
   });
 
-  it("should parse --collection-prep argument", () => {
-    process.argv = ["node", "cleanup.ts", "--collection-prep", "Test-Canpar-Langley-1234"];
-
-    const args = parseCleanupArgs();
-
-    expect(args.collectionPrepName).toBe("Test-Canpar-Langley-1234");
-    expect(args.dryRun).toBe(false);
-  });
-
   it("should parse --tag argument", () => {
     process.argv = ["node", "cleanup.ts", "--tag", "wms_seed"];
 

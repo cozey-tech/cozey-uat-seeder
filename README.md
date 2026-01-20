@@ -335,9 +335,6 @@ npm run cleanup -- --batch-id <batch-id>
 # Cleanup by custom test tag (from config testTag field)
 npm run cleanup -- --tag <test-tag>
 
-# Cleanup by collection prep name (legacy, less common)
-npm run cleanup -- --collection-prep <prep-name>
-
 # Dry-run (preview without deleting)
 npm run cleanup -- --batch-id <batch-id> --dry-run
 
@@ -448,8 +445,7 @@ npm run cleanup -- --tag wms_seed --dry-run
 - `npm run seed <config-file.json>`: Run the seeder
 - `npm run cleanup -- [options]`: Delete seeded test data
   - `--batch-id <id>`: Cleanup by batch ID
-  - `--collection-prep <name>`: Cleanup by collection prep name
-  - `--tag <tag>`: Cleanup by custom tag
+  - `--tag <tag>`: Cleanup by custom tag (e.g., testTag from config, or wms_seed)
   - `--dry-run`: Preview without deleting
   - `--skip-confirmation`: Skip confirmation prompt
 

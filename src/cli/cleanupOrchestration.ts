@@ -78,9 +78,6 @@ export async function executeCleanup(args: CleanupArgs, services: CleanupService
 function determineTag(args: CleanupArgs, shopifyService: ShopifyService): string {
   if (args.batchId) {
     return shopifyService.formatBatchTag(args.batchId);
-  } else if (args.collectionPrepName) {
-    // Legacy support: format collection prep name as tag for backward compatibility
-    return `collection_prep:${args.collectionPrepName.replace(/\s/g, "_")}`;
   } else if (args.tag) {
     return args.tag;
   }
