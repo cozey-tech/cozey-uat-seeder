@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+import { config } from "dotenv";
+import { resolve } from "path";
+
+config({ path: resolve(process.cwd(), ".env") });
+config({ path: resolve(process.cwd(), ".env.local"), override: true });
+
+import { initializeEnvConfig } from "./config/env";
 import { parseCleanupArgs } from "./cli/cleanupArgs";
 import { executeCleanup } from "./cli/cleanupOrchestration";
 import { PrismaClient } from "@prisma/client";
@@ -14,6 +21,8 @@ import { Logger } from "./utils/logger";
 
 async function main(): Promise<void> {
   try {
+    await initializeEnvConfig();
+
     const args = parseCleanupArgs();
 
     const prisma = new PrismaClient();

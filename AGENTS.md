@@ -34,6 +34,8 @@ Project status: active development. Core seeder functionality is implemented and
 - Seed: `npm run seed <config-file.json>`
 - Generate config: `npm run generate-config`
 - Cleanup: `npm run cleanup -- --batch-id <id>` Delete test data by batch ID
+- Fetch order template: `npm run fetch-order-template -- <order-number> [--save]` Convert Shopify order to template
+- Fetch multiple templates: `npm run fetch-order-templates-batch -- <order-numbers...> [--save]` Batch convert orders
 
 ## 3) Repository Map
 

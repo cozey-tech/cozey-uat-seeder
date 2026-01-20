@@ -120,6 +120,591 @@
           "pickType": "Pick and Pack"
         }
       ]
+    },
+    {
+      "id": "order-4993",
+      "name": "Order 4993",
+      "description": "Template from Shopify order 4993 (regular-only)",
+      "lineItems": [
+        {
+          "sku": "1+2052-0-00-300",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34032-1-92-9x12F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34015-1-62-8x10F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34003-1-57-8x10F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34026-1-67-5x8F",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#4993",
+        "sourceOrderId": "gid://shopify/Order/7340426166588",
+        "fetchedAt": "2026-01-20T20:20:41.587Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4126 Rue Claude",
+        "city": "Verdun",
+        "province": "Quebec",
+        "postalCode": "H4G 1H5"
+      }
+    },
+    {
+      "id": "order-4994",
+      "name": "Order 4994",
+      "description": "Template from Shopify order 4994 (regular-only)",
+      "lineItems": [
+        {
+          "sku": "34032-1-92-9x12F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34026-1-67-5x8F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+1276-0-0-800",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "25000-302",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#4994",
+        "sourceOrderId": "gid://shopify/Order/7340480233788",
+        "fetchedAt": "2026-01-20T20:20:42.245Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4126 Rue Claude",
+        "city": "Verdun",
+        "province": "Quebec",
+        "postalCode": "H4G 1H5"
+      }
+    },
+    {
+      "id": "order-4995",
+      "name": "Order 4995",
+      "description": "Template from Shopify order 4995 (regular-only)",
+      "lineItems": [
+        {
+          "sku": "34032-1-92-9x12F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+1276-0-0-800",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+2271-201",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#4995",
+        "sourceOrderId": "gid://shopify/Order/7340487803196",
+        "fetchedAt": "2026-01-20T20:20:42.909Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4126 Rue Claude",
+        "city": "Verdun",
+        "province": "Quebec",
+        "postalCode": "H4G 1H5"
+      }
+    },
+    {
+      "id": "order-4996",
+      "name": "Order 4996",
+      "description": "Template from Shopify order 4996 (regular-only)",
+      "lineItems": [
+        {
+          "sku": "34032-1-92-9x12F",
+          "quantity": 6,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34026-1-67-5x8F",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+1276-0-0-800",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "25000-302",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#4996",
+        "sourceOrderId": "gid://shopify/Order/7340736184636",
+        "fetchedAt": "2026-01-20T20:20:43.596Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4885 201 St",
+        "city": "Langley",
+        "province": "British Columbia",
+        "postalCode": "V3A 0H1"
+      }
+    },
+    {
+      "id": "order-4997",
+      "name": "Order 4997",
+      "description": "Template from Shopify order 4997 (regular-only)",
+      "lineItems": [
+        {
+          "sku": "1+2052-0-00-300",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34032-1-92-9x12F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34015-1-62-8x10F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34003-1-57-8x10F",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34026-1-67-5x8F",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#4997",
+        "sourceOrderId": "gid://shopify/Order/7340737626428",
+        "fetchedAt": "2026-01-20T20:20:44.244Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4126 Rue Claude",
+        "city": "Verdun",
+        "province": "Quebec",
+        "postalCode": "H4G 1H5"
+      }
+    },
+    {
+      "id": "order-4985",
+      "name": "Order 4985",
+      "description": "Template from Shopify order 4985 (regular-only)",
+      "lineItems": [
+        {
+          "sku": "34005-1-44-3x5F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34028-1-81-3x5F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "42024-101-2x2",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "42024-101-3x2",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#4985",
+        "sourceOrderId": "gid://shopify/Order/7340026724668",
+        "fetchedAt": "2026-01-20T20:20:44.926Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4126 Rue Claude",
+        "city": "Verdun",
+        "province": "Quebec",
+        "postalCode": "H4G 1H5"
+      }
+    },
+    {
+      "id": "order-4998",
+      "name": "Order 4998",
+      "description": "Template from Shopify order 4998 (regular-only)",
+      "lineItems": [
+        {
+          "sku": "34005-1-44-3x5F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34028-1-81-3x5F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "42024-101-2x2",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "42024-101-3x2",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1+2271-2A1",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#4998",
+        "sourceOrderId": "gid://shopify/Order/7340740116796",
+        "fetchedAt": "2026-01-20T20:20:45.611Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4126 Rue Claude",
+        "city": "Verdun",
+        "province": "Quebec",
+        "postalCode": "H4G 1H5"
+      }
+    },
+    {
+      "id": "order-4999",
+      "name": "Order 4999",
+      "description": "Template from Shopify order 4999 (regular-only)",
+      "lineItems": [
+        {
+          "sku": "34032-1-92-9x12F",
+          "quantity": 6,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34026-1-67-5x8F",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "25000-302",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "25000-301",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "3R55-0-00-300",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "12055-0-00-300-S",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#4999",
+        "sourceOrderId": "gid://shopify/Order/7340746473788",
+        "fetchedAt": "2026-01-20T20:20:46.294Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4885 201 St",
+        "city": "Langley",
+        "province": "British Columbia",
+        "postalCode": "V3A 0H1"
+      }
+    },
+    {
+      "id": "order-5003",
+      "name": "Order 5003",
+      "description": "Template from Shopify order 5003 (regular-only)",
+      "lineItems": [
+        {
+          "sku": "34026-1-67-5x8F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "25000-302",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "12055-0-00-300-S",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2071-2-00-300-S",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#5003",
+        "sourceOrderId": "gid://shopify/Order/7340770525500",
+        "fetchedAt": "2026-01-20T20:20:46.955Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4885 201 St",
+        "city": "Langley",
+        "province": "British Columbia",
+        "postalCode": "V3A 0H1"
+      }
+    },
+    {
+      "id": "order-5004",
+      "name": "Order 5004",
+      "description": "Template from Shopify order 5004 (regular-only)",
+      "lineItems": [
+        {
+          "sku": "34026-1-67-5x8F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "12055-0-00-300-S",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#5004",
+        "sourceOrderId": "gid://shopify/Order/7340772983100",
+        "fetchedAt": "2026-01-20T20:20:47.619Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4885 201 St",
+        "city": "Langley",
+        "province": "British Columbia",
+        "postalCode": "V3A 0H1"
+      }
+    },
+    {
+      "id": "order-5008",
+      "name": "Order 5008",
+      "description": "Template from Shopify order 5008 (regular-only)",
+      "lineItems": [
+        {
+          "sku": "34026-1-67-5x8F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1+2035-0-SS-610",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34018-1-65-3x5F",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "42023-101-3x1",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#5008",
+        "sourceOrderId": "gid://shopify/Order/7340791955772",
+        "fetchedAt": "2026-01-20T20:20:48.263Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4885 201 St",
+        "city": "Langley",
+        "province": "British Columbia",
+        "postalCode": "V3A 0H1"
+      }
+    },
+    {
+      "id": "order-5048",
+      "name": "Order 5048",
+      "description": "Template from Shopify order 5048 (mixed)",
+      "lineItems": [
+        {
+          "sku": "71070-0-00-300",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "70070-E-00-300",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "70054-0-00-300",
+          "quantity": 6,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "71043-0-00-300",
+          "quantity": 4,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "71044-0-00-300",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "72044-0-00-301",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "ATM-0000-HW-20000000",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "ATM-0000-HW-30000000",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#5048",
+        "sourceOrderId": "gid://shopify/Order/7342386053436",
+        "fetchedAt": "2026-01-20T20:20:48.939Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4885 201 St",
+        "city": "Langley",
+        "province": "British Columbia",
+        "postalCode": "V3A 0H1"
+      }
+    },
+    {
+      "id": "order-5049",
+      "name": "Order 5049",
+      "description": "Template from Shopify order 5049 (mixed)",
+      "lineItems": [
+        {
+          "sku": "71070-0-00-300",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "70070-E-00-300",
+          "quantity": 3,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "71044-0-00-300",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "72044-0-00-301",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "ATM-0000-HW-20000000",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#5049",
+        "sourceOrderId": "gid://shopify/Order/7342387921212",
+        "fetchedAt": "2026-01-20T20:20:49.593Z"
+      },
+      "customer": {
+        "name": "Adam Cozey",
+        "email": "natasha@cozey.ca",
+        "address": "4885 201 St",
+        "city": "Langley",
+        "province": "British Columbia",
+        "postalCode": "V3A 0H1"
+      }
+    },
+    {
+      "id": "order-5050",
+      "name": "Order 5050",
+      "description": "Template from Shopify order 5050 (regular-only)",
+      "lineItems": [
+        {
+          "sku": "3+2076-2A1",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "34005-1-44-5x8F",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ],
+      "metadata": {
+        "sourceOrderNumber": "#5050",
+        "sourceOrderId": "gid://shopify/Order/7342502379836",
+        "fetchedAt": "2026-01-20T21:48:24.796Z"
+      },
+      "customer": {
+        "name": "Jeff Trinh",
+        "email": "jeffery@cozey.ca",
+        "address": "3515 Kariya Drive",
+        "city": "Mississauga",
+        "province": "Ontario",
+        "postalCode": "L5B 0C1"
+      }
     }
   ]
 }
