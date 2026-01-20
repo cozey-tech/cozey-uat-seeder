@@ -229,7 +229,8 @@ Example `seed-config.json`:
     "carrier": "FedEx",
     "locationId": "WH1",
     "region": "CA",
-    "prepDate": "2026-01-20T10:00:00Z"
+    "prepDate": "2026-01-20T10:00:00Z",
+    "testTag": "Outbound_Compliance"
   },
   "orders": [
     {
@@ -280,6 +281,12 @@ Example `seed-config.json`:
 }
 ```
 
+**Shopify Tagging:** Orders are tagged in Shopify with:
+
+- `wms_seed` - Universal tag for all seeded orders
+- `seed_batch_id:<batch-id>` - Unique batch identifier
+- `testTag` value (if provided in config) - Custom tag for easy identification and cleanup
+
 ## Configuration Files
 
 The seeder uses JSON configuration files in the `config/` directory for pre-defined reference data:
@@ -325,11 +332,11 @@ The seeder provides a comprehensive cleanup feature to delete seeded test data f
 # Cleanup by batch ID (recommended)
 npm run cleanup -- --batch-id <batch-id>
 
-# Cleanup by collection prep name
-npm run cleanup -- --collection-prep <prep-name>
+# Cleanup by custom test tag (from config testTag field)
+npm run cleanup -- --tag <test-tag>
 
-# Cleanup by custom tag
-npm run cleanup -- --tag <tag-name>
+# Cleanup by collection prep name (legacy, less common)
+npm run cleanup -- --collection-prep <prep-name>
 
 # Dry-run (preview without deleting)
 npm run cleanup -- --batch-id <batch-id> --dry-run
@@ -362,7 +369,7 @@ Cleanup removes **all entities** associated with the specified tag:
 - **Confirmation Prompt**: Shows preview of entities to be deleted, requires explicit confirmation
 - **Dry-Run Mode**: Preview deletions without making changes
 - **Staging-Only**: Hard-coded guardrails prevent production cleanup
-- **Tag Validation**: Only allows cleanup of test tags (wms_seed, seed_batch_id, collection_prep)
+- **Tag Validation**: Allows cleanup of test tags (wms_seed, seed_batch_id, or custom testTag)
 - **Transaction Safety**: WMS deletions use database transactions for atomicity
 - **Idempotent**: Safe to re-run if cleanup partially fails
 - **Hybrid Cleanup**: Deletes orders when possible (manual payment), archives when restricted (online gateway)
@@ -385,11 +392,11 @@ npm run cleanup -- --batch-id abc-123-def-456
 # Prompts: Delete 10 Shopify orders and 50 WMS entities? [y/N]
 ```
 
-**Cleanup by collection prep:**
+**Cleanup by test tag:**
 
 ```bash
-# Use collection prep name from seeding output
-npm run cleanup -- --collection-prep Test-Canpar-Langley-1234 --dry-run
+# Use testTag from your config (e.g., "Outbound_Compliance")
+npm run cleanup -- --tag Outbound_Compliance --dry-run
 ```
 
 **Cleanup all seed data (use with caution):**

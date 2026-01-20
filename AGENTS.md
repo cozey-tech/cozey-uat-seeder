@@ -129,7 +129,7 @@ Project status: active development. Core seeder functionality is implemented and
 ### Cleanup Operations
 
 - Do use transactions for WMS entity deletions (atomicity).
-- Do validate tags before cleanup (only test tags allowed: wms_seed, seed_batch_id, collection_prep).
+- Do validate tags before cleanup (standard test tags: wms_seed, seed_batch_id; custom testTag values also allowed).
 - Do implement continue-on-error pattern (collect failures, don't abort).
 - Do use hybrid cleanup for Shopify (delete manual payment orders, archive online gateway orders).
 - Don't delete collection preps if still referenced by other batches (safety check required).
