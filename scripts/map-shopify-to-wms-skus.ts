@@ -116,8 +116,6 @@ async function mapShopifyToWmsSkus(shopifyVariants: ShopifyVariant[], region: st
     // Output JSON
     console.log("\n=== JSON Mapping ===\n");
     console.log(JSON.stringify(results, null, 2));
-
-    return results;
   } finally {
     await prisma.$disconnect();
   }

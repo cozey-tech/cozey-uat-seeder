@@ -66,8 +66,6 @@ async function inspectShopifyIds(region: string = "CA"): Promise<void> {
     } else {
       console.log("❌ SKU not found in database");
     }
-
-    return variants;
   } finally {
     await prisma.$disconnect();
   }

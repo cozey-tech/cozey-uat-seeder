@@ -34,7 +34,7 @@ async function verifyTemplates(): Promise<void> {
       console.log(`\nTemplate: ${template.name} (${template.id})`);
       console.log(`  Line items: ${template.lineItems.length}`);
 
-      const skus = template.lineItems.map((item: { sku: string }) => item.sku);
+      const skus = template.lineItems.map((item: { sku: string; quantity: number }) => item.sku);
       const variants = await prisma.variant.findMany({
         where: {
           sku: { in: skus },
@@ -48,7 +48,7 @@ async function verifyTemplates(): Promise<void> {
       });
 
       const foundSkus = new Set(variants.map((v) => v.sku));
-      const missingSkus = skus.filter((sku) => !foundSkus.has(sku));
+      const missingSkus = skus.filter((sku: string) => !foundSkus.has(sku));
 
       if (missingSkus.length === 0) {
         console.log(`  ✓ All SKUs valid`);
