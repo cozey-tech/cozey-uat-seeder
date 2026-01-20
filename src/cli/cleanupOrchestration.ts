@@ -14,7 +14,8 @@ export interface CleanupServiceDependencies {
 }
 
 function isValidCleanupTag(tag: string): boolean {
-  return tag === "wms_seed" || tag.startsWith("seed_batch_id:") || tag.startsWith("collection_prep:");
+  // Allow wms_seed, seed_batch_id:*, and any custom test tags
+  return tag === "wms_seed" || tag.startsWith("seed_batch_id:");
 }
 
 export async function executeCleanup(args: CleanupArgs, services: CleanupServiceDependencies): Promise<void> {
@@ -24,8 +25,9 @@ export async function executeCleanup(args: CleanupArgs, services: CleanupService
   console.log(OutputFormatter.separator());
 
   const tag = determineTag(args, services.shopifyService);
+  // Log info for custom tags (not wms_seed or seed_batch_id:*)
   if (!isValidCleanupTag(tag)) {
-    throw new Error(`Invalid cleanup tag: ${tag}. Must be wms_seed, seed_batch_id, or collection_prep tag.`);
+    console.log(OutputFormatter.info(`Cleaning up by custom tag: ${tag}`));
   }
 
   console.log(OutputFormatter.header("Querying Entities", "🔍"));
@@ -77,7 +79,8 @@ function determineTag(args: CleanupArgs, shopifyService: ShopifyService): string
   if (args.batchId) {
     return shopifyService.formatBatchTag(args.batchId);
   } else if (args.collectionPrepName) {
-    return shopifyService.formatCollectionPrepTag(args.collectionPrepName);
+    // Legacy support: format collection prep name as tag for backward compatibility
+    return `collection_prep:${args.collectionPrepName.replace(/\s/g, "_")}`;
   } else if (args.tag) {
     return args.tag;
   }

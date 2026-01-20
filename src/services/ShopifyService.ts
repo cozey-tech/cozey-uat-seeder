@@ -196,7 +196,7 @@ export class ShopifyService {
    * @param input - Customer and line items for the draft order
    * @param batchId - Unique batch ID for tagging (format: wms_seed_<batchId>)
    * @param region - Optional region code (CA or US) for determining country code in shipping address
-   * @param collectionPrepName - Optional collection prep name to include in order notes
+   * @param testTag - Optional test tag to add to Shopify orders for identification
    * @param variantMap - Optional pre-fetched variant map (SKU -> variant ID). If not provided, will lookup variants.
    * @returns Draft order ID
    * @throws ShopifyServiceError if variant lookup fails or API returns errors
@@ -205,7 +205,7 @@ export class ShopifyService {
     input: DraftOrderInput,
     batchId: string,
     region?: string,
-    collectionPrepName?: string,
+    testTag?: string,
     variantMap?: Map<string, string>,
   ): Promise<DraftOrderResult> {
     if (this.dryRun) {
@@ -222,7 +222,7 @@ export class ShopifyService {
             }
           : undefined,
         batchId,
-        collectionPrepName,
+        testTag,
         draftOrderId,
         lineItemCount: input.lineItems.length,
         lineItems: input.lineItems.map((item) => ({ sku: item.sku, quantity: item.quantity })),
@@ -282,14 +282,14 @@ export class ShopifyService {
           : undefined;
 
       let note = `WMS Seed Order - Batch: ${batchId}`;
-      if (collectionPrepName) {
-        note = `WMS Seed Order - Batch: ${batchId}\nCollection Prep: ${collectionPrepName}`;
+      if (testTag) {
+        note = `WMS Seed Order - Batch: ${batchId}\nTest Tag: ${testTag}`;
       }
 
-      // Build tags array: always include wms_seed and batch ID, optionally add collection prep tag
+      // Build tags array: always include wms_seed and batch ID, optionally add test tag
       const tags = [`wms_seed`, this.formatBatchTag(batchId)];
-      if (collectionPrepName) {
-        tags.push(this.formatCollectionPrepTag(collectionPrepName));
+      if (testTag) {
+        tags.push(testTag);
       }
 
       const variables = {

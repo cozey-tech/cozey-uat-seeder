@@ -21,7 +21,7 @@ export const seedShopifyOrdersRequestSchema = z.object({
   ),
   batchId: z.string().uuid(),
   region: z.enum(["CA", "US"]).optional(), // Region for determining country code in shipping address
-  collectionPrepName: z.string().optional(), // Collection prep name to include in order notes
+  testTag: z.string().optional(), // Test tag to add to Shopify orders for identification
 });
 
 export type SeedShopifyOrdersRequest = z.infer<typeof seedShopifyOrdersRequestSchema> & {

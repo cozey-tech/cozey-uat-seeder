@@ -115,7 +115,7 @@ export class SeedShopifyOrdersUseCase {
                 },
                 request.batchId,
                 request.region,
-                request.collectionPrepName,
+                request.testTag,
                 variantMap, // Pass pre-fetched variant map
               ),
           );

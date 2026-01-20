@@ -91,7 +91,8 @@ export class CleanupUseCase {
     if (request.batchId) {
       return this.shopifyService.formatBatchTag(request.batchId);
     } else if (request.collectionPrepName) {
-      return this.shopifyService.formatCollectionPrepTag(request.collectionPrepName);
+      // Legacy support: format collection prep name as tag for backward compatibility
+      return `collection_prep:${request.collectionPrepName.replace(/\s/g, "_")}`;
     } else if (request.tag) {
       return request.tag;
     }

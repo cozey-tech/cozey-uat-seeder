@@ -160,7 +160,7 @@ export async function executeSeedingFlow(
     })),
     batchId,
     region: config.region || config.collectionPrep?.region || "CA",
-    collectionPrepName,
+    testTag: config.collectionPrep?.testTag,
     onOrderProgress: (current: number, total: number, customerEmail: string, _success: boolean): void => {
       // Adjust current count if resuming (add already completed count)
       // Note: 'current' and 'total' are relative to ordersToProcess, not config.orders
