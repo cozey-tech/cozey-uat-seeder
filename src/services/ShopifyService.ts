@@ -907,7 +907,17 @@ export class ShopifyService {
       }
 
       if (!response.data?.orderDelete?.deletedOrderId) {
-        throw new ShopifyServiceError("Order deletion returned no data");
+        // Check for GraphQL errors that might indicate why deletion failed
+        const graphqlErrors = (response as { errors?: Array<{ message: string }> }).errors;
+        if (graphqlErrors && graphqlErrors.length > 0) {
+          throw new ShopifyServiceError(
+            `GraphQL errors during order deletion: ${graphqlErrors.map((e) => e.message).join(", ")}`,
+          );
+        }
+        // Order deletion returned no data - might be payment restriction
+        throw new ShopifyServiceError(
+          "Order cannot be deleted (possibly due to payment gateway restrictions). Will attempt cancel + archive.",
+        );
       }
 
       Logger.info("Order deleted successfully", { orderId });
