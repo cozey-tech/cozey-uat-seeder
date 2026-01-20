@@ -29,7 +29,7 @@ async function main(): Promise<void> {
     const wmsRepository = new WmsPrismaRepository(prisma);
     const shopifyService = new ShopifyService(args.dryRun);
     const wmsCleanupService = new WmsCleanupService(wmsRepository, args.dryRun);
-    const cleanupUseCase = new CleanupUseCase(shopifyService, wmsCleanupService);
+    const cleanupUseCase = new CleanupUseCase(shopifyService, wmsCleanupService, wmsRepository);
     const cleanupHandler = new CleanupHandler(cleanupUseCase);
     const interactivePromptService = new InteractivePromptService();
 

@@ -457,6 +457,70 @@ export class WmsPrismaRepository implements WmsRepository {
     return collectionPrep;
   }
 
+  async findCollectionPrepByName(name: string): Promise<ICollectionPrep | null> {
+    // Collection prep name is used as the ID, but we need to check both regions
+    // Try CA first, then US
+    let collectionPrep = await this.prisma.collectionPrep.findUnique({
+      where: {
+        id_region: { id: name, region: "CA" },
+      },
+      select: {
+        id: true,
+        region: true,
+        carrier: true,
+        locationId: true,
+        prepDate: true,
+        boxes: true,
+      },
+    });
+
+    if (!collectionPrep) {
+      collectionPrep = await this.prisma.collectionPrep.findUnique({
+        where: {
+          id_region: { id: name, region: "US" },
+        },
+        select: {
+          id: true,
+          region: true,
+          carrier: true,
+          locationId: true,
+          prepDate: true,
+          boxes: true,
+        },
+      });
+    }
+
+    return collectionPrep;
+  }
+
+  async findShipmentsByCollectionPrepId(collectionPrepId: string, region: string): Promise<Array<{ orderId: string }>> {
+    const shipments = await this.prisma.shipment.findMany({
+      where: {
+        collectionPrepId,
+        region,
+      },
+      select: {
+        orderId: true,
+      },
+    });
+
+    return shipments;
+  }
+
+  async findOrdersByIds(orderIds: string[], region: string): Promise<Array<{ shopifyOrderId: string }>> {
+    const orders = await this.prisma.order.findMany({
+      where: {
+        id: { in: orderIds },
+        region,
+      },
+      select: {
+        shopifyOrderId: true,
+      },
+    });
+
+    return orders;
+  }
+
   async findCollectionPrepsByIds(ids: string[], region: string): Promise<ICollectionPrep[]> {
     const collectionPreps = await this.prisma.collectionPrep.findMany({
       where: {

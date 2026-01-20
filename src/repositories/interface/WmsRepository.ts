@@ -155,6 +155,9 @@ export interface WmsRepository {
   findShipmentsByOrderIds(orderIds: string[]): Promise<IShipment[]>;
   findCollectionPrepById(id: string, region: string): Promise<ICollectionPrep | null>;
   findCollectionPrepsByIds(ids: string[], region: string): Promise<ICollectionPrep[]>;
+  findCollectionPrepByName(name: string): Promise<ICollectionPrep | null>;
+  findShipmentsByCollectionPrepId(collectionPrepId: string, region: string): Promise<Array<{ orderId: string }>>;
+  findOrdersByIds(orderIds: string[], region: string): Promise<Array<{ shopifyOrderId: string }>>;
   previewBatchDeletion(shopifyOrderIds: string[]): Promise<Map<string, IDeletionPreview>>;
   // Delete methods
   deleteOrderEntitiesTransaction(shopifyOrderId: string): Promise<{

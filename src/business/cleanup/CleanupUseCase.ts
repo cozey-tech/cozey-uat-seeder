@@ -1,5 +1,6 @@
 import type { ShopifyService } from "../../services/ShopifyService";
 import type { WmsCleanupService } from "../../services/WmsCleanupService";
+import type { WmsRepository } from "../../repositories/interface/WmsRepository";
 import type { CleanupRequest } from "../../shared/requests/CleanupRequest";
 import type { CleanupResponse } from "../../shared/responses/CleanupResponse";
 import { Logger } from "../../utils/logger";
@@ -16,48 +17,109 @@ export class CleanupUseCase {
   constructor(
     private readonly shopifyService: ShopifyService,
     private readonly wmsCleanupService: WmsCleanupService,
+    private readonly wmsRepository: WmsRepository,
   ) {}
 
   async execute(request: CleanupRequest): Promise<CleanupResponse> {
     const startTime = Date.now();
 
-    const tag = this.determineTag(request);
-    Logger.info("Starting cleanup operation", {
-      tag,
-      dryRun: request.dryRun,
-      skipConfirmation: request.skipConfirmation,
-    });
+    let shopifyOrderIds: string[];
 
-    const shopifyOrders = await this.shopifyService.queryOrdersByTag(tag);
+    // Handle collection prep name-based cleanup
+    if (request.collectionPrepName) {
+      Logger.info("Starting cleanup by collection prep name", {
+        collectionPrepName: request.collectionPrepName,
+        dryRun: request.dryRun,
+      });
 
-    if (shopifyOrders.length === 0) {
-      Logger.warn("No orders found with tag", { tag });
-      return {
-        shopifyOrders: {
-          deleted: [],
-          archived: [],
-          failed: [],
-        },
-        wmsEntities: {
-          orders: { deleted: 0, failed: 0 },
-          preps: { deleted: 0, failed: 0 },
-          shipments: { deleted: 0, failed: 0 },
-          collectionPreps: { deleted: 0, failed: 0 },
-        },
-        summary: {
-          totalDeleted: 0,
-          totalArchived: 0,
-          totalFailed: 0,
-          durationMs: Date.now() - startTime,
-        },
-      };
+      // Query WMS for the collection prep
+      const collectionPrep = await this.wmsRepository.findCollectionPrepByName(request.collectionPrepName);
+
+      if (!collectionPrep) {
+        throw new CleanupUseCaseError(`Collection prep not found: ${request.collectionPrepName}`);
+      }
+
+      // Find all shipments for this collection prep
+      const shipments = await this.wmsRepository.findShipmentsByCollectionPrepId(
+        collectionPrep.id,
+        collectionPrep.region,
+      );
+
+      const orderIds = [...new Set(shipments.map((s) => s.orderId))];
+
+      // Get the orders to find Shopify order IDs
+      const wmsOrders = await this.wmsRepository.findOrdersByIds(orderIds, collectionPrep.region);
+
+      shopifyOrderIds = wmsOrders.map((o) => o.shopifyOrderId);
+
+      Logger.info("Found orders for collection prep", {
+        collectionPrepName: request.collectionPrepName,
+        orderCount: shopifyOrderIds.length,
+      });
+
+      if (shopifyOrderIds.length === 0) {
+        Logger.warn("No orders found for collection prep", { collectionPrepName: request.collectionPrepName });
+        return {
+          shopifyOrders: {
+            deleted: [],
+            archived: [],
+            failed: [],
+          },
+          wmsEntities: {
+            orders: { deleted: 0, failed: 0 },
+            preps: { deleted: 0, failed: 0 },
+            shipments: { deleted: 0, failed: 0 },
+            collectionPreps: { deleted: 0, failed: 0 },
+          },
+          summary: {
+            totalDeleted: 0,
+            totalArchived: 0,
+            totalFailed: 0,
+            durationMs: Date.now() - startTime,
+          },
+        };
+      }
+    } else {
+      // Tag-based cleanup
+      const tag = this.determineTag(request);
+      Logger.info("Starting cleanup operation", {
+        tag,
+        dryRun: request.dryRun,
+        skipConfirmation: request.skipConfirmation,
+      });
+
+      const shopifyOrders = await this.shopifyService.queryOrdersByTag(tag);
+
+      if (shopifyOrders.length === 0) {
+        Logger.warn("No orders found with tag", { tag });
+        return {
+          shopifyOrders: {
+            deleted: [],
+            archived: [],
+            failed: [],
+          },
+          wmsEntities: {
+            orders: { deleted: 0, failed: 0 },
+            preps: { deleted: 0, failed: 0 },
+            shipments: { deleted: 0, failed: 0 },
+            collectionPreps: { deleted: 0, failed: 0 },
+          },
+          summary: {
+            totalDeleted: 0,
+            totalArchived: 0,
+            totalFailed: 0,
+            durationMs: Date.now() - startTime,
+          },
+        };
+      }
+
+      shopifyOrderIds = shopifyOrders.map((o) => o.orderId);
     }
 
-    const shopifyOrderIds = shopifyOrders.map((o) => o.orderId);
     const wmsEntities = await this.wmsCleanupService.findEntitiesForCleanup(shopifyOrderIds);
 
     Logger.info("Entities found for cleanup", {
-      shopifyOrderCount: shopifyOrders.length,
+      shopifyOrderCount: shopifyOrderIds.length,
       wmsOrderCount: wmsEntities.orders.length,
       prepCount: wmsEntities.prepCount,
       shipmentCount: wmsEntities.shipmentCount,
@@ -65,7 +127,11 @@ export class CleanupUseCase {
     });
 
     if (request.dryRun) {
-      return this.buildDryRunResponse(shopifyOrders, wmsEntities, startTime);
+      return this.buildDryRunResponse(
+        shopifyOrderIds.map((id) => ({ orderId: id })),
+        wmsEntities,
+        startTime,
+      );
     }
 
     const wmsResults = await this.wmsCleanupService.deleteOrdersWithEntities(shopifyOrderIds, request.onProgress);
@@ -93,7 +159,7 @@ export class CleanupUseCase {
     } else if (request.tag) {
       return request.tag;
     }
-    throw new CleanupUseCaseError("No tag specified");
+    throw new CleanupUseCaseError("No tag or batch ID specified");
   }
 
   private buildDryRunResponse(

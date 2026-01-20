@@ -133,18 +133,31 @@ export class ConfigDataRepository {
 
   /**
    * Get all available variants for a region with pickType and configuration
-   * Only includes variants that have Shopify IDs (required for order creation)
    * Variants are grouped by: model > color > configuration > variant
+   * Note: shopifyIds are not required - ShopifyService queries Shopify API directly by SKU
    */
   async getAvailableVariants(region: string): Promise<Variant[]> {
+    // #region agent log
+    fetch("http://127.0.0.1:7250/ingest/4a3b661a-4368-4076-baf3-0dcc0b914dfc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        location: "ConfigDataRepository.ts:139",
+        message: "getAvailableVariants called",
+        data: { region },
+        timestamp: Date.now(),
+        sessionId: "debug-session",
+        runId: "post-fix",
+        hypothesisId: "FIX",
+      }),
+    }).catch(() => {});
+    // #endregion
     const variants = await this.prisma.variant.findMany({
       where: {
         region,
         disabled: false,
-        // Only include variants that have Shopify IDs
-        shopifyIds: {
-          isEmpty: false,
-        },
+        // Removed shopifyIds filter: ShopifyService queries Shopify API directly by SKU,
+        // so variants with empty shopifyIds in WMS can still be used for order creation
       },
       select: {
         id: true,
@@ -157,6 +170,27 @@ export class ConfigDataRepository {
       },
       orderBy: [{ modelName: "asc" }, { colorId: "asc" }, { description: "asc" }, { sku: "asc" }],
     });
+
+    // #region agent log
+    fetch("http://127.0.0.1:7250/ingest/4a3b661a-4368-4076-baf3-0dcc0b914dfc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        location: "ConfigDataRepository.ts:160",
+        message: "Variants fetched",
+        data: {
+          region,
+          totalCount: variants.length,
+          withShopifyIds: variants.filter((v) => v.shopifyIds && v.shopifyIds.length > 0).length,
+          withoutShopifyIds: variants.filter((v) => !v.shopifyIds || v.shopifyIds.length === 0).length,
+        },
+        timestamp: Date.now(),
+        sessionId: "debug-session",
+        runId: "post-fix",
+        hypothesisId: "FIX",
+      }),
+    }).catch(() => {});
+    // #endregion
 
     // Batch fetch all variantParts for all variants at once to avoid connection pool exhaustion
     const variantIds = variants.map((v) => v.id);
