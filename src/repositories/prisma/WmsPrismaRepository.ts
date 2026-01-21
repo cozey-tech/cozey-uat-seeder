@@ -365,6 +365,7 @@ export class WmsPrismaRepository implements WmsRepository {
         shopifyOrderNumber: true,
         status: true,
         region: true,
+        customerId: true,
       },
     });
 
