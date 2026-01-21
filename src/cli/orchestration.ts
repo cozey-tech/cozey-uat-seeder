@@ -1045,7 +1045,7 @@ export async function executeDryRun(configFilePath: string, services: ServiceDep
   const options: ExecutionOptions = {
     useWebhookMode: false,
     pollingTimeout: 180,
-    pollingInterval: 5,
+    pollingInterval: 2,
   };
 
   const { shopifyResult, wmsResult, collectionPrepResult } = await executeSeedingFlow(

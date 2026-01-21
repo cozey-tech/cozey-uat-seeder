@@ -33,7 +33,7 @@ export function parseArgs(): CliOptions {
     .option("--resume <batch-id>", "Resume a failed seeding operation from batch ID (requires config-file)")
     .option("--use-direct-mode", "Use direct Prisma mode (bypass COS webhook, for debugging). Default is webhook mode.")
     .option("--polling-timeout <seconds>", "COS webhook polling timeout in seconds (default: 180 = 3 minutes)", "180")
-    .option("--polling-interval <seconds>", "COS webhook polling interval in seconds (default: 5)", "5")
+    .option("--polling-interval <seconds>", "COS webhook polling interval in seconds (default: 2)", "2")
     .addHelpText(
       "after",
       `

@@ -249,8 +249,8 @@ npm run seed config.json
 # Configure polling timeout (default: 3 minutes)
 npm run seed config.json --polling-timeout 600  # 10 minutes
 
-# Configure polling interval (default: 5 seconds)
-npm run seed config.json --polling-interval 10  # 10 seconds
+# Configure polling interval (default: 2 seconds)
+npm run seed config.json --polling-interval 5  # Check every 5 seconds instead
 ```
 
 #### Direct Mode (Fallback, Debugging)
