@@ -2,6 +2,9 @@
  * Orchestration logic for seeding workflow
  */
 
+// Suppress verbose logging during normal operations (show only warnings/errors)
+process.env.LOG_LEVEL = process.env.LOG_LEVEL || "warn";
+
 import { PrismaClient } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import type { SeedConfig } from "../shared/types/SeedConfig";
@@ -883,8 +886,12 @@ async function executeWebhookBasedFlow(
   console.log(OutputFormatter.info("COS will update: inventory, inventoryHistory\n"));
 
   const pollerService = new OrderPollerService(services.wmsRepository);
-  const webhookProgressTracker = new ProgressTracker();
-  webhookProgressTracker.start("Polling for orders", finalShopifyResult.shopifyOrders.length);
+
+  // Use custom progress display for polling (ProgressTracker doesn't handle 0-based well)
+  let lastProgressMessage = "";
+  const pollStartTime = Date.now();
+
+  console.log("⏳ Polling for COS webhook ingestion...");
 
   let pollingResult;
   try {
@@ -894,24 +901,40 @@ async function executeWebhookBasedFlow(
         timeout: options.pollingTimeout * 1000, // Convert seconds to milliseconds
         pollInterval: options.pollingInterval * 1000,
         onProgress: (found: number, total: number, elapsed: number) => {
-          // ProgressTracker requires current >= 1 (1-based indexing), so skip when found=0
-          if (found > 0) {
-            webhookProgressTracker.update(found, `${found}/${total} orders (${Math.round(elapsed / 1000)}s elapsed)`);
+          const elapsedSec = Math.round(elapsed / 1000);
+          const message =
+            found > 0
+              ? `   Found ${found}/${total} orders (${elapsedSec}s elapsed)`
+              : `   Waiting for COS webhook... (${elapsedSec}s elapsed)`;
+
+          // Clear previous line and write new progress
+          if (lastProgressMessage) {
+            process.stdout.write("\r\x1b[K"); // Clear line
           }
+          process.stdout.write(message);
+          lastProgressMessage = message;
         },
         allowPartialSuccess: false, // Strict mode: fail if any order times out
       },
     );
 
-    webhookProgressTracker.update(pollingResult.foundOrders.length);
-    webhookProgressTracker.complete();
+    // Clear progress line and show success
+    if (lastProgressMessage) {
+      process.stdout.write("\r\x1b[K"); // Clear line
+    }
+
+    const totalElapsed = Math.round((Date.now() - pollStartTime) / 1000);
+    const prepCount = pollingResult.foundOrders.reduce((sum, o) => sum + o.preps.length, 0);
     console.log(
       OutputFormatter.success(
-        `✅ All ${pollingResult.foundOrders.length} orders ingested by COS webhook (${pollingResult.foundOrders.reduce((sum, o) => sum + o.preps.length, 0)} preps created)\n`,
+        `✅ All ${pollingResult.foundOrders.length} orders ingested by COS webhook in ${totalElapsed}s (${prepCount} preps created)\n`,
       ),
     );
   } catch (error) {
-    webhookProgressTracker.complete();
+    // Clear progress line on error
+    if (lastProgressMessage) {
+      process.stdout.write("\r\x1b[K\n");
+    }
 
     if (error instanceof WebhookTimeoutError) {
       console.log(OutputFormatter.error("\n⚠️  COS webhook timeout\n"));
