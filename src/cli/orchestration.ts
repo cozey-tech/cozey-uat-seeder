@@ -894,7 +894,10 @@ async function executeWebhookBasedFlow(
         timeout: options.pollingTimeout * 1000, // Convert seconds to milliseconds
         pollInterval: options.pollingInterval * 1000,
         onProgress: (found: number, total: number, elapsed: number) => {
-          webhookProgressTracker.update(found, `${found}/${total} orders (${Math.round(elapsed / 1000)}s elapsed)`);
+          // ProgressTracker requires current >= 1 (1-based indexing), so skip when found=0
+          if (found > 0) {
+            webhookProgressTracker.update(found, `${found}/${total} orders (${Math.round(elapsed / 1000)}s elapsed)`);
+          }
         },
         allowPartialSuccess: false, // Strict mode: fail if any order times out
       },
@@ -912,6 +915,8 @@ async function executeWebhookBasedFlow(
 
     if (error instanceof WebhookTimeoutError) {
       console.log(OutputFormatter.error("\n⚠️  COS webhook timeout\n"));
+      console.log(OutputFormatter.info(`Batch ID: ${batchId}`));
+      console.log(OutputFormatter.info(`To resume: npm run seed config.json --resume ${batchId}\n`));
       console.log(
         OutputFormatter.section("Suggestions", [
           OutputFormatter.listItem("Wait a few minutes and check WMS database manually"),
