@@ -219,6 +219,63 @@ npm run seed -- --resume abc-123-def
 
 **Note:** Progress state files are stored in `.progress/` directory. List available batch IDs by checking the directory or looking at previous run output.
 
+### Seeding Modes
+
+The seeder supports two modes: **Webhook Mode** (default) and **Direct Mode** (fallback).
+
+#### Webhook Mode (Default, Production-Like)
+
+**How It Works**:
+
+1. Creates orders in Shopify
+2. Waits for COS webhook to ingest orders (typical: 1-2 minutes)
+3. COS automatically creates WMS entities (order, prep, prepPart, customer, etc.)
+4. COS updates inventory and inventory history
+5. Creates collection prep using preps from COS
+
+**Benefits**:
+
+- ✅ Test data matches production behavior exactly
+- ✅ Inventory updates happen automatically (onHand, onHandCommitted)
+- ✅ Inventory history is recorded
+- ✅ All background tasks run (same as production)
+
+**Usage**:
+
+```bash
+# Webhook mode is the default
+npm run seed config.json
+
+# Configure polling timeout (default: 3 minutes)
+npm run seed config.json --polling-timeout 600  # 10 minutes
+
+# Configure polling interval (default: 5 seconds)
+npm run seed config.json --polling-interval 10  # 10 seconds
+```
+
+#### Direct Mode (Fallback, Debugging)
+
+**How It Works**:
+
+1. Creates orders in Shopify
+2. Directly creates WMS entities via Prisma (bypasses COS webhook)
+3. Creates collection prep via Prisma
+
+**When to Use**:
+
+- COS webhook listener is down
+- Debugging seeder itself (faster iteration, no wait time)
+- Testing WMS in isolation
+
+**Usage**:
+
+```bash
+# Use direct mode
+npm run seed config.json --use-direct-mode
+```
+
+**Note:** Direct mode bypasses COS business logic, so test data won't match production (missing inventory updates, inventory history, and background tasks).
+
 ### Configuration Format
 
 Example `seed-config.json`:

@@ -82,11 +82,18 @@ async function main(): Promise<void> {
         console.log(OutputFormatter.keyValue("Resuming Batch ID", options.resume));
         console.log();
 
+        const executionOptions = {
+          useWebhookMode: !options.useDirectMode,
+          pollingTimeout: options.pollingTimeout,
+          pollingInterval: options.pollingInterval,
+        };
+
         const { shopifyResult, wmsResult, collectionPrepResult } = await executeSeedingFlow(
           config,
           services,
           options.resume,
           false,
+          executionOptions,
           resumeState,
         );
 
@@ -164,13 +171,27 @@ async function main(): Promise<void> {
       // Generate batch ID for this run
       const batchId = uuidv4();
       console.log(OutputFormatter.keyValue("Batch ID", batchId));
+
+      // Show mode selection
+      if (options.useDirectMode) {
+        console.log(OutputFormatter.info("Mode: DIRECT (bypassing COS webhook)"));
+      } else {
+        console.log(OutputFormatter.info("Mode: WEBHOOK (production-like, waiting for COS ingestion)"));
+      }
       console.log();
+
+      const executionOptions = {
+        useWebhookMode: !options.useDirectMode,
+        pollingTimeout: options.pollingTimeout,
+        pollingInterval: options.pollingInterval,
+      };
 
       const { shopifyResult, wmsResult, collectionPrepResult } = await executeSeedingFlow(
         config,
         services,
         batchId,
         false,
+        executionOptions,
       );
 
       displaySummary(shopifyResult, wmsResult, collectionPrepResult, false);

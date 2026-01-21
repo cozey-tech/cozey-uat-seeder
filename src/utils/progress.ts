@@ -70,7 +70,7 @@ export class ProgressTracker {
 
   /**
    * Update progress
-   * @param current - Current progress (1-based)
+   * @param current - Current progress (1-based, not 0-based - minimum value is 1)
    * @param message - Optional message to display
    */
   update(current: number, message?: string): void {

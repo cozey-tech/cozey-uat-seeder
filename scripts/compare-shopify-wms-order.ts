@@ -46,21 +46,18 @@ async function compareShopifyWmsOrder(shopifyOrderNumber: string, region: string
 
     if (wmsOrders.length === 0) {
       console.log(`❌ No WMS orders found with Shopify order number: ${shopifyOrderNumber}`);
-      console.log("\nLet me search for any orders with tags...\n");
+      console.log("\nSearching for recent seed orders...\n");
 
-      // Search by batch tag instead
-      const ordersWithTags = await prisma.order.findMany({
+      // Search for recent seed orders by sourceName
+      const recentOrders = await prisma.order.findMany({
         where: {
           region,
-          tags: {
-            hasSome: ["wms_seed"],
-          },
+          sourceName: "wms_seed",
         },
         select: {
           id: true,
           shopifyOrderId: true,
           shopifyOrderNumber: true,
-          tags: true,
           variantOrder: {
             select: {
               lineItemId: true,
@@ -80,12 +77,11 @@ async function compareShopifyWmsOrder(shopifyOrderNumber: string, region: string
         },
       });
 
-      console.log(`Found ${ordersWithTags.length} recent WMS seed orders:\n`);
-      for (const order of ordersWithTags) {
+      console.log(`Found ${recentOrders.length} recent WMS seed orders:\n`);
+      for (const order of recentOrders) {
         console.log(`Order ID: ${order.id}`);
         console.log(`  Shopify Order #: ${order.shopifyOrderNumber}`);
         console.log(`  Shopify Order ID: ${order.shopifyOrderId}`);
-        console.log(`  Tags: ${JSON.stringify(order.tags)}`);
         console.log(`  Line Items:`);
         for (const vo of order.variantOrder) {
           console.log(`    - SKU: ${vo.variant.sku} (qty: ${vo.quantity})`);
@@ -93,8 +89,7 @@ async function compareShopifyWmsOrder(shopifyOrderNumber: string, region: string
         }
         console.log("");
       }
-
-      return ordersWithTags;
+      return;
     }
 
     console.log(`✅ Found ${wmsOrders.length} WMS order(s):\n`);
@@ -113,8 +108,6 @@ async function compareShopifyWmsOrder(shopifyOrderNumber: string, region: string
         console.log("");
       }
     }
-
-    return wmsOrders;
   } finally {
     await prisma.$disconnect();
   }

@@ -17,6 +17,7 @@ import { SeedWmsEntitiesHandler } from "../business/seedWmsEntities/SeedWmsEntit
 import { SeedWmsEntitiesUseCase } from "../business/seedWmsEntities/SeedWmsEntitiesUseCase";
 import { CreateCollectionPrepHandler } from "../business/createCollectionPrep/CreateCollectionPrepHandler";
 import { CreateCollectionPrepUseCase } from "../business/createCollectionPrep/CreateCollectionPrepUseCase";
+import { OrderPollerService, WebhookTimeoutError } from "../services/OrderPollerService";
 import { ProgressTracker } from "../utils/progress";
 import { OutputFormatter } from "../utils/outputFormatter";
 import { InteractivePromptService } from "../services/InteractivePromptService";
@@ -77,10 +78,52 @@ export function initializeServices(dryRun: boolean): ServiceDependencies {
   };
 }
 
+export interface ExecutionOptions {
+  useWebhookMode: boolean;
+  pollingTimeout: number; // seconds
+  pollingInterval: number; // seconds
+}
+
 /**
  * Execute the seeding flow (shared between normal and dry-run)
+ * Routes to webhook-based or direct mode based on options
  */
 export async function executeSeedingFlow(
+  config: SeedConfig,
+  services: ServiceDependencies,
+  batchId: string,
+  isDryRun: boolean,
+  options: ExecutionOptions,
+  resumeState?: ProgressState,
+): Promise<{
+  shopifyResult: {
+    shopifyOrders: Array<{
+      shopifyOrderId: string;
+      shopifyOrderNumber: string;
+      lineItems: Array<{ lineItemId: string; sku: string }>;
+    }>;
+    failures?: Array<{ orderIndex: number; customerEmail: string; error: string }>;
+  };
+  wmsResult: {
+    orders: Array<{ orderId: string }>;
+    shipments: Array<{ shipmentId: string }>;
+    failures?: Array<{ orderIndex: number; shopifyOrderId: string; customerEmail?: string; error: string }>;
+  };
+  collectionPrepResult?: { collectionPrepId: string; region: string };
+}> {
+  // Route to webhook or direct mode
+  if (options.useWebhookMode && !isDryRun) {
+    return executeWebhookBasedFlow(config, services, batchId, options, resumeState);
+  } else {
+    return executeDirectFlow(config, services, batchId, isDryRun, resumeState);
+  }
+}
+
+/**
+ * Execute seeding using direct Prisma mode (original behavior)
+ * Creates WMS entities directly via Prisma, bypassing COS webhook
+ */
+async function executeDirectFlow(
   config: SeedConfig,
   services: ServiceDependencies,
   batchId: string,
@@ -684,7 +727,283 @@ export async function executeSeedingFlow(
 }
 
 /**
+ * Execute seeding using webhook-based mode (production-like behavior)
+ * Creates Shopify orders, waits for COS webhook to ingest them, then creates collection prep
+ */
+async function executeWebhookBasedFlow(
+  config: SeedConfig,
+  services: ServiceDependencies,
+  batchId: string,
+  options: ExecutionOptions,
+  resumeState?: ProgressState,
+): Promise<{
+  shopifyResult: {
+    shopifyOrders: Array<{
+      shopifyOrderId: string;
+      shopifyOrderNumber: string;
+      lineItems: Array<{ lineItemId: string; sku: string }>;
+    }>;
+    failures?: Array<{ orderIndex: number; customerEmail: string; error: string }>;
+  };
+  wmsResult: {
+    orders: Array<{ orderId: string }>;
+    shipments: Array<{ shipmentId: string }>;
+    failures?: Array<{ orderIndex: number; shopifyOrderId: string; customerEmail?: string; error: string }>;
+  };
+  collectionPrepResult?: { collectionPrepId: string; region: string };
+}> {
+  console.log(OutputFormatter.info("Running in WEBHOOK MODE (production-like behavior)"));
+  console.log(OutputFormatter.info("COS webhook will create WMS entities automatically\n"));
+
+  // Step 1: Create Shopify orders (same as direct mode)
+  let collectionPrepName: string | undefined;
+  if (config.collectionPrep) {
+    collectionPrepName = await services.createCollectionPrepUseCase.generateCollectionPrepName(
+      config.collectionPrep.testTag,
+      config.collectionPrep.carrier,
+      config.collectionPrep.locationId,
+      config.collectionPrep.region,
+    );
+  }
+
+  const step1Label = resumeState ? "Resuming" : "Seeding";
+  const totalSteps = config.collectionPrep ? 3 : 2;
+  console.log(OutputFormatter.step(1, totalSteps, `${step1Label} Shopify orders`));
+
+  let ordersToProcess = config.orders;
+  const filteredToOriginalIndexMap = new Map<number, number>();
+  if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
+    const successfulIndices = new Set(resumeState.shopifyOrders.successful.map((s) => s.orderIndex));
+    ordersToProcess = config.orders.filter((_, index) => !successfulIndices.has(index));
+    let filteredIndex = 0;
+    for (let originalIndex = 0; originalIndex < config.orders.length; originalIndex++) {
+      if (!successfulIndices.has(originalIndex)) {
+        filteredToOriginalIndexMap.set(filteredIndex, originalIndex);
+        filteredIndex++;
+      }
+    }
+    console.log(
+      OutputFormatter.info(
+        `Resuming: ${ordersToProcess.length} failed orders to retry, ${resumeState.shopifyOrders.successful.length} already successful`,
+      ),
+    );
+  } else {
+    for (let i = 0; i < config.orders.length; i++) {
+      filteredToOriginalIndexMap.set(i, i);
+    }
+  }
+
+  const progressTracker = new ProgressTracker();
+  progressTracker.start(`${step1Label} Shopify orders`, config.orders.length);
+
+  if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
+    progressTracker.update(resumeState.shopifyOrders.successful.length, "Already completed");
+  }
+
+  const shopifyRequest = {
+    orders: ordersToProcess.map((order) => ({
+      customer: order.customer,
+      lineItems: order.lineItems.map((item) => ({
+        sku: item.sku,
+        quantity: item.quantity,
+      })),
+    })),
+    batchId,
+    region: config.region || config.collectionPrep?.region || "CA",
+    testTag: config.collectionPrep?.testTag,
+    onOrderProgress: (current: number, _total: number, customerEmail: string, _success: boolean): void => {
+      const adjustedCurrent = resumeState ? resumeState.shopifyOrders.successful.length + current : current;
+      progressTracker.update(adjustedCurrent, customerEmail);
+    },
+  };
+
+  const shopifyResult = await services.seedShopifyOrdersHandler.execute(shopifyRequest);
+
+  let finalShopifyResult = shopifyResult;
+  if (resumeState && resumeState.shopifyOrders.successful.length > 0) {
+    const previousSuccessful = resumeState.shopifyOrders.successful.map((s) => ({
+      shopifyOrderId: s.shopifyOrderId,
+      shopifyOrderNumber: s.shopifyOrderNumber,
+      lineItems: [] as Array<{ lineItemId: string; sku: string }>,
+      fulfillmentStatus: "unfulfilled" as string,
+    }));
+    finalShopifyResult = {
+      shopifyOrders: [...previousSuccessful, ...shopifyResult.shopifyOrders],
+      failures: shopifyResult.failures,
+    };
+  }
+
+  progressTracker.update(config.orders.length);
+  progressTracker.complete();
+
+  const createdLabel = resumeState ? "Resumed" : "Created";
+  const successCount = finalShopifyResult.shopifyOrders.length;
+  const totalCount = config.orders.length;
+
+  if (finalShopifyResult.failures && finalShopifyResult.failures.length > 0) {
+    console.log(
+      OutputFormatter.warning(
+        `${createdLabel} ${successCount}/${totalCount} Shopify order(s). ${finalShopifyResult.failures.length} failed.\n`,
+      ),
+    );
+  } else {
+    console.log(OutputFormatter.success(`${createdLabel} ${successCount} Shopify order(s)\n`));
+  }
+
+  // Handle failures - allow user to continue or abort
+  if (finalShopifyResult.failures && finalShopifyResult.failures.length > 0) {
+    console.log(
+      OutputFormatter.section("Shopify Seeding Failures", [
+        OutputFormatter.listItem(`Failed: ${finalShopifyResult.failures.length} of ${totalCount} orders`),
+        ...finalShopifyResult.failures.map((failure) =>
+          OutputFormatter.listItem(`Order ${failure.orderIndex + 1} (${failure.customerEmail}): ${failure.error}`, 2),
+        ),
+      ]),
+    );
+
+    console.log(OutputFormatter.info(`To resume this operation, use: --resume ${batchId}`));
+    console.log();
+
+    const promptService = new InteractivePromptService();
+    const shouldContinue = await promptService.promptConfirm(
+      "Some Shopify orders failed. Continue waiting for COS webhook for successful orders?",
+      false,
+    );
+
+    if (!shouldContinue) {
+      console.log(OutputFormatter.info("Aborting seeding operation."));
+      process.exit(1);
+    }
+    console.log();
+  }
+
+  // Step 2: Wait for COS webhook to ingest orders
+  console.log(OutputFormatter.step(2, totalSteps, "Waiting for COS webhook ingestion"));
+  console.log(OutputFormatter.info("COS will create: order, prep, prepPart, customer, variantOrder"));
+  console.log(OutputFormatter.info("COS will update: inventory, inventoryHistory\n"));
+
+  const pollerService = new OrderPollerService(services.wmsRepository);
+  const webhookProgressTracker = new ProgressTracker();
+  webhookProgressTracker.start("Polling for orders", finalShopifyResult.shopifyOrders.length);
+
+  let pollingResult;
+  try {
+    pollingResult = await pollerService.pollForOrders(
+      finalShopifyResult.shopifyOrders.map((o) => o.shopifyOrderId),
+      {
+        timeout: options.pollingTimeout * 1000, // Convert seconds to milliseconds
+        pollInterval: options.pollingInterval * 1000,
+        onProgress: (found: number, total: number, elapsed: number) => {
+          // ProgressTracker requires current >= 1 (1-based indexing), so skip when found=0
+          if (found > 0) {
+            webhookProgressTracker.update(found, `${found}/${total} orders (${Math.round(elapsed / 1000)}s elapsed)`);
+          }
+        },
+        allowPartialSuccess: false, // Strict mode: fail if any order times out
+      },
+    );
+
+    webhookProgressTracker.update(pollingResult.foundOrders.length);
+    webhookProgressTracker.complete();
+    console.log(
+      OutputFormatter.success(
+        `✅ All ${pollingResult.foundOrders.length} orders ingested by COS webhook (${pollingResult.foundOrders.reduce((sum, o) => sum + o.preps.length, 0)} preps created)\n`,
+      ),
+    );
+  } catch (error) {
+    webhookProgressTracker.complete();
+
+    if (error instanceof WebhookTimeoutError) {
+      console.log(OutputFormatter.error("\n⚠️  COS webhook timeout\n"));
+      console.log(OutputFormatter.info(`Batch ID: ${batchId}`));
+      console.log(OutputFormatter.info(`To resume: npm run seed config.json --resume ${batchId}\n`));
+      console.log(
+        OutputFormatter.section("Suggestions", [
+          OutputFormatter.listItem("Wait a few minutes and check WMS database manually"),
+          OutputFormatter.listItem("Retry with longer timeout: --polling-timeout 600 (10 minutes)"),
+          OutputFormatter.listItem("Use direct mode as fallback: --use-direct-mode"),
+          OutputFormatter.listItem("Check COS webhook listener status"),
+        ]),
+      );
+      throw error;
+    }
+    throw error;
+  }
+
+  // Step 3: Create collection prep (if configured)
+  let collectionPrepId: string | undefined;
+  if (config.collectionPrep) {
+    console.log(OutputFormatter.step(3, totalSteps, "Creating collection prep"));
+
+    // Extract prep IDs from polling result
+    const allPrepIds = pollingResult.foundOrders.flatMap((order) => order.preps.map((p) => p.prepId));
+
+    console.log(OutputFormatter.info(`Using ${allPrepIds.length} preps created by COS webhook\n`));
+
+    const collectionPrepRequest = {
+      orderIds: pollingResult.foundOrders.map((o) => o.shopifyOrderId),
+      carrier: config.collectionPrep.carrier,
+      locationId: config.collectionPrep.locationId,
+      region: config.collectionPrep.region,
+      prepDate: config.collectionPrep.prepDate,
+      testTag: config.collectionPrep.testTag,
+      collectionPrepName,
+    };
+
+    const collectionPrepResult = await services.createCollectionPrepHandler.execute(collectionPrepRequest);
+    collectionPrepId = collectionPrepResult.collectionPrepId;
+    console.log(OutputFormatter.success(`Created collection prep: ${collectionPrepId}\n`));
+  }
+
+  // Build WMS result from polling (COS created the entities)
+  const wmsResult = {
+    orders: pollingResult.foundOrders.map((o) => ({ orderId: o.wmsOrderId })),
+    shipments: [], // Shipments created by collection prep, not tracked here
+    failures: [],
+  };
+
+  // Save progress state
+  const progressState: ProgressState = {
+    batchId,
+    timestamp: Date.now(),
+    shopifyOrders: {
+      successful: finalShopifyResult.shopifyOrders.map((order, index) => ({
+        orderIndex: index,
+        shopifyOrderId: order.shopifyOrderId,
+        shopifyOrderNumber: order.shopifyOrderNumber,
+        customerEmail: config.orders[index]?.customer.email || "",
+      })),
+      failed: finalShopifyResult.failures || [],
+    },
+    wmsEntities: {
+      successful: pollingResult.foundOrders.map((order, index) => ({
+        orderIndex: index,
+        orderId: order.wmsOrderId,
+        shopifyOrderId: order.shopifyOrderId,
+        prepPartItems: [], // COS webhook creates these, we don't track them individually
+      })),
+      failed: [],
+      shipments: [], // Shipments created by collection prep
+    },
+    collectionPrep: collectionPrepId ? { collectionPrepId, region: config.collectionPrep!.region } : undefined,
+  };
+  saveProgressState(progressState);
+
+  const collectionPrepResult = collectionPrepId
+    ? { collectionPrepId, region: config.collectionPrep!.region }
+    : undefined;
+
+  // Delete progress state on successful completion
+  if (!finalShopifyResult.failures || finalShopifyResult.failures.length === 0) {
+    deleteProgressState(batchId);
+  }
+
+  return { shopifyResult: finalShopifyResult, wmsResult, collectionPrepResult };
+}
+
+/**
  * Execute dry-run mode: simulate full flow without making actual changes
+ * Always uses direct mode (webhook mode requires real Shopify orders)
  */
 export async function executeDryRun(configFilePath: string, services: ServiceDependencies): Promise<void> {
   console.log(OutputFormatter.header("DRY RUN MODE - No changes will be made", "🔍"));
@@ -699,7 +1018,20 @@ export async function executeDryRun(configFilePath: string, services: ServiceDep
   console.log(OutputFormatter.keyValue("Batch ID", batchId));
   console.log();
 
-  const { shopifyResult, wmsResult, collectionPrepResult } = await executeSeedingFlow(config, services, batchId, true);
+  // Dry-run always uses direct mode (can't dry-run webhook ingestion)
+  const options: ExecutionOptions = {
+    useWebhookMode: false,
+    pollingTimeout: 180,
+    pollingInterval: 5,
+  };
+
+  const { shopifyResult, wmsResult, collectionPrepResult } = await executeSeedingFlow(
+    config,
+    services,
+    batchId,
+    true,
+    options,
+  );
 
   displaySummary(shopifyResult, wmsResult, collectionPrepResult, true);
 }

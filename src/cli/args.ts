@@ -11,6 +11,9 @@ export interface CliOptions {
   validate: boolean;
   dryRun: boolean;
   resume?: string;
+  useDirectMode: boolean;
+  pollingTimeout: number; // seconds
+  pollingInterval: number; // seconds
 }
 
 /**
@@ -28,6 +31,9 @@ export function parseArgs(): CliOptions {
     .option("--dry-run", "Simulate seeding without making changes")
     .option("--skip-confirmation", "Skip staging confirmation prompt")
     .option("--resume <batch-id>", "Resume a failed seeding operation from batch ID (requires config-file)")
+    .option("--use-direct-mode", "Use direct Prisma mode (bypass COS webhook, for debugging). Default is webhook mode.")
+    .option("--polling-timeout <seconds>", "COS webhook polling timeout in seconds (default: 180 = 3 minutes)", "180")
+    .option("--polling-interval <seconds>", "COS webhook polling interval in seconds (default: 5)", "5")
     .addHelpText(
       "after",
       `
@@ -36,6 +42,14 @@ Examples:
   $ npm run seed config.json --validate
   $ npm run seed config.json --dry-run
   $ npm run seed config.json --skip-confirmation
+  $ npm run seed config.json --use-direct-mode
+
+Webhook Mode (default):
+  Creates Shopify orders and waits for COS to ingest via webhook (1-2 minutes).
+  Ensures test data matches production (inventory updates, history).
+
+Direct Mode (fallback):
+  Directly creates WMS entities via Prisma. Use for debugging or if COS is unavailable.
 
 For more information, see README.md
       `,
@@ -73,5 +87,8 @@ For more information, see README.md
     validate: options.validate || false,
     dryRun: options.dryRun || false,
     resume: options.resume || undefined,
+    useDirectMode: options.useDirectMode || false,
+    pollingTimeout: parseInt(options.pollingTimeout),
+    pollingInterval: parseInt(options.pollingInterval),
   };
 }
