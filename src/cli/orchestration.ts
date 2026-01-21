@@ -3,6 +3,7 @@
  */
 
 // Suppress verbose logging during normal operations (show only warnings/errors)
+// Set to "debug" to see detailed polling information
 process.env.LOG_LEVEL = process.env.LOG_LEVEL || "warn";
 
 import { PrismaClient } from "@prisma/client";
@@ -892,6 +893,8 @@ async function executeWebhookBasedFlow(
   const pollStartTime = Date.now();
 
   console.log("⏳ Polling for COS webhook ingestion...");
+  console.log(`   Checking every ${options.pollingInterval}s (timeout: ${options.pollingTimeout}s)`);
+  console.log(`   Set LOG_LEVEL=debug for detailed polling logs\n`);
 
   let pollingResult;
   try {

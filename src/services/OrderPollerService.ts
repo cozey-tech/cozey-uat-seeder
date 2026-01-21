@@ -107,6 +107,20 @@ export class OrderPollerService {
         if (!foundOrders.has(shopifyOrderId)) {
           const order = await this.wmsRepository.findOrderByShopifyId(shopifyOrderId);
 
+          // Debug: Log what we found
+          if (order) {
+            Logger.debug("Order found in WMS", {
+              shopifyOrderId,
+              wmsOrderId: order.id,
+              status: order.status,
+              customerId: order.customerId,
+              hasStatus: !!order.status,
+              hasCustomerId: !!order.customerId,
+            });
+          } else {
+            Logger.debug("Order not yet in WMS", { shopifyOrderId });
+          }
+
           if (order && order.status && order.customerId) {
             // Order fully created by COS webhook (status and customer populated)
             Logger.debug("Order ingested by webhook", {
