@@ -114,39 +114,46 @@ export class OrderPollerService {
               wmsOrderId: order.id,
               status: order.status,
               customerId: order.customerId,
-              hasStatus: !!order.status,
-              hasCustomerId: !!order.customerId,
             });
           } else {
             Logger.debug("Order not yet in WMS", { shopifyOrderId });
           }
 
-          if (order && order.status && order.customerId) {
-            // Order fully created by COS webhook (status and customer populated)
-            Logger.debug("Order ingested by webhook", {
-              shopifyOrderId,
-              wmsOrderId: order.id,
-              status: order.status,
-            });
-
+          // If order exists, check if COS webhook created preps for it
+          if (order) {
             // Query preps created by COS for this order
             const preps = await this.wmsRepository.findPrepsByOrderIds([shopifyOrderId], order.region);
 
-            foundOrders.set(shopifyOrderId, {
-              wmsOrderId: order.id,
-              preps: preps
-                .filter((prep) => prep.lineItemId) // Only include preps with line item IDs
-                .map((prep) => ({
-                  prepId: prep.prep,
-                  lineItemId: prep.lineItemId!,
-                })),
-            });
-
-            Logger.info("Order and preps found", {
+            Logger.debug("Checking preps for order", {
               shopifyOrderId,
               wmsOrderId: order.id,
               prepCount: preps.length,
             });
+
+            // Order is considered "ingested" when preps exist (COS webhook completed)
+            if (preps.length > 0) {
+              Logger.debug("Order ingested by webhook", {
+                shopifyOrderId,
+                wmsOrderId: order.id,
+                prepCount: preps.length,
+              });
+
+              foundOrders.set(shopifyOrderId, {
+                wmsOrderId: order.id,
+                preps: preps
+                  .filter((prep) => prep.lineItemId) // Only include preps with line item IDs
+                  .map((prep) => ({
+                    prepId: prep.prep,
+                    lineItemId: prep.lineItemId!,
+                  })),
+              });
+
+              Logger.info("Order and preps found", {
+                shopifyOrderId,
+                wmsOrderId: order.id,
+                prepCount: preps.length,
+              });
+            }
           }
         }
       }
