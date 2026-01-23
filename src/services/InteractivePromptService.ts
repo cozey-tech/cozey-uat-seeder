@@ -705,13 +705,14 @@ export class InteractivePromptService {
   /**
    * Prompt for collection prep builder mode
    */
-  async promptCollectionPrepBuilderMode(): Promise<"single" | "multiple" | "bulk"> {
-    const { mode } = await inquirer.prompt<{ mode: "single" | "multiple" | "bulk" }>([
+  async promptCollectionPrepBuilderMode(): Promise<"single" | "multiple" | "bulk" | "skip"> {
+    const { mode } = await inquirer.prompt<{ mode: "single" | "multiple" | "bulk" | "skip" }>([
       {
         type: "list",
         name: "mode",
-        message: "How would you like to configure collection preps?",
+        message: "How would you like to configure collection preps? (Select 'Skip' if you don't need collection preps)",
         choices: [
+          { name: "Skip collection prep", value: "skip" },
           { name: "Single collection prep (simple)", value: "single" },
           { name: "Multiple collection preps with different carriers (builder)", value: "multiple" },
           { name: "Bulk create multiple preps (same config, vary carriers)", value: "bulk" },

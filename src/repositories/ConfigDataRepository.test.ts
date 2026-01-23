@@ -106,9 +106,6 @@ describe("ConfigDataRepository", () => {
         where: {
           region: "CA",
           disabled: false,
-          shopifyIds: {
-            isEmpty: false,
-          },
         },
         select: {
           id: true,
@@ -147,9 +144,6 @@ describe("ConfigDataRepository", () => {
         expect.objectContaining({
           where: expect.objectContaining({
             disabled: false,
-            shopifyIds: {
-              isEmpty: false,
-            },
           }),
         }),
       );

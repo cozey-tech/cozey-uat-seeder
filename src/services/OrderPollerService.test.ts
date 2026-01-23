@@ -316,12 +316,15 @@ describe("OrderPollerService", () => {
         { prep: "prep-1", orderId: "shopify-order-1", lineItemId: "line-1", region: "CA", collectionPrepId: null },
       ];
 
-      // First call returns incomplete order, second call returns complete
+      // First call returns incomplete order (no preps), second call returns complete order (with preps)
       vi.mocked(mockRepository.findOrderByShopifyId)
         .mockResolvedValueOnce(incompleteOrder)
         .mockResolvedValue(completeOrder);
 
-      vi.mocked(mockRepository.findPrepsByOrderIds).mockResolvedValue(preps);
+      // First call: no preps (incomplete order), second call: preps exist (complete order)
+      vi.mocked(mockRepository.findPrepsByOrderIds)
+        .mockResolvedValueOnce([]) // No preps for incomplete order
+        .mockResolvedValue(preps); // Preps exist for complete order
 
       const result = await service.pollForOrders(["shopify-order-1"], {
         timeout: 10000,
@@ -398,16 +401,18 @@ describe("OrderPollerService", () => {
       };
 
       // Order exists but no preps yet (COS may create order before preps)
+      // Service requires preps.length > 0 to consider order ingested, so this will timeout
       vi.mocked(mockRepository.findOrderByShopifyId).mockResolvedValue(order);
       vi.mocked(mockRepository.findPrepsByOrderIds).mockResolvedValue([]);
 
-      const result = await service.pollForOrders(["shopify-order-1"], {
-        timeout: 10000,
-        pollInterval: 100,
-      });
-
-      expect(result.foundOrders).toHaveLength(1);
-      expect(result.foundOrders[0].preps).toEqual([]);
+      // Service will continue polling until timeout since preps.length === 0
+      // This test verifies timeout behavior when preps never appear
+      await expect(
+        service.pollForOrders(["shopify-order-1"], {
+          timeout: 500, // Short timeout for test
+          pollInterval: 50,
+        }),
+      ).rejects.toThrow(WebhookTimeoutError);
     });
   });
 

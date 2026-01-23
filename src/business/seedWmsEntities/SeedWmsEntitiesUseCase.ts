@@ -114,30 +114,38 @@ export class SeedWmsEntitiesUseCase {
           request.region,
         );
 
-        // Create preps
-        const preps = await this.wmsService.createPrepsForOrder(
-          shopifyOrder.shopifyOrderId,
-          variantOrders,
-          request.collectionPrepId,
-          request.region,
-        );
+        // Create preps only if collectionPrepId is provided
+        if (request.collectionPrepId) {
+          const preps = await this.wmsService.createPrepsForOrder(
+            shopifyOrder.shopifyOrderId,
+            variantOrders,
+            request.collectionPrepId,
+            request.region,
+          );
 
-        // Create prepParts and prepPartItems - use actual quantities
-        const prepPartsAndItems = await this.wmsService.createPrepPartsAndItems(
-          preps,
-          shopifyOrder.lineItems.map((item) => ({
-            lineItemId: item.lineItemId,
-            sku: item.sku,
-            quantity: item.quantity || 1, // Use actual quantity from Shopify
-          })),
-          request.region,
-        );
+          // Create prepParts and prepPartItems - use actual quantities
+          const prepPartsAndItems = await this.wmsService.createPrepPartsAndItems(
+            preps,
+            shopifyOrder.lineItems.map((item) => ({
+              lineItemId: item.lineItemId,
+              sku: item.sku,
+              quantity: item.quantity || 1, // Use actual quantity from Shopify
+            })),
+            request.region,
+          );
 
-        // Collect prepPartItem IDs
-        for (const prepPartItem of prepPartsAndItems) {
-          prepPartItems.push({
-            prepPartItemId: prepPartItem.prepPartItemId,
-            partId: prepPartItem.partId,
+          // Collect prepPartItem IDs
+          for (const prepPartItem of prepPartsAndItems) {
+            prepPartItems.push({
+              prepPartItemId: prepPartItem.prepPartItemId,
+              partId: prepPartItem.partId,
+            });
+          }
+        } else {
+          // Log that preps are being skipped
+          Logger.info("Skipping prep creation - no collectionPrepId provided", {
+            shopifyOrderId: shopifyOrder.shopifyOrderId,
+            orderIndex,
           });
         }
 

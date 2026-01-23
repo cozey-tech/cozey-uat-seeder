@@ -59,6 +59,15 @@ export async function configureCollectionPreps(context: CollectionPrepContext): 
 
   const builderMode = await promptService.promptCollectionPrepBuilderMode();
 
+  if (builderMode === "skip") {
+    // User chose to skip collection prep configuration
+    Logger.info("Collection prep configuration skipped by user", {
+      orderCount: orders.length,
+    });
+    console.log(OutputFormatter.info("Collection prep configuration skipped\n"));
+    return {};
+  }
+
   if (builderMode === "bulk") {
     // Bulk collection prep creation mode
     const bulkConfig = await promptService.promptBulkCollectionPrepConfig(carriers, orders.length);
