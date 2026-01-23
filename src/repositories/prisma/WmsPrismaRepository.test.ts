@@ -378,6 +378,7 @@ describe("WmsPrismaRepository", () => {
           shopifyOrderNumber: true,
           status: true,
           region: true,
+          customerId: true,
         },
       });
     });
