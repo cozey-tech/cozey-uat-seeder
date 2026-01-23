@@ -278,7 +278,7 @@ npm run seed config.json --use-direct-mode
 
 ### Configuration Format
 
-Example `seed-config.json`:
+Example `seed-config.json` with collection prep:
 
 ```json
 {
@@ -335,6 +335,31 @@ Example `seed-config.json`:
       }
     ]
   }
+}
+```
+
+**Note:** The `collectionPrep` field is optional. If omitted, orders will be created without collection preps (and without preps/prepParts/prepPartItems). This is useful for testing order creation in isolation.
+
+Example `seed-config.json` without collection prep:
+
+```json
+{
+  "orders": [
+    {
+      "orderType": "regular-only",
+      "customer": {
+        "name": "Test Customer",
+        "email": "test@example.com"
+      },
+      "lineItems": [
+        {
+          "sku": "SOFA-CHAR-BLK",
+          "quantity": 1,
+          "pickType": "Regular"
+        }
+      ]
+    }
+  ]
 }
 ```
 
