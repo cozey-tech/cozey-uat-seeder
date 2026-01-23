@@ -62,7 +62,7 @@ describe("SeedWmsEntitiesUseCase", () => {
     expect(mockWmsService.createOrderWithCustomer).not.toHaveBeenCalled();
   });
 
-  it("should create WMS entities for new orders", async () => {
+  it("should create WMS entities for new orders with collection prep", async () => {
     const request: SeedWmsEntitiesRequest = {
       shopifyOrders: [
         {
@@ -75,6 +75,7 @@ describe("SeedWmsEntitiesUseCase", () => {
         },
       ],
       region: "CA",
+      collectionPrepId: "cp-123",
     };
 
     vi.mocked(mockWmsService.repository.findOrderByShopifyId).mockResolvedValue(null);
@@ -109,6 +110,49 @@ describe("SeedWmsEntitiesUseCase", () => {
       [{ lineItemId: "line-1", sku: "SKU-001", quantity: 2 }],
       "CA",
     );
+    expect(mockWmsService.createPrepsForOrder).toHaveBeenCalledWith(
+      "gid://shopify/Order/123",
+      [{ variantId: "variant-1", lineItemId: "line-1" }],
+      "cp-123",
+      "CA",
+    );
+    expect(mockWmsService.createPrepPartsAndItems).toHaveBeenCalled();
+    expect(result.prepPartItems).toHaveLength(1);
+  });
+
+  it("should skip prep creation when collectionPrepId is not provided", async () => {
+    const request: SeedWmsEntitiesRequest = {
+      shopifyOrders: [
+        {
+          shopifyOrderId: "gid://shopify/Order/123",
+          shopifyOrderNumber: "#1001",
+          status: "fulfilled",
+          customerName: "Test Customer",
+          customerEmail: "test@example.com",
+          lineItems: [{ lineItemId: "line-1", sku: "SKU-001", quantity: 2 }],
+        },
+      ],
+      region: "CA",
+    };
+
+    vi.mocked(mockWmsService.repository.findOrderByShopifyId).mockResolvedValue(null);
+    vi.mocked(mockWmsService.createOrderWithCustomer).mockResolvedValue({
+      orderDbId: "order-123",
+      shopifyOrderId: "gid://shopify/Order/123",
+      customerId: "customer-123",
+    });
+    vi.mocked(mockWmsService.createVariantOrdersForOrder).mockResolvedValue([
+      { variantId: "variant-1", lineItemId: "line-1" },
+    ]);
+
+    const result = await useCase.execute(request);
+
+    expect(result.orders).toHaveLength(1);
+    expect(mockWmsService.createOrderWithCustomer).toHaveBeenCalled();
+    expect(mockWmsService.createVariantOrdersForOrder).toHaveBeenCalled();
+    expect(mockWmsService.createPrepsForOrder).not.toHaveBeenCalled();
+    expect(mockWmsService.createPrepPartsAndItems).not.toHaveBeenCalled();
+    expect(result.prepPartItems).toHaveLength(0);
   });
 
   it("should use actual quantities from request", async () => {
@@ -121,6 +165,7 @@ describe("SeedWmsEntitiesUseCase", () => {
         },
       ],
       region: "CA",
+      collectionPrepId: "cp-123",
     };
 
     vi.mocked(mockWmsService.repository.findOrderByShopifyId).mockResolvedValue(null);
