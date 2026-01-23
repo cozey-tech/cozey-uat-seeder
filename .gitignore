@@ -36,3 +36,5 @@ output/
 
 # Progress state files (resume/retry)
 .progress/
+.specstory/
+.cursorindexingignore
