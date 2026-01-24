@@ -11,6 +11,55 @@ This tool creates coordinated test data across two systems:
 
 The seeder is **staging-only** and includes hard-coded guardrails to prevent execution against production environments.
 
+## Recent Improvements
+
+### Enhanced Error Messages (v0.2.0)
+
+Error messages now follow a structured "What/Why/How" format for faster issue resolution:
+
+```
+📍 Step: Step 2 (WMS seeding) | Order: 5 | SKU: INVALID-123
+❌ Failed to create WMS order
+
+What happened: SKU "INVALID-123" not found in database
+Why: The specified SKU doesn't exist in the WMS variant catalog for this region
+What to do:
+  1. Check SKU "INVALID-123" spelling in configuration file
+  2. Verify SKU exists in the staging WMS database
+  3. Ensure you're using the correct region (CA/US)
+  4. Check order at index 5 in your config
+
+📖 See: docs/troubleshooting.md#sku-not-found
+```
+
+### Progress Tracking with Time Estimates
+
+Progress bars now show estimated time remaining based on recent operation speed:
+
+```
+Seeding Shopify orders [████████░░░] 75% ~2m 30s remaining
+```
+
+### Performance Timing Breakdown
+
+After seeding completes, a timing breakdown shows duration of each phase:
+
+```
+⏱️  Timing Breakdown
+  • Shopify Orders: 2m 15s
+  • WMS Entities: 1m 45s
+  • Collection Prep: 30s
+
+Total Duration: 4m 30s
+```
+
+### Bug Fixes (Sprint 1 & 2)
+
+- ✅ Fixed WMS order index mapping during partial failures
+- ✅ Fixed shipment tracking for idempotent orders during resume
+- ✅ Fixed collection prep reuse when resuming operations
+- ✅ Verified config order index mapping preserves original indices
+
 ## Quickstart
 
 ### Prerequisites
