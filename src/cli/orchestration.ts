@@ -760,6 +760,9 @@ async function executeWebhookBasedFlow(
   console.log(OutputFormatter.info("COS webhook will create WMS entities automatically\n"));
 
   // Step 1: Create Shopify orders (same as direct mode)
+  // Check if collection preps are configured (support both singular and plural)
+  const hasCollectionPreps = !!(config.collectionPrep || (config.collectionPreps && config.collectionPreps.length > 0));
+
   let collectionPrepName: string | undefined;
   if (config.collectionPrep) {
     collectionPrepName = await services.createCollectionPrepUseCase.generateCollectionPrepName(
@@ -771,7 +774,7 @@ async function executeWebhookBasedFlow(
   }
 
   const step1Label = resumeState ? "Resuming" : "Seeding";
-  const totalSteps = config.collectionPrep ? 3 : 2;
+  const totalSteps = hasCollectionPreps ? 3 : 1; // Only Shopify orders if no collection preps
   console.log(OutputFormatter.step(1, totalSteps, `${step1Label} Shopify orders`));
 
   let ordersToProcess = config.orders;
@@ -854,7 +857,7 @@ async function executeWebhookBasedFlow(
     console.log(OutputFormatter.success(`${createdLabel} ${successCount} Shopify order(s)\n`));
   }
 
-  // Handle failures - allow user to continue or abort
+  // Handle failures - allow user to continue or abort (only if collection preps are needed)
   if (finalShopifyResult.failures && finalShopifyResult.failures.length > 0) {
     console.log(
       OutputFormatter.section("Shopify Seeding Failures", [
@@ -868,20 +871,65 @@ async function executeWebhookBasedFlow(
     console.log(OutputFormatter.info(`To resume this operation, use: --resume ${batchId}`));
     console.log();
 
-    const promptService = new InteractivePromptService();
-    const shouldContinue = await promptService.promptConfirm(
-      "Some Shopify orders failed. Continue waiting for COS webhook for successful orders?",
-      false,
-    );
+    // Only prompt about webhook if collection preps are configured
+    if (hasCollectionPreps) {
+      const promptService = new InteractivePromptService();
+      const shouldContinue = await promptService.promptConfirm(
+        "Some Shopify orders failed. Continue waiting for COS webhook for successful orders?",
+        false,
+      );
 
-    if (!shouldContinue) {
-      console.log(OutputFormatter.info("Aborting seeding operation."));
-      process.exit(1);
+      if (!shouldContinue) {
+        console.log(OutputFormatter.info("Aborting seeding operation."));
+        process.exit(1);
+      }
+      console.log();
     }
-    console.log();
   }
 
-  // Step 2: Wait for COS webhook to ingest orders
+  // Step 2: Wait for COS webhook to ingest orders (only if collection preps are needed)
+  if (!hasCollectionPreps) {
+    // No collection preps configured, skip webhook waiting and return early
+    console.log(OutputFormatter.info("No collection preps configured - skipping COS webhook wait\n"));
+
+    // Build minimal WMS result (no WMS entities created since we're not waiting for webhook)
+    const wmsResult = {
+      orders: [],
+      shipments: [],
+      failures: [],
+    };
+
+    // Save progress state
+    const progressState: ProgressState = {
+      batchId,
+      timestamp: Date.now(),
+      shopifyOrders: {
+        successful: finalShopifyResult.shopifyOrders.map((order, index) => ({
+          orderIndex: index,
+          shopifyOrderId: order.shopifyOrderId,
+          shopifyOrderNumber: order.shopifyOrderNumber,
+          customerEmail: config.orders[index]?.customer.email || "",
+        })),
+        failed: finalShopifyResult.failures || [],
+      },
+      wmsEntities: {
+        successful: [],
+        failed: [],
+        shipments: [],
+      },
+      collectionPrep: undefined,
+    };
+    saveProgressState(progressState);
+
+    // Delete progress state on successful completion
+    if (!finalShopifyResult.failures || finalShopifyResult.failures.length === 0) {
+      deleteProgressState(batchId);
+    }
+
+    return { shopifyResult: finalShopifyResult, wmsResult, collectionPrepResult: undefined };
+  }
+
+  // Collection preps are configured, proceed with webhook waiting
   console.log(OutputFormatter.step(2, totalSteps, "Waiting for COS webhook ingestion"));
   console.log(OutputFormatter.info("COS will create: order, prep, prepPart, customer, variantOrder"));
   console.log(OutputFormatter.info("COS will update: inventory, inventoryHistory\n"));
