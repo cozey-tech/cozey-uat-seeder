@@ -208,5 +208,48 @@ describe("WMS Order Index Mapping", () => {
       // TODO: Implement integration test for this when orchestration mocking is available
       expect(true).toBe(true);
     });
+
+    it("should preserve original config indices after filtering during resume", () => {
+      // Scenario: Config has 5 orders [0,1,2,3,4], orders 1 and 3 were successful
+      // On resume, we filter to [0,2,4] but need to track original indices
+
+      // Create filtered to original index map (simulating resume scenario)
+      const filteredToOriginalIndexMap = new Map<number, number>();
+      const originalOrders = [0, 1, 2, 3, 4]; // Original config indices
+      const successfulIndices = new Set([1, 3]); // Orders 1 and 3 succeeded
+
+      let filteredIndex = 0;
+      for (let originalIndex = 0; originalIndex < originalOrders.length; originalIndex++) {
+        if (!successfulIndices.has(originalIndex)) {
+          filteredToOriginalIndexMap.set(filteredIndex, originalIndex);
+          filteredIndex++;
+        }
+      }
+
+      // Verify mapping
+      expect(filteredToOriginalIndexMap.get(0)).toBe(0); // First filtered order is original index 0
+      expect(filteredToOriginalIndexMap.get(1)).toBe(2); // Second filtered order is original index 2
+      expect(filteredToOriginalIndexMap.get(2)).toBe(4); // Third filtered order is original index 4
+      expect(filteredToOriginalIndexMap.size).toBe(3); // Only 3 orders to process
+
+      // Simulate failure mapping back to original indices
+      const failures = [
+        { orderIndex: 0, customerEmail: "test0@example.com", error: "Failed" }, // Filtered index 0 (original 0)
+        { orderIndex: 2, customerEmail: "test4@example.com", error: "Failed" }, // Filtered index 2 (original 4)
+      ];
+
+      const mappedFailures = failures.map((failure) => {
+        const originalIndex = filteredToOriginalIndexMap.get(failure.orderIndex);
+        return {
+          orderIndex: originalIndex !== undefined ? originalIndex : failure.orderIndex,
+          customerEmail: failure.customerEmail,
+          error: failure.error,
+        };
+      });
+
+      // Verify failures mapped to correct original indices
+      expect(mappedFailures[0]?.orderIndex).toBe(0); // Original index 0
+      expect(mappedFailures[1]?.orderIndex).toBe(4); // Original index 4
+    });
   });
 });
