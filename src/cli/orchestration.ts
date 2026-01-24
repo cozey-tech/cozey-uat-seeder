@@ -642,21 +642,13 @@ async function executeDirectFlow(
           // Note: wmsResult.orders only contains successful orders, so we need to reconstruct the mapping
           // by tracking which orders from wmsOrdersToProcess succeeded vs failed.
 
-          // Build set of failed indices (relative to wmsOrdersToProcess)
-          const wmsFailedIndices = new Set((wmsResult.failures || []).map((f) => f.orderIndex));
-
           // Build map of shopifyOrderId to index in wmsOrdersToProcess
-          // Since orders are processed sequentially, we can match successful orders by position
+          // Match successful orders by shopifyOrderId, not by position, to handle any ordering issues
           const successfulOrderIdToProcessedIndex = new Map<string, number>();
-          let successfulOrderIndex = 0;
           for (let processedIndex = 0; processedIndex < wmsOrdersToProcess.length; processedIndex++) {
-            if (!wmsFailedIndices.has(processedIndex)) {
-              // This order succeeded - match it to the successful order at this position
-              if (successfulOrderIndex < wmsResult.orders.length) {
-                const successfulOrder = wmsResult.orders[successfulOrderIndex];
-                successfulOrderIdToProcessedIndex.set(successfulOrder.shopifyOrderId, processedIndex);
-                successfulOrderIndex++;
-              }
+            const order = wmsOrdersToProcess[processedIndex];
+            if (order) {
+              successfulOrderIdToProcessedIndex.set(order.shopifyOrderId, processedIndex);
             }
           }
 
