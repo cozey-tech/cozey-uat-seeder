@@ -97,18 +97,20 @@ describe("ErrorFormatter", () => {
       });
 
       expect(formatted).toContain("❌");
-      expect(formatted).toContain("💡");
+      expect(formatted).toContain("What happened:");
+      expect(formatted).toContain("Why:");
+      expect(formatted).toContain("What to do:");
       expect(formatted).toContain("Step 2");
       expect(formatted).toContain("Order: 1");
-      expect(formatted).toContain("Suggestions:");
     });
 
     it("should include suggestions in formatted string", () => {
       const error = new InputValidationError("Invalid schema");
       const formatted = ErrorFormatter.formatAsString(error);
 
-      expect(formatted).toContain("Suggestions:");
-      expect(formatted).toContain("•");
+      expect(formatted).toContain("What happened:");
+      expect(formatted).toContain("What to do:");
+      expect(formatted).toContain("1.");
     });
 
     it("should handle errors without context", () => {
@@ -174,6 +176,133 @@ describe("ErrorFormatter", () => {
 
       expect(formatted.message).toContain("already exists");
       expect(formatted.suggestions.some((s) => s.includes("idempotent"))).toBe(true);
+    });
+  });
+
+  describe("structured error format (What/Why/How)", () => {
+    it("should provide structured details for DataValidationError with SKU", () => {
+      const error = new DataValidationError("SKU not found");
+      const formatted = ErrorFormatter.format(error, {
+        sku: "INVALID-123",
+        orderIndex: 5,
+      });
+
+      expect(formatted.structured).toBeDefined();
+      expect(formatted.structured?.what).toContain("INVALID-123");
+      expect(formatted.structured?.why).toContain("WMS variant catalog");
+      expect(formatted.structured?.whatToDo.length).toBeGreaterThan(0);
+      expect(formatted.structured?.docLink).toBe("docs/troubleshooting.md#sku-not-found");
+    });
+
+    it("should provide structured details for StagingGuardrailError", () => {
+      const error = new StagingGuardrailError("Production database detected");
+      const formatted = ErrorFormatter.format(error);
+
+      expect(formatted.structured).toBeDefined();
+      expect(formatted.structured?.what).toContain("Staging environment");
+      expect(formatted.structured?.why).toContain("prevent accidental production");
+      expect(formatted.structured?.whatToDo.some((step) => step.includes("DATABASE_URL"))).toBe(true);
+      expect(formatted.structured?.docLink).toBe("README.md#staging-guardrails");
+    });
+
+    it("should provide structured details for ShopifyServiceError with variant not found", () => {
+      const error = new ShopifyServiceError("Product variant not found", []);
+      const formatted = ErrorFormatter.format(error, { sku: "SKU-999" });
+
+      expect(formatted.structured).toBeDefined();
+      expect(formatted.structured?.what).toContain("Product variant not found");
+      expect(formatted.structured?.why).toContain("SKU-999");
+      expect(formatted.structured?.whatToDo.length).toBeGreaterThan(0);
+    });
+
+    it("should provide structured details for WmsServiceError with already exists", () => {
+      const error = new WmsServiceError("Order already exists");
+      const formatted = ErrorFormatter.format(error);
+
+      expect(formatted.structured).toBeDefined();
+      expect(formatted.structured?.what).toContain("already exists");
+      expect(formatted.structured?.why).toContain("re-running");
+      expect(formatted.structured?.whatToDo.some((step) => step.includes("--resume"))).toBe(true);
+    });
+
+    it("should provide structured details for CollectionPrepValidationError", () => {
+      const error = new CollectionPrepValidationError("Order mix validation failed");
+      const formatted = ErrorFormatter.format(error);
+
+      expect(formatted.structured).toBeDefined();
+      expect(formatted.structured?.what).toContain("Collection prep");
+      expect(formatted.structured?.why).toContain("specific requirements");
+      expect(formatted.structured?.whatToDo.some((step) => step.includes("regular-only"))).toBe(true);
+      expect(formatted.structured?.docLink).toBe("docs/data-model.md#collection-prep");
+    });
+
+    it("should provide structured details for InputValidationError", () => {
+      const error = new InputValidationError("Invalid JSON schema");
+      const formatted = ErrorFormatter.format(error);
+
+      expect(formatted.structured).toBeDefined();
+      expect(formatted.structured?.what).toContain("Configuration file validation");
+      expect(formatted.structured?.why).toContain("schema");
+      expect(formatted.structured?.docLink).toBe("README.md#configuration-schema");
+    });
+
+    it("should return undefined structured details for unknown errors", () => {
+      const error = new Error("Unknown error");
+      const formatted = ErrorFormatter.format(error);
+
+      expect(formatted.structured).toBeUndefined();
+    });
+  });
+
+  describe("formatAsString with structured format", () => {
+    it("should use structured format when available", () => {
+      const error = new DataValidationError("SKU not found");
+      const formatted = ErrorFormatter.formatAsString(error, { sku: "INVALID-123" });
+
+      // Should contain structured format elements
+      expect(formatted).toContain("What happened:");
+      expect(formatted).toContain("Why:");
+      expect(formatted).toContain("What to do:");
+      expect(formatted).toContain("📖 See:");
+
+      // Should contain structured content
+      expect(formatted).toContain("INVALID-123");
+      expect(formatted).toContain("1.");
+      expect(formatted).toContain("2.");
+    });
+
+    it("should fall back to legacy format for unknown errors", () => {
+      const error = new Error("Unknown error");
+      const formatted = ErrorFormatter.formatAsString(error);
+
+      // Should contain legacy format elements
+      expect(formatted).toContain("❌");
+      expect(formatted).toContain("💡 Suggestions:");
+      expect(formatted).toContain("•");
+
+      // Should not contain structured format elements
+      expect(formatted).not.toContain("What happened:");
+      expect(formatted).not.toContain("Why:");
+    });
+
+    it("should include context indicator in structured format", () => {
+      const error = new StagingGuardrailError("Production DB detected");
+      const formatted = ErrorFormatter.formatAsString(error, {
+        step: "Step 1 (Environment check)",
+      });
+
+      expect(formatted).toContain("📍");
+      expect(formatted).toContain("Step 1");
+    });
+
+    it("should format numbered steps correctly in structured format", () => {
+      const error = new DataValidationError("SKU validation failed");
+      const formatted = ErrorFormatter.formatAsString(error);
+
+      // Check for numbered steps (1., 2., 3., etc.)
+      const lines = formatted.split("\n");
+      const stepLines = lines.filter((line) => /^\s+\d+\.\s/.test(line));
+      expect(stepLines.length).toBeGreaterThan(0);
     });
   });
 });

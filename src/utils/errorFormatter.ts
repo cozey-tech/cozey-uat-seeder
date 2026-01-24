@@ -28,6 +28,13 @@ export interface FormattedError {
   message: string;
   suggestions: string[];
   context?: string;
+  /** Structured error details (What/Why/How) */
+  structured?: {
+    what: string;
+    why: string;
+    whatToDo: string[];
+    docLink?: string;
+  };
 }
 
 /**
@@ -44,11 +51,13 @@ export class ErrorFormatter {
     const baseMessage = this.getBaseMessage(error, context);
     const suggestions = this.getRecoverySuggestions(error, context);
     const contextInfo = this.formatContext(context);
+    const structured = this.getStructuredDetails(error, context);
 
     return {
       message: baseMessage,
       suggestions,
       context: contextInfo || undefined,
+      structured,
     };
   }
 
@@ -62,16 +71,46 @@ export class ErrorFormatter {
     const formatted = this.format(error, context);
     const parts: string[] = [];
 
-    if (formatted.context) {
-      parts.push(formatted.context);
-    }
+    // Use structured format if available, otherwise fall back to legacy format
+    if (formatted.structured) {
+      // Header with context
+      if (formatted.context) {
+        parts.push(`📍 ${formatted.context}`);
+      }
 
-    parts.push(`❌ ${formatted.message}`);
+      // Main error message
+      parts.push(`❌ ${formatted.message}`);
+      parts.push("");
 
-    if (formatted.suggestions.length > 0) {
-      parts.push("\n💡 Suggestions:");
-      for (const suggestion of formatted.suggestions) {
-        parts.push(`   • ${suggestion}`);
+      // Structured explanation
+      parts.push(`What happened: ${formatted.structured.what}`);
+      parts.push(`Why: ${formatted.structured.why}`);
+
+      if (formatted.structured.whatToDo.length > 0) {
+        parts.push("What to do:");
+        formatted.structured.whatToDo.forEach((step, index) => {
+          parts.push(`  ${index + 1}. ${step}`);
+        });
+      }
+
+      // Documentation link
+      if (formatted.structured.docLink) {
+        parts.push("");
+        parts.push(`📖 See: ${formatted.structured.docLink}`);
+      }
+    } else {
+      // Legacy format (backwards compatible)
+      if (formatted.context) {
+        parts.push(formatted.context);
+      }
+
+      parts.push(`❌ ${formatted.message}`);
+
+      if (formatted.suggestions.length > 0) {
+        parts.push("\n💡 Suggestions:");
+        for (const suggestion of formatted.suggestions) {
+          parts.push(`   • ${suggestion}`);
+        }
       }
     }
 
@@ -182,6 +221,147 @@ export class ErrorFormatter {
     }
 
     return suggestions;
+  }
+
+  /**
+   * Get structured error details (What/Why/How) for enhanced error messages
+   */
+  private static getStructuredDetails(error: Error, context?: ErrorContext): FormattedError["structured"] {
+    // Return structured details for known error types
+    if (error instanceof DataValidationError) {
+      if (error.message.includes("SKU")) {
+        return {
+          what: context?.sku
+            ? `SKU "${context.sku}" not found in database`
+            : "One or more SKUs are invalid or missing from the database",
+          why: "The specified SKU doesn't exist in the WMS variant catalog for this region",
+          whatToDo: [
+            context?.sku
+              ? `Check SKU "${context.sku}" spelling in configuration file`
+              : "Review SKU values in your configuration file",
+            "Verify SKUs exist in the staging WMS database",
+            "Ensure you're using the correct region (CA/US)",
+            context?.orderIndex
+              ? `Check order at index ${context.orderIndex} in your config`
+              : "Check all orders in your config",
+          ],
+          docLink: "docs/troubleshooting.md#sku-not-found",
+        };
+      } else if (error.message.includes("quantity")) {
+        return {
+          what: "Line item quantity validation failed",
+          why: "Quantities must be positive integers",
+          whatToDo: [
+            "Check that all line item quantities are greater than 0",
+            "Ensure quantities are integers, not decimals",
+            context?.orderIndex
+              ? `Review order ${context.orderIndex} in your configuration`
+              : "Review all orders in your configuration",
+          ],
+        };
+      }
+    }
+
+    if (error instanceof StagingGuardrailError) {
+      return {
+        what: "Staging environment validation failed",
+        why: "This tool can only run against staging/test environments to prevent accidental production data corruption",
+        whatToDo: [
+          "Verify DATABASE_URL contains staging patterns (staging, stage, test, dev, uat)",
+          "Verify SHOPIFY_STORE_DOMAIN is a staging store or ends with .myshopify.com",
+          "Check your .env file configuration",
+          "Never run this tool against production databases or stores",
+        ],
+        docLink: "README.md#staging-guardrails",
+      };
+    }
+
+    if (error instanceof ShopifyServiceError) {
+      if (error.message.includes("variant")) {
+        return {
+          what: "Product variant not found in Shopify",
+          why: context?.sku
+            ? `SKU "${context.sku}" doesn't exist in the Shopify store`
+            : "One or more SKUs don't exist in the Shopify store",
+          whatToDo: [
+            "Verify the SKU exists in your Shopify staging store",
+            "Check that products have been synced from WMS to Shopify",
+            "Ensure the SKU spelling matches exactly (case-sensitive)",
+            context?.orderIndex ? `Review order ${context.orderIndex} line items` : "Review order line items",
+          ],
+        };
+      } else if (error.userErrors && error.userErrors.length > 0) {
+        const firstError = error.userErrors[0];
+        return {
+          what: "Shopify order creation failed validation",
+          why: firstError?.message || "Shopify rejected the order due to validation errors",
+          whatToDo: [
+            "Review the Shopify user errors listed above",
+            "Check order data format (addresses, line items, etc.)",
+            "Verify all required fields are present",
+            "Test with a simpler order configuration first",
+          ],
+          docLink: "docs/troubleshooting.md#shopify-validation-errors",
+        };
+      }
+    }
+
+    if (error instanceof WmsServiceError) {
+      if (error.message.includes("already exists")) {
+        return {
+          what: "WMS record already exists in database",
+          why: "You may be re-running the seeder with data that was already created",
+          whatToDo: [
+            "This is expected behavior if resuming - the seeder is idempotent",
+            "Use --resume flag with the batch ID to continue from where you left off",
+            "Or use the cleanup command to remove existing test data first",
+            "Run: npm run cleanup -- --batch-id <your-batch-id>",
+          ],
+        };
+      } else if (error.message.includes("not found")) {
+        return {
+          what: "Required WMS record not found in database",
+          why: "The seeder expected to find a record that doesn't exist",
+          whatToDo: [
+            "Verify database schema is up to date: npm run prisma:generate",
+            "Check that referenced entities exist (collection prep, variants, etc.)",
+            "Review database connection and permissions",
+          ],
+        };
+      }
+    }
+
+    if (error instanceof CollectionPrepValidationError) {
+      return {
+        what: "Collection prep order mix validation failed",
+        why: "Collection preps have specific requirements - either all regular orders or all Pick and Pack orders",
+        whatToDo: [
+          "Check your config's collectionPrep.orderMix setting",
+          "Ensure all orders match the configured mix type",
+          'Use "regular-only" for standard fulfillment orders',
+          'Use "pnp-only" for Pick and Pack orders',
+          "Don't mix regular and PnP orders in the same collection prep",
+        ],
+        docLink: "docs/data-model.md#collection-prep",
+      };
+    }
+
+    if (error instanceof InputValidationError) {
+      return {
+        what: "Configuration file validation failed",
+        why: "The JSON file doesn't match the expected schema or contains invalid data",
+        whatToDo: [
+          "Check that your JSON file is valid (no syntax errors)",
+          "Verify the file structure matches the schema",
+          "Use the config generator for a valid starting point: npm run generate-config",
+          "Review example configs in the config/ folder",
+        ],
+        docLink: "README.md#configuration-schema",
+      };
+    }
+
+    // Return undefined for unknown errors (will fall back to legacy format)
+    return undefined;
   }
 
   /**
