@@ -19,6 +19,7 @@ import { initializeEnvConfig } from "./config/env";
 import { ProgressTracker } from "./utils/progress";
 import { ErrorFormatter } from "./utils/errorFormatter";
 import { OutputFormatter } from "./utils/outputFormatter";
+import { setColorsEnabled } from "./utils/colors";
 import { parseArgs } from "./cli/args";
 import { validateConfig, checkStagingEnvironment, parseAndValidateConfig, validateData } from "./cli/validation";
 import { initializeServices, executeSeedingFlow, executeDryRun } from "./cli/orchestration";
@@ -33,6 +34,11 @@ async function main(): Promise<void> {
     await initializeEnvConfig();
 
     const options = parseArgs();
+
+    // Configure color output based on --no-color flag
+    if (options.noColor) {
+      setColorsEnabled(false);
+    }
 
     if (options.resume) {
       const resumeState = loadProgressState(options.resume);
@@ -66,17 +72,36 @@ async function main(): Promise<void> {
       initProgress.complete("Services initialized");
       console.log();
 
-      // Load original config from progress state (we'd need to store it, but for now we'll require it)
-      // For now, we'll require the config file even when resuming
-      if (!options.configFile) {
-        console.error(
-          OutputFormatter.error("Config file is required when resuming (needed to reconstruct order data)"),
-        );
-        process.exit(1);
+      // Determine which config file to use
+      let configFilePath: string;
+      if (options.configFile) {
+        // User provided a config file
+        if (resumeState.configFilePath && resumeState.configFilePath !== options.configFile) {
+          console.log(
+            OutputFormatter.warning(
+              `⚠️  Using different config file than original. Original: ${resumeState.configFilePath}`,
+            ),
+          );
+          console.log();
+        }
+        configFilePath = options.configFile;
+      } else {
+        // Use stored config file path
+        if (!resumeState.configFilePath) {
+          console.error(
+            OutputFormatter.error(
+              "Config file path not stored in progress state. Please provide config file explicitly.",
+            ),
+          );
+          process.exit(1);
+        }
+        console.log(OutputFormatter.info(`Using stored config file: ${resumeState.configFilePath}`));
+        console.log();
+        configFilePath = resumeState.configFilePath;
       }
 
       try {
-        const config = parseAndValidateConfig(options.configFile, services.inputParser);
+        const config = parseAndValidateConfig(configFilePath, services.inputParser);
         await validateData(config, services.dataValidator);
 
         console.log(OutputFormatter.keyValue("Resuming Batch ID", options.resume));
@@ -95,6 +120,7 @@ async function main(): Promise<void> {
           false,
           executionOptions,
           resumeState,
+          configFilePath,
         );
 
         displaySummary(shopifyResult, wmsResult, collectionPrepResult, false);
@@ -192,6 +218,8 @@ async function main(): Promise<void> {
         batchId,
         false,
         executionOptions,
+        undefined, // no resumeState for new runs
+        options.configFile,
       );
 
       displaySummary(shopifyResult, wmsResult, collectionPrepResult, false);

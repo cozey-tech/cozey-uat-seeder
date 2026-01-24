@@ -3,6 +3,7 @@
  */
 
 import { OutputFormatter } from "../utils/outputFormatter";
+import type { GraphQLCostInfo } from "../shared/types/PerformanceMetrics";
 
 export interface ShopifyResult {
   shopifyOrders: Array<{ shopifyOrderId: string; shopifyOrderNumber: string }>;
@@ -23,6 +24,11 @@ export interface TimingMetrics {
   totalDuration?: number; // milliseconds
 }
 
+export interface PerformanceMetrics {
+  totalApiCalls?: number;
+  finalThrottleStatus?: GraphQLCostInfo["throttleStatus"];
+}
+
 /**
  * Display summary of seeding results
  */
@@ -32,6 +38,7 @@ export function displaySummary(
   collectionPrepResult?: { collectionPrepId: string; region: string },
   isDryRun = false,
   timingMetrics?: TimingMetrics,
+  performanceMetrics?: PerformanceMetrics,
 ): void {
   const items: Array<{ label: string; value: string | number }> = [];
 
@@ -123,6 +130,39 @@ export function displaySummary(
     if (timingMetrics.totalDuration !== undefined) {
       console.log();
       console.log(OutputFormatter.success(`Total Duration: ${formatDuration(timingMetrics.totalDuration)}`));
+    }
+
+    console.log();
+  }
+
+  // Display performance metrics if provided
+  if (performanceMetrics && !isDryRun) {
+    console.log(OutputFormatter.header("Performance Metrics", "📊"));
+
+    // Calculate operations per second if we have timing data
+    if (timingMetrics?.totalDuration && shopifyTotal > 0) {
+      const totalSeconds = timingMetrics.totalDuration / 1000;
+      const ordersPerSecond = shopifyTotal / totalSeconds;
+      console.log(OutputFormatter.listItem(`Throughput: ${ordersPerSecond.toFixed(2)} orders/sec`));
+    }
+
+    // Display API call count if available
+    if (performanceMetrics.totalApiCalls !== undefined) {
+      console.log(OutputFormatter.listItem(`Total API Calls: ${performanceMetrics.totalApiCalls}`));
+    }
+
+    // Display GraphQL throttle status if available
+    if (performanceMetrics.finalThrottleStatus) {
+      const throttle = performanceMetrics.finalThrottleStatus;
+      const usagePercent = (
+        ((throttle.maximumAvailable - throttle.currentlyAvailable) / throttle.maximumAvailable) *
+        100
+      ).toFixed(1);
+      console.log(
+        OutputFormatter.listItem(
+          `GraphQL Rate Limit: ${throttle.currentlyAvailable}/${throttle.maximumAvailable} available (${usagePercent}% used, restore rate: ${throttle.restoreRate}/sec)`,
+        ),
+      );
     }
 
     console.log();

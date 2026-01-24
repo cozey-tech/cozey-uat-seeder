@@ -99,6 +99,7 @@ export async function executeSeedingFlow(
   isDryRun: boolean,
   options: ExecutionOptions,
   resumeState?: ProgressState,
+  configFilePath?: string,
 ): Promise<{
   shopifyResult: {
     shopifyOrders: Array<{
@@ -117,9 +118,9 @@ export async function executeSeedingFlow(
 }> {
   // Route to webhook or direct mode
   if (options.useWebhookMode && !isDryRun) {
-    return executeWebhookBasedFlow(config, services, batchId, options, resumeState);
+    return executeWebhookBasedFlow(config, services, batchId, options, resumeState, configFilePath);
   } else {
-    return executeDirectFlow(config, services, batchId, isDryRun, resumeState);
+    return executeDirectFlow(config, services, batchId, isDryRun, resumeState, configFilePath);
   }
 }
 
@@ -133,6 +134,7 @@ async function executeDirectFlow(
   batchId: string,
   isDryRun: boolean,
   resumeState?: ProgressState,
+  configFilePath?: string,
 ): Promise<{
   shopifyResult: {
     shopifyOrders: Array<{
@@ -321,6 +323,7 @@ async function executeDirectFlow(
     const progressState: ProgressState = {
       batchId,
       timestamp: Date.now(),
+      configFilePath,
       shopifyOrders: {
         successful: successfulOrders,
         failed: failedOrders,
@@ -596,6 +599,7 @@ async function executeDirectFlow(
     const progressState: ProgressState = {
       batchId,
       timestamp: Date.now(),
+      configFilePath,
       shopifyOrders: {
         // Reuse the same logic we used when saving after Shopify seeding
         // Build successful orders array with correct orderIndex values
@@ -775,6 +779,7 @@ async function executeWebhookBasedFlow(
   batchId: string,
   options: ExecutionOptions,
   resumeState?: ProgressState,
+  configFilePath?: string,
 ): Promise<{
   shopifyResult: {
     shopifyOrders: Array<{
@@ -938,6 +943,7 @@ async function executeWebhookBasedFlow(
     const progressState: ProgressState = {
       batchId,
       timestamp: Date.now(),
+      configFilePath,
       shopifyOrders: {
         successful: finalShopifyResult.shopifyOrders.map((order, index) => ({
           orderIndex: index,
@@ -1075,6 +1081,7 @@ async function executeWebhookBasedFlow(
   const progressState: ProgressState = {
     batchId,
     timestamp: Date.now(),
+    configFilePath,
     shopifyOrders: {
       successful: finalShopifyResult.shopifyOrders.map((order, index) => ({
         orderIndex: index,

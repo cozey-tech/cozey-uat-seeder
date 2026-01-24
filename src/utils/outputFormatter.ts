@@ -2,6 +2,8 @@
  * Output formatting utility for consistent CLI output across both tools.
  */
 
+import { colors } from "./colors";
+
 export interface SeparatorOptions {
   /**
    * Character to use for separator (default: "━")
@@ -48,23 +50,23 @@ export class OutputFormatter {
    */
   static header(text: string, emoji?: string): string {
     const prefix = emoji ? `${emoji} ` : "";
-    return `${prefix}${text}`;
+    return colors.header(`${prefix}${text}`);
   }
 
   static success(message: string): string {
-    return `✅ ${message}`;
+    return colors.success(`✅ ${message}`);
   }
 
   static error(message: string): string {
-    return `❌ ${message}`;
+    return colors.error(`❌ ${message}`);
   }
 
   static warning(message: string): string {
-    return `⚠️  ${message}`;
+    return colors.warning(`⚠️  ${message}`);
   }
 
   static info(message: string): string {
-    return `ℹ️  ${message}`;
+    return colors.info(`ℹ️  ${message}`);
   }
 
   /**
@@ -101,15 +103,15 @@ export class OutputFormatter {
   static summary(options: SummaryOptions): string {
     const lines: string[] = [];
 
-    lines.push(options.title);
-    lines.push(this.separator());
+    lines.push(colors.header(options.title));
+    lines.push(colors.dim(this.separator()));
 
     for (const item of options.items) {
-      lines.push(`   ${item.label}: ${item.value}`);
+      lines.push(`   ${colors.key(item.label)}: ${colors.value(String(item.value))}`);
     }
 
     if (options.showSeparator !== false) {
-      lines.push(this.separator());
+      lines.push(colors.dim(this.separator()));
     }
 
     return lines.join("\n");
@@ -135,7 +137,7 @@ export class OutputFormatter {
    */
   static keyValue(key: string, value: string | number, indent = 1): string {
     const indentStr = "   ".repeat(indent);
-    return `${indentStr}${key}: ${value}`;
+    return `${indentStr}${colors.key(key)}: ${colors.value(String(value))}`;
   }
 
   /**
