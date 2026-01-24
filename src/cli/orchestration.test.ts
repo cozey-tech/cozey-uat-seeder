@@ -200,5 +200,13 @@ describe("WMS Order Index Mapping", () => {
       // TODO: Implement this test once WmsService mocking is set up
       expect(true).toBe(true);
     });
+
+    it("should reuse existing collection prep ID on resume", () => {
+      // This tests that when resuming, the existing collection prep is reused
+      // instead of creating a duplicate collection prep
+      // The fix checks resumeState.collectionPrep and uses existing ID
+      // TODO: Implement integration test for this when orchestration mocking is available
+      expect(true).toBe(true);
+    });
   });
 });

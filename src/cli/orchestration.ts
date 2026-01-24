@@ -355,7 +355,11 @@ async function executeDirectFlow(
   const region = config.collectionPrep?.region || "CA";
   let collectionPrepId: string | undefined;
 
-  if (config.collectionPrep) {
+  // Check if collection prep already exists from previous run (resume scenario)
+  if (resumeState?.collectionPrep) {
+    collectionPrepId = resumeState.collectionPrep.collectionPrepId;
+    console.log(OutputFormatter.info(`Using existing collection prep from previous run: ${collectionPrepId}`));
+  } else if (config.collectionPrep) {
     const step2aNumber = 2;
     const creatingLabel = isDryRun ? "Would create" : "Creating";
     console.log(OutputFormatter.step(step2aNumber, totalSteps, `${creatingLabel} collection prep`));
