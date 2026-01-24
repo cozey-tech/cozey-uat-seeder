@@ -11,6 +11,7 @@ import { join } from "path";
 export interface ProgressState {
   batchId: string;
   timestamp: number;
+  configFilePath?: string; // Store original config file path for resume
   shopifyOrders: {
     successful: Array<{
       orderIndex: number;

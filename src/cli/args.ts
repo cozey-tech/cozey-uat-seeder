@@ -30,7 +30,10 @@ export function parseArgs(): CliOptions {
     .option("--validate", "Validate config file schema only (no DB/API calls)")
     .option("--dry-run", "Simulate seeding without making changes")
     .option("--skip-confirmation", "Skip staging confirmation prompt")
-    .option("--resume <batch-id>", "Resume a failed seeding operation from batch ID (requires config-file)")
+    .option(
+      "--resume <batch-id>",
+      "Resume a failed seeding operation from batch ID (uses stored config if none provided)",
+    )
     .option("--use-direct-mode", "Use direct Prisma mode (bypass COS webhook, for debugging). Default is webhook mode.")
     .option("--polling-timeout <seconds>", "COS webhook polling timeout in seconds (default: 180 = 3 minutes)", "180")
     .option("--polling-interval <seconds>", "COS webhook polling interval in seconds (default: 2)", "2")
@@ -43,6 +46,8 @@ Examples:
   $ npm run seed config.json --dry-run
   $ npm run seed config.json --skip-confirmation
   $ npm run seed config.json --use-direct-mode
+  $ npm run seed --resume batch-123                    # Uses stored config
+  $ npm run seed modified-config.json --resume batch-123  # Uses new config (with warning)
 
 Webhook Mode (default):
   Creates Shopify orders and waits for COS to ingest via webhook (1-2 minutes).
@@ -63,13 +68,6 @@ For more information, see README.md
   // Validate flags are mutually exclusive
   if (options.validate && options.dryRun) {
     console.error("Error: --validate and --dry-run cannot be used together\n");
-    program.help();
-    process.exit(1);
-  }
-
-  // --resume requires config-file (needed to reconstruct order data)
-  if (options.resume && !configFile) {
-    console.error("Error: --resume requires a config-file to reconstruct order data\n");
     program.help();
     process.exit(1);
   }
