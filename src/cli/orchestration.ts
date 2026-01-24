@@ -149,6 +149,15 @@ async function executeDirectFlow(
   };
   collectionPrepResult?: { collectionPrepId: string; region: string };
 }> {
+  // Track timing for each phase
+  const startTime = Date.now();
+  let shopifyStartTime: number;
+  let shopifyEndTime: number = 0;
+  let wmsStartTime: number = 0;
+  let wmsEndTime: number = 0;
+  let collectionPrepStartTime: number = 0;
+  let collectionPrepEndTime: number = 0;
+
   // Generate collection prep name early if collection prep is configured
   // This allows us to include it in Shopify order notes
   let collectionPrepName: string | undefined;
@@ -165,6 +174,9 @@ async function executeDirectFlow(
   const step1Name = `${step1Label} Shopify orders`;
   const totalSteps = config.collectionPrep ? 3 : 2;
   console.log(OutputFormatter.step(1, totalSteps, step1Name));
+
+  // Start Shopify timing
+  shopifyStartTime = Date.now();
 
   let ordersToProcess = config.orders;
   const filteredToOriginalIndexMap = new Map<number, number>();
@@ -348,6 +360,9 @@ async function executeDirectFlow(
     console.log();
   }
 
+  // End Shopify timing
+  shopifyEndTime = Date.now();
+
   const step2Number = config.collectionPrep ? 3 : 2;
   const step2Name = `${step1Label} WMS entities`;
   console.log(OutputFormatter.step(step2Number, config.collectionPrep ? 3 : 2, step2Name));
@@ -363,6 +378,9 @@ async function executeDirectFlow(
     const step2aNumber = 2;
     const creatingLabel = isDryRun ? "Would create" : "Creating";
     console.log(OutputFormatter.step(step2aNumber, totalSteps, `${creatingLabel} collection prep`));
+
+    // Start collection prep timing
+    collectionPrepStartTime = Date.now();
     const collectionPrepRequest = {
       orderIds: finalShopifyResult.shopifyOrders.map((o) => o.shopifyOrderId),
       carrier: config.collectionPrep.carrier,
@@ -375,8 +393,15 @@ async function executeDirectFlow(
 
     const collectionPrepResult = await services.createCollectionPrepHandler.execute(collectionPrepRequest);
     collectionPrepId = collectionPrepResult.collectionPrepId;
+
+    // End collection prep timing
+    collectionPrepEndTime = Date.now();
+
     console.log(OutputFormatter.success(`${createdLabel} collection prep: ${collectionPrepId}\n`));
   }
+
+  // Start WMS timing
+  wmsStartTime = Date.now();
 
   // Seed WMS entities with Shopify order data
   const wmsProgressTracker = new ProgressTracker();
@@ -722,6 +747,20 @@ async function executeDirectFlow(
   ) {
     deleteProgressState(batchId);
   }
+
+  // End WMS timing and calculate total
+  wmsEndTime = Date.now();
+  const totalDuration = Date.now() - startTime;
+
+  // Display summary with timing
+  const timingMetrics = {
+    shopifyDuration: shopifyEndTime - shopifyStartTime,
+    wmsDuration: wmsEndTime - wmsStartTime,
+    collectionPrepDuration: collectionPrepStartTime ? collectionPrepEndTime - collectionPrepStartTime : undefined,
+    totalDuration,
+  };
+
+  displaySummary(finalShopifyResult, finalWmsResult, collectionPrepResult, isDryRun, timingMetrics);
 
   return { shopifyResult: finalShopifyResult, wmsResult: finalWmsResult, collectionPrepResult };
 }

@@ -15,6 +15,14 @@ export interface WmsResult {
   failures?: Array<{ orderIndex: number; shopifyOrderId: string; customerEmail?: string; error: string }>;
 }
 
+export interface TimingMetrics {
+  shopifyDuration?: number; // milliseconds
+  wmsDuration?: number; // milliseconds
+  webhookDuration?: number; // milliseconds
+  collectionPrepDuration?: number; // milliseconds
+  totalDuration?: number; // milliseconds
+}
+
 /**
  * Display summary of seeding results
  */
@@ -23,6 +31,7 @@ export function displaySummary(
   wmsResult: WmsResult,
   collectionPrepResult?: { collectionPrepId: string; region: string },
   isDryRun = false,
+  timingMetrics?: TimingMetrics,
 ): void {
   const items: Array<{ label: string; value: string | number }> = [];
 
@@ -90,4 +99,57 @@ export function displaySummary(
     console.log(OutputFormatter.warning("DRY RUN - No actual changes were made"));
     console.log();
   }
+
+  // Display timing breakdown if provided
+  if (timingMetrics && Object.keys(timingMetrics).length > 0) {
+    console.log(OutputFormatter.header("Timing Breakdown", "⏱️"));
+
+    if (timingMetrics.shopifyDuration !== undefined) {
+      console.log(OutputFormatter.listItem(`Shopify Orders: ${formatDuration(timingMetrics.shopifyDuration)}`));
+    }
+
+    if (timingMetrics.webhookDuration !== undefined) {
+      console.log(OutputFormatter.listItem(`COS Webhook Ingestion: ${formatDuration(timingMetrics.webhookDuration)}`));
+    }
+
+    if (timingMetrics.wmsDuration !== undefined) {
+      console.log(OutputFormatter.listItem(`WMS Entities: ${formatDuration(timingMetrics.wmsDuration)}`));
+    }
+
+    if (timingMetrics.collectionPrepDuration !== undefined) {
+      console.log(OutputFormatter.listItem(`Collection Prep: ${formatDuration(timingMetrics.collectionPrepDuration)}`));
+    }
+
+    if (timingMetrics.totalDuration !== undefined) {
+      console.log();
+      console.log(OutputFormatter.success(`Total Duration: ${formatDuration(timingMetrics.totalDuration)}`));
+    }
+
+    console.log();
+  }
+}
+
+/**
+ * Format duration in milliseconds to human-readable string
+ */
+function formatDuration(ms: number): string {
+  if (ms < 1000) {
+    return `${Math.round(ms)}ms`;
+  }
+
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  if (minutes < 60) {
+    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
