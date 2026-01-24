@@ -25,20 +25,38 @@ export function parseArgs(): CliOptions {
     .name("generate-config")
     .description("Interactive config generator for seed configuration files")
     .version(seedVersion, "-v, --version", "display version number")
-    .option("--dry-run", "Preview generated config without saving")
-    .option("--modify-inventory", "Enable inventory modification during order creation")
-    .option("--skip-save-template", "Skip prompt to save custom orders as templates")
-    .option("--output <path>", "Output file path (default: output/seed-config.json)")
-    .option("--region <region>", "Region (CA or US)", /^(CA|US)$/i)
+    .option("--dry-run", "Preview generated config without saving to disk")
+    .option("--modify-inventory", "Enable inventory modification during order creation (use with caution)")
+    .option("--skip-save-template", "Skip prompt to save custom orders as templates for future use")
+    .option("--output <path>", "Output file path for the generated config (default: output/seed-config.json)")
+    .option("--region <region>", "Default region for orders: CA (Canada) or US (United States)", /^(CA|US)$/i)
     .addHelpText(
       "after",
       `
 Examples:
-  $ npm run generate-config
-  $ npm run generate-config -- --region CA
-  $ npm run generate-config -- --output custom-config.json
-  $ npm run generate-config -- --dry-run
-  $ npm run generate-config -- --modify-inventory
+  Basic usage (interactive prompts):
+    $ npm run generate-config
+
+  Specify region and output path:
+    $ npm run generate-config -- --region CA --output configs/my-config.json
+
+  Preview config without saving:
+    $ npm run generate-config -- --dry-run
+
+  Enable inventory modification (affects warehouse stock):
+    $ npm run generate-config -- --modify-inventory
+
+Common Workflows:
+  1. First-time users: Run without flags for guided setup
+  2. Batch testing: Use --output with descriptive names (e.g., pnp-test.json)
+  3. Testing templates: Skip save prompt with --skip-save-template
+  4. Preview before commit: Use --dry-run to review config structure
+
+Tips:
+  • Save order templates for reusable test scenarios
+  • Use descriptive output filenames (e.g., multi-region-pnp.json)
+  • Start with --dry-run to validate config structure
+  • Review generated config files before running seeder
 
 For more information, see README.md
       `,
