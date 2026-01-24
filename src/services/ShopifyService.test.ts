@@ -16,6 +16,11 @@ vi.mock("../config/env", () => ({
     SHOPIFY_ACCESS_TOKEN: "test-token",
     SHOPIFY_API_VERSION: "2024-01",
   })),
+  getShopifyConfig: vi.fn((region: "CA" | "US") => ({
+    storeDomain: region === "US" ? "test-store-us.myshopify.com" : "test-store.myshopify.com",
+    accessToken: region === "US" ? "test-token-us" : "test-token",
+    apiVersion: "2024-01",
+  })),
 }));
 
 describe("ShopifyService", () => {

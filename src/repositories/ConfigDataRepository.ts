@@ -137,6 +137,8 @@ export class ConfigDataRepository {
    * Note: shopifyIds are not required - ShopifyService queries Shopify API directly by SKU
    */
   async getAvailableVariants(region: string): Promise<Variant[]> {
+    // Query without orderBy first (much faster - avoids expensive sort on unindexed columns)
+    // We'll sort in memory instead
     const variants = await this.prisma.variant.findMany({
       where: {
         region,
@@ -153,23 +155,55 @@ export class ConfigDataRepository {
         region: true,
         description: true,
       },
-      orderBy: [{ modelName: "asc" }, { colorId: "asc" }, { description: "asc" }, { sku: "asc" }],
+      // Removed orderBy - sort in memory instead to avoid full table scan + sort
+      // orderBy: [{ modelName: "asc" }, { colorId: "asc" }, { description: "asc" }, { sku: "asc" }],
     });
 
-    // Batch fetch all variantParts for all variants at once to avoid connection pool exhaustion
+    // Sort in memory (much faster than database sort on unindexed columns)
+    variants.sort((a, b) => {
+      if (a.modelName !== b.modelName) return a.modelName.localeCompare(b.modelName);
+      if (a.colorId !== b.colorId) return a.colorId.localeCompare(b.colorId);
+      if (a.description !== b.description) return a.description.localeCompare(b.description);
+      return a.sku.localeCompare(b.sku);
+    });
+
+    // Batch fetch all variantParts for all variants in chunks to avoid large IN clause performance issues
+    // PostgreSQL has limits on IN clause size, and large IN clauses can be very slow
     const variantIds = variants.map((v) => v.id);
-    const allVariantParts = await this.prisma.variantPart.findMany({
-      where: {
-        variantId: { in: variantIds },
-      },
-      include: {
-        part: {
-          select: {
-            pickType: true,
+
+    // Process in chunks of 1000 to avoid large IN clause performance degradation
+    const BATCH_SIZE = 1000;
+    const allVariantParts: Array<{
+      variantId: string;
+      partId: string;
+      quantity: number;
+      part: { pickType: string };
+    }> = [];
+
+    for (let i = 0; i < variantIds.length; i += BATCH_SIZE) {
+      const batch = variantIds.slice(i, i + BATCH_SIZE);
+      const batchParts = await this.prisma.variantPart.findMany({
+        where: {
+          variantId: { in: batch },
+        },
+        include: {
+          part: {
+            select: {
+              pickType: true,
+            },
           },
         },
-      },
-    });
+      });
+      // Convert Decimal quantity to number
+      allVariantParts.push(
+        ...batchParts.map((vp) => ({
+          variantId: vp.variantId,
+          partId: vp.partId,
+          quantity: vp.quantity.toNumber(),
+          part: vp.part,
+        })),
+      );
+    }
 
     // Group variantParts by variantId
     const variantPartsByVariantId = new Map<string, typeof allVariantParts>();

@@ -13,6 +13,7 @@ import { resolve } from "path";
 config({ path: resolve(process.cwd(), ".env") });
 config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
+import { initializeEnvConfig } from "./config/env";
 import { PrismaClient } from "@prisma/client";
 import { parseArgs } from "./generateConfig/args";
 import { loadReferenceData } from "./generateConfig/initialization";
@@ -49,6 +50,9 @@ async function main(): Promise<void> {
   };
 
   try {
+    // Initialize environment config first (applies connection pool settings to DATABASE_URL)
+    await initializeEnvConfig();
+
     const options = parseArgs();
 
     console.log(OutputFormatter.header("Interactive Config Generator", "🚀"));
@@ -60,12 +64,80 @@ async function main(): Promise<void> {
       console.log();
     }
 
-    const prisma = new PrismaClient();
+    // PrismaClient reads from process.env.DATABASE_URL by default
+    // We've already set it in initializeEnvConfig(), so we can use the default constructor
+    const prisma = new PrismaClient({
+      log: [
+        { level: "error", emit: "event" },
+        { level: "warn", emit: "event" },
+      ],
+    });
+
+    // Log Prisma errors and warnings
+    prisma.$on("error" as never, (e: { message: string }) => {
+      Logger.error("Prisma error", e, { message: e.message });
+    });
+
+    prisma.$on("warn" as never, (e: { message: string }) => {
+      Logger.warn("Prisma warning", { message: e.message });
+    });
 
     try {
+      // Test database connection before proceeding
+      try {
+        console.log(OutputFormatter.info("Testing database connection..."));
+        await Promise.race([
+          prisma.$queryRaw`SELECT 1`,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Database connection timeout after 30 seconds")), 30000),
+          ),
+        ]);
+        console.log(OutputFormatter.success("Database connection successful"));
+      } catch (error) {
+        console.error();
+        console.error(OutputFormatter.error("Database connection failed"));
+        if (error instanceof Error) {
+          if (error.message.includes("timeout") || error.message.includes("Can't reach database server")) {
+            console.error(
+              OutputFormatter.listItem("Cannot connect to database. This may be a network connectivity issue."),
+            );
+            console.error(
+              OutputFormatter.listItem(
+                "The application can continue in templates-only mode (without database variants).",
+              ),
+            );
+          } else if (error.message.includes("P1001") || error.message.includes("connection")) {
+            console.error(
+              OutputFormatter.listItem("Cannot connect to database. Check DATABASE_URL and network connectivity."),
+            );
+          } else {
+            console.error(OutputFormatter.listItem(`Error: ${error.message}`));
+          }
+        }
+        console.error();
+        // Offer graceful degradation: continue with templates only
+        const promptService = new InteractivePromptService();
+        const continueWithoutDb = await promptService.promptConfirm(
+          "Would you like to continue using only order templates (without database access)?",
+          false,
+        );
+        if (!continueWithoutDb) {
+          throw new Error("Config generation cancelled. Please fix database connection and try again.");
+        }
+        console.log(OutputFormatter.info("Continuing with templates only mode (no database access)..."));
+        // Store promptService for reuse later
+        (globalThis as { __PROMPT_SERVICE__?: InteractivePromptService }).__PROMPT_SERVICE__ = promptService;
+        // Set a flag to indicate we're in templates-only mode - loadReferenceData will skip database queries
+        (globalThis as { __TEMPLATES_ONLY_MODE__?: boolean }).__TEMPLATES_ONLY_MODE__ = true;
+      }
+
       // Initialize services
       const dataRepository = new ConfigDataRepository(prisma);
-      const promptService = new InteractivePromptService();
+      // promptService may have been created during connection test graceful degradation
+      const promptService =
+        (globalThis as { __PROMPT_SERVICE__?: InteractivePromptService }).__PROMPT_SERVICE__ ||
+        new InteractivePromptService();
+      (globalThis as { __PROMPT_SERVICE__?: InteractivePromptService }).__PROMPT_SERVICE__ = promptService;
       const compositionBuilder = new OrderCompositionBuilder(promptService);
       const generatorService = new ConfigGeneratorService(prisma);
       const dataValidationService = new DataValidationService(prisma);
@@ -75,8 +147,8 @@ async function main(): Promise<void> {
       // Prompt for region if not provided
       const region = options.region || (await promptService.promptRegion());
 
-      // Load reference data
-      const { data: referenceData, loadTime } = await loadReferenceData(dataRepository, region);
+      // Load reference data (pass promptService for graceful degradation)
+      const { data: referenceData, loadTime } = await loadReferenceData(dataRepository, region, promptService);
       performanceMetrics.referenceDataLoadTime = loadTime;
 
       let { variants, customers, carriers, templates, locationsCache } = referenceData;

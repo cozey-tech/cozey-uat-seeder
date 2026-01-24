@@ -8,6 +8,8 @@ const STAGING_DB_PATTERNS = [
   /test/i,
   /dev/i,
   /uat/i,
+  /neon\.tech/i, // Neon databases (typically staging/dev)
+  /aws\.neon/i, // AWS Neon databases
   // Add specific staging domains if needed
 ];
 

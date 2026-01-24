@@ -86,14 +86,23 @@ export async function createOrders(
       // Location is validated but not used directly - customer.locationId is used
 
       // Select order composition method (automatically uses custom if no templates available)
-      const compositionType = await promptService.promptOrderComposition(variants, templates);
+      // In templates-only mode (variants.length === 0), only allow template-based composition
+      const compositionType =
+        variants.length === 0 && templates.length > 0
+          ? "template"
+          : await promptService.promptOrderComposition(variants, templates);
 
       let composition: OrderComposition;
       if (compositionType === "template") {
         const template = await promptService.promptTemplateSelection(templates);
         composition = await compositionBuilder.buildFromTemplate(template, variants);
       } else {
-        // Build custom order
+        // Build custom order (requires variants)
+        if (variants.length === 0) {
+          throw new Error(
+            "Cannot build custom orders without database variants. Please use template-based orders or fix database connection.",
+          );
+        }
         composition = await compositionBuilder.buildCustom(variants);
 
         // Offer to save custom order as template (unless skipped)

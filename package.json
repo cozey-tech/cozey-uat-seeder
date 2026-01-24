@@ -24,6 +24,9 @@
     "fetch-order-templates-batch": "tsx scripts/fetch-order-templates-batch.ts",
     "list-recent-orders": "tsx scripts/list-recent-orders.ts",
     "search-orders": "tsx scripts/search-orders.ts",
+    "seed-all-canada-configs": "tsx scripts/seed-all-canada-configs.ts",
+    "seed-small-canada-orders": "tsx scripts/seed-small-canada-orders.ts",
+    "seed-1to5-boxes-canada-orders": "tsx scripts/seed-1to5-boxes-canada-orders.ts",
     "prepare": "husky"
   },
   "devDependencies": {

@@ -127,19 +127,89 @@ export function filterValidTemplates(
 export async function loadReferenceData(
   dataRepository: ConfigDataRepository,
   region: "CA" | "US",
+  promptService?: { promptConfirm: (message: string, defaultAnswer?: boolean) => Promise<boolean> },
 ): Promise<{ data: ReferenceData; loadTime: number }> {
   const referenceDataStart = Date.now();
   const loadingProgress = new ProgressTracker({ showSpinner: true });
   loadingProgress.start("Loading reference data", 4);
 
+  // Add timeout wrapper for database queries (60 seconds)
+  // Query can take 45-50 seconds for large datasets (50k+ variants)
+  const QUERY_TIMEOUT_MS = 60000;
+  const withTimeout = <T>(promise: Promise<T>, operation: string): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => {
+          reject(
+            new Error(
+              `Database query timeout: ${operation} exceeded ${QUERY_TIMEOUT_MS}ms. Check database connection and query performance.`,
+            ),
+          );
+        }, QUERY_TIMEOUT_MS),
+      ),
+    ]);
+  };
+
   loadingProgress.update(1, "Loading variants...");
-  const variants = await dataRepository.getAvailableVariants(region);
+  let variants: Variant[] = [];
+  let variantsLoadFailed = false;
+
+  // Check if we're already in templates-only mode (from connection test graceful degradation)
+  const isTemplatesOnlyMode = (globalThis as { __TEMPLATES_ONLY_MODE__?: boolean }).__TEMPLATES_ONLY_MODE__ === true;
+
+  if (isTemplatesOnlyMode) {
+    // Skip database queries - we're already in templates-only mode
+    variantsLoadFailed = true;
+    loadingProgress.update(1, "Skipped variants (using templates only)...");
+    console.log(OutputFormatter.info("Skipping database queries (templates-only mode)..."));
+  } else {
+    try {
+      variants = await withTimeout(dataRepository.getAvailableVariants(region), "getAvailableVariants");
+    } catch (error) {
+      variantsLoadFailed = true;
+
+      // Offer graceful degradation: continue with templates only
+      if (promptService) {
+        loadingProgress.fail("Failed to load variants");
+        console.error();
+        console.error(OutputFormatter.warning("Database query failed while loading variants."));
+        if (error instanceof Error) {
+          if (error.message.includes("timeout")) {
+            console.error(OutputFormatter.listItem("Query timed out - database may be slow or unavailable."));
+          } else if (error.message.includes("P1001") || error.message.includes("connection")) {
+            console.error(OutputFormatter.listItem("Cannot connect to database."));
+          } else {
+            console.error(OutputFormatter.listItem(`Error: ${error.message}`));
+          }
+        }
+        console.error();
+        const continueWithTemplates = await promptService.promptConfirm(
+          "Would you like to continue using only order templates (without database variants)?",
+          false,
+        );
+        if (!continueWithTemplates) {
+          throw new Error("Config generation cancelled. Please fix database connection and try again.");
+        }
+        console.log(OutputFormatter.info("Continuing with templates only mode..."));
+        // Restart progress tracker since we're continuing
+        loadingProgress.start("Loading reference data", 4);
+        loadingProgress.update(1, "Skipped variants (using templates only)...");
+      } else {
+        // If no promptService, fail and throw the error
+        loadingProgress.fail("Failed to load variants");
+        throw error;
+      }
+    }
+  }
 
   loadingProgress.update(2, "Loading customers...");
-  const customers = await dataRepository.getCustomers(region);
+  // Skip database queries if in templates-only mode
+  const customers = isTemplatesOnlyMode ? [] : await dataRepository.getCustomers(region);
 
   loadingProgress.update(3, "Loading carriers...");
-  const carriers = await dataRepository.getCarriers(region);
+  // Skip database queries if in templates-only mode
+  const carriers = isTemplatesOnlyMode ? [] : await dataRepository.getCarriers(region);
 
   loadingProgress.update(4, "Loading templates...");
   const allTemplates = loadOrderTemplates();
@@ -148,14 +218,35 @@ export async function loadReferenceData(
   loadingProgress.complete(`✓ Loaded reference data`);
 
   // Filter templates to only include those with valid SKUs for this region
-  const templates = filterValidTemplates(allTemplates, variants);
+  // If variants failed to load, skip validation and use all templates
+  const templates = variantsLoadFailed ? allTemplates : filterValidTemplates(allTemplates, variants);
 
   // Batch fetch all locations for customers upfront (performance optimization)
   const locationLoadStart = Date.now();
   const locationProgress = new ProgressTracker({ showSpinner: true });
   locationProgress.start("Loading customer locations", customers.length);
 
-  const locationsCache = await dataRepository.getLocationsForCustomers(customers);
+  let locationsCache: Map<string, Location>;
+  try {
+    locationsCache = await Promise.race([
+      dataRepository.getLocationsForCustomers(customers),
+      new Promise<Map<string, Location>>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Database query timeout: getLocationsForCustomers exceeded ${QUERY_TIMEOUT_MS}ms`)),
+          QUERY_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+  } catch (error) {
+    locationProgress.fail("Failed to load customer locations");
+    if (error instanceof Error && error.message.includes("timeout")) {
+      throw new Error(
+        `Database query timed out while loading customer locations. Check database connection and performance.\n\n` +
+          `Original error: ${error.message}`,
+      );
+    }
+    throw error;
+  }
   const locationLoadTime = Date.now() - locationLoadStart;
 
   locationProgress.complete(`✓ Loaded ${locationsCache.size} location(s)`);
@@ -180,8 +271,12 @@ export async function loadReferenceData(
   console.log();
 
   // Validate reference data is not empty
-  if (variants.length === 0) {
+  // If variants failed to load, we're in templates-only mode, so skip variant validation
+  if (variants.length === 0 && !variantsLoadFailed) {
     throw new Error(`No variants found for region ${region}. Please check database.`);
+  }
+  if (variantsLoadFailed && templates.length === 0) {
+    throw new Error("No order templates available. Cannot generate config without variants or templates.");
   }
   if (customers.length === 0) {
     throw new Error("No customers found in config/customers.json. Please add at least one customer.");

@@ -37,16 +37,25 @@ export class OrderCompositionBuilder {
       variantMap.set(variant.sku, variant);
     }
 
-    // Start with template line items, but use pickType from variant (database) instead of template
+    // Start with template line items
+    // Use pickType from variant (database) if available, otherwise fall back to template pickType
     const lineItems: LineItem[] = template.lineItems.map((item) => {
       const variant = variantMap.get(item.sku);
+      if (variants.length === 0) {
+        // Templates-only mode: use pickType from template
+        return {
+          sku: item.sku,
+          quantity: item.quantity,
+          pickType: item.pickType, // Use pickType from template when variants unavailable
+        };
+      }
       if (!variant) {
         throw new Error(`Variant not found for SKU ${item.sku} in template`);
       }
       return {
         sku: item.sku,
         quantity: item.quantity,
-        pickType: variant.pickType, // Use pickType from database, not template
+        pickType: variant.pickType, // Use pickType from database when available
       };
     });
 

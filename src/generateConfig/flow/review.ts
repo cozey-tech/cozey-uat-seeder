@@ -66,52 +66,72 @@ export async function reviewOrders(
     if (reviewAction === "continue") {
       reviewComplete = true;
     } else if (reviewAction === "add-more") {
-      // Add more orders using the same creation mode
+      // Add more orders - allow creating multiple like in initial flow
       Logger.info("Adding more orders", { currentOrderCount: orders.length });
-      // Reuse the creation mode logic (simplified - just add one more order)
-      const customer = await promptService.promptCustomerSelection(customers);
-      const location = locationsCache.get(customer.id);
-      if (!location) {
-        throw new Error(`Location not found for customer ${customer.id}`);
-      }
+      const orderCount = await promptService.promptOrderCount();
 
-      const compositionType = await promptService.promptOrderComposition(variants, templates);
-      let composition: OrderComposition;
-      if (compositionType === "template") {
-        const template = await promptService.promptTemplateSelection(templates);
-        composition = await compositionBuilder.buildFromTemplate(template, variants);
-      } else {
-        composition = await compositionBuilder.buildCustom(variants);
-      }
+      for (let i = 0; i < orderCount; i++) {
+        console.log();
+        console.log(OutputFormatter.progress(i + 1, orderCount, "Building Order"));
+        console.log(OutputFormatter.separator());
 
-      // Validate order before adding
-      const validation = validateOrder(orders.length, composition, variants, customer.email);
-      if (!validation.valid) {
-        displayValidationIssues(validation.issues);
-        Logger.warn("Order validation failed when adding", {
-          orderIndex: orders.length,
-          customerEmail: customer.email,
-          issues: validation.issues,
-        });
-      } else if (validation.issues.length > 0) {
-        displayValidationIssues(validation.issues);
-      }
+        const customer = await promptService.promptCustomerSelection(customers);
+        const location = locationsCache.get(customer.id);
+        if (!location) {
+          throw new Error(`Location not found for customer ${customer.id}`);
+        }
 
-      if (options.modifyInventory) {
-        inventoryChecks.push({
-          orderIndex: orders.length,
-          composition,
+        // Select order composition method (automatically uses custom if no templates available)
+        // In templates-only mode (variants.length === 0), only allow template-based composition
+        const compositionType =
+          variants.length === 0 && templates.length > 0
+            ? "template"
+            : await promptService.promptOrderComposition(variants, templates);
+
+        let composition: OrderComposition;
+        if (compositionType === "template") {
+          const template = await promptService.promptTemplateSelection(templates);
+          composition = await compositionBuilder.buildFromTemplate(template, variants);
+        } else {
+          // Build custom order (requires variants)
+          if (variants.length === 0) {
+            throw new Error(
+              "Cannot build custom orders without database variants. Please use template-based orders or fix database connection.",
+            );
+          }
+          composition = await compositionBuilder.buildCustom(variants);
+        }
+
+        // Validate order before adding
+        const validation = validateOrder(orders.length, composition, variants, customer.email);
+        if (!validation.valid) {
+          displayValidationIssues(validation.issues);
+          Logger.warn("Order validation failed when adding", {
+            orderIndex: orders.length,
+            customerEmail: customer.email,
+            issues: validation.issues,
+          });
+          // Continue anyway - user can fix in review step
+        } else if (validation.issues.length > 0) {
+          displayValidationIssues(validation.issues);
+        }
+
+        if (options.modifyInventory) {
+          inventoryChecks.push({
+            orderIndex: orders.length,
+            composition,
+            customer,
+            locationId: customer.locationId,
+          });
+        }
+
+        orders.push({
           customer,
+          composition,
           locationId: customer.locationId,
         });
+        Logger.info("Order added", { totalOrders: orders.length, orderIndex: i + 1, totalCount: orderCount });
       }
-
-      orders.push({
-        customer,
-        composition,
-        locationId: customer.locationId,
-      });
-      Logger.info("Order added", { totalOrders: orders.length });
     } else if (reviewAction === "edit") {
       if (orders.length === 0) {
         Logger.warn("No orders to edit", { orderCount: orders.length });
