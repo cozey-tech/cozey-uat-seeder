@@ -14,6 +14,7 @@ export interface CliOptions {
   useDirectMode: boolean;
   pollingTimeout: number; // seconds
   pollingInterval: number; // seconds
+  noColor: boolean;
 }
 
 /**
@@ -40,6 +41,7 @@ export function parseArgs(): CliOptions {
     )
     .option("--polling-timeout <seconds>", "COS webhook polling timeout in seconds (default: 180 = 3 minutes)", "180")
     .option("--polling-interval <seconds>", "COS webhook polling interval in seconds (default: 2)", "2")
+    .option("--no-color", "Disable colored output (useful for CI/CD or non-TTY environments)")
     .addHelpText(
       "after",
       `
@@ -117,5 +119,6 @@ For more information, see README.md
     useDirectMode: options.useDirectMode || false,
     pollingTimeout: parseInt(options.pollingTimeout),
     pollingInterval: parseInt(options.pollingInterval),
+    noColor: options.color === false, // Commander's --no-color sets color to false
   };
 }

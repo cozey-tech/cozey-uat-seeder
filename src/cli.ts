@@ -19,6 +19,7 @@ import { initializeEnvConfig } from "./config/env";
 import { ProgressTracker } from "./utils/progress";
 import { ErrorFormatter } from "./utils/errorFormatter";
 import { OutputFormatter } from "./utils/outputFormatter";
+import { setColorsEnabled } from "./utils/colors";
 import { parseArgs } from "./cli/args";
 import { validateConfig, checkStagingEnvironment, parseAndValidateConfig, validateData } from "./cli/validation";
 import { initializeServices, executeSeedingFlow, executeDryRun } from "./cli/orchestration";
@@ -33,6 +34,11 @@ async function main(): Promise<void> {
     await initializeEnvConfig();
 
     const options = parseArgs();
+
+    // Configure color output based on --no-color flag
+    if (options.noColor) {
+      setColorsEnabled(false);
+    }
 
     if (options.resume) {
       const resumeState = loadProgressState(options.resume);
