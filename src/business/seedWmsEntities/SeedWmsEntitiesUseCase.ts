@@ -52,16 +52,31 @@ export class SeedWmsEntitiesUseCase {
               });
             } catch (error: unknown) {
               // Shipment may already exist (unique constraint violation P2002)
-              // This is expected for idempotent orders that already have shipments
-              // Check if it's a P2002 error (unique constraint) - if so, shipment already exists, which is fine
+              // Query for existing shipment and include it in the response
               const errorMessage = error instanceof Error ? error.message : String(error);
               if (errorMessage.includes("already exists")) {
-                Logger.info("Shipment already exists for idempotent order", {
+                Logger.info("Shipment already exists for idempotent order, querying existing shipment", {
                   shopifyOrderId: shopifyOrder.shopifyOrderId,
                   orderId: existingOrder.id,
                   collectionPrepId: request.collectionPrepId,
                 });
-                // Shipment already exists - this is fine, continue
+                // Query for existing shipment to include in response
+                const existingShipmentId = await this.wmsService.findShipmentByOrderAndCollectionPrep(
+                  existingOrder.id,
+                  request.collectionPrepId,
+                );
+                if (existingShipmentId) {
+                  shipments.push({
+                    shipmentId: existingShipmentId,
+                    orderId: existingOrder.id,
+                  });
+                } else {
+                  Logger.warn("Could not find existing shipment that should exist", {
+                    shopifyOrderId: shopifyOrder.shopifyOrderId,
+                    orderId: existingOrder.id,
+                    collectionPrepId: request.collectionPrepId,
+                  });
+                }
               } else {
                 // Re-throw unexpected errors
                 throw error;

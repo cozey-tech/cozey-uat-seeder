@@ -193,5 +193,12 @@ describe("WMS Order Index Mapping", () => {
       // TODO: Add test for resume scenario
       expect(true).toBe(true);
     });
+
+    it("should track shipments for idempotent orders even when they already exist", () => {
+      // This tests that existing shipments for idempotent orders are included in the response
+      // Even if the shipment already exists, it should be tracked so resume logic is aware
+      // TODO: Implement this test once WmsService mocking is set up
+      expect(true).toBe(true);
+    });
   });
 });

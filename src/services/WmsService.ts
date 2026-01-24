@@ -315,6 +315,16 @@ export class WmsService {
     return results;
   }
 
+  /**
+   * Find shipment by order ID and collection prep ID
+   * Used when checking if a shipment already exists for idempotent orders
+   */
+  async findShipmentByOrderAndCollectionPrep(orderId: string, collectionPrepId: string): Promise<string | null> {
+    const shipments = await this.repository.findShipmentsByOrderIds([orderId]);
+    const matchingShipment = shipments.find((s) => s.collectionPrepId === collectionPrepId);
+    return matchingShipment?.id || null;
+  }
+
   async createShipmentForOrder(collectionPrepId: string, orderId: string, region: string): Promise<string> {
     if (this.dryRun) {
       const shipmentId = uuidv4();
