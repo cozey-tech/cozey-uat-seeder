@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Color theme with semantic colors (cyan headers, green/red/yellow/blue for status messages) for improved terminal readability (2026-01-24)
+- `--no-color` flag to disable colors for CI/CD and accessibility (2026-01-24)
+- Performance metrics display infrastructure showing throughput (orders/sec) and GraphQL rate limit status (2026-01-24)
+- Enhanced CLI help text with organized examples, common workflows, and tips for all commands (2026-01-24)
+- Timing breakdown display showing duration of each seeding phase (Shopify, WMS, Collection Prep) (2026-01-23)
+- Progress bars now show estimated time remaining based on recent operation speed (2026-01-23)
+- Enhanced error messages with structured "What/Why/How" format for faster issue resolution (2026-01-23)
 - Data model documentation (`docs/data-model.md`)
 - Runbook with troubleshooting guide (`docs/runbook.md`)
 - Contributing guide (`CONTRIBUTING.md`)
@@ -21,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Resume config flexibility: config file is now optional when using `--resume`, with stored config path as fallback (2026-01-24)
+- Warning displayed when different config specified during resume operation (2026-01-24)
 - Fixed broken internal links in documentation
 - Organized implementation docs (moved working notes to `ai-docs/`)
 - Updated architecture.md to reference correct technical design document
@@ -33,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed WMS order index mapping when processing failures during resume operations (2026-01-23)
+- Fixed shipment tracking for idempotent orders during resume (2026-01-23)
+- Fixed collection prep reuse when resuming operations (2026-01-23)
+- Verified and fixed config order index mapping to preserve original indices (2026-01-23)
 - Fixed broken link to `docs/implementation/progress.md` (moved to `ai-docs/`)
 - Fixed architecture.md link to technical design document
 
