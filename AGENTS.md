@@ -1,5 +1,7 @@
 # AGENTS.md
 
+**Extends:** ~/AGENTS.md
+
 Project status: active development. Core seeder functionality is implemented and tested. Documentation and tooling are established.
 
 ## Changelog

@@ -4,31 +4,96 @@
     {
       "orderType": "regular-only",
       "customer": {
-        "name": "Test Customer Royalmount 1",
-        "email": "test-royalmount-1@example.com",
-        "address": "275 Rue Notre-Dame Est",
-        "city": "Montreal",
-        "province": "QC",
-        "postalCode": "H2Y 1C6"
+        "name": "Test Customer Windsor 3",
+        "email": "test-windsor-3@example.com",
+        "address": "3000 Dougall Avenue",
+        "city": "Windsor",
+        "province": "ON",
+        "postalCode": "N9E 1S3"
       },
       "lineItems": [
         {
-          "sku": "2+3+2051-1-85-420-1",
-          "quantity": 5,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+2+2431-112",
-          "quantity": 4,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "4532-112-D",
+          "sku": "1+2058-0-00-300",
           "quantity": 2,
           "pickType": "Regular"
         },
         {
-          "sku": "2+3+2045-2-00-300",
+          "sku": "2+2069-2A1-R",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "40104-101",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+3162-111",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1073-2A1",
+          "quantity": 10,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1+2R69-0-0-900-R",
+          "quantity": 4,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+2+2231-101-R",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+3+2108-201-R",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "4237-111-R",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "3+3026-102",
+          "quantity": 4,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+3+2019-R-00-501-D",
+          "quantity": 5,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "3+2328-101",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "4036-111-R",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "4234-112-R",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+2046-0-00-300",
+          "quantity": 10,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "3+3251-0-00-300-S",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+3+2308-202-R",
           "quantity": 1,
           "pickType": "Regular"
         }
@@ -46,427 +111,14 @@
       },
       "lineItems": [
         {
-          "sku": "3070-L-00-300-S",
+          "sku": "71059-0-00-300-R",
           "quantity": 1,
           "pickType": "Pick and Pack"
         },
         {
-          "sku": "11019-E-1-7LT-R",
-          "quantity": 5,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "11054-0-00-300-S",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "1053-L-00-300",
+          "sku": "3+2008-0-2-701-R",
           "quantity": 2,
           "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "2L69-0-00-300-S-D",
-          "quantity": 2,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "46F49-0-0U-0-E-4-102-R",
-          "quantity": 4,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "70057-0-00-300-D",
-          "quantity": 13,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "30029-401",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "73087-0-00-301-D",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        }
-      ]
-    },
-    {
-      "orderType": "regular-only",
-      "customer": {
-        "name": "Test Customer Langley 2",
-        "email": "test-langley-2@example.com",
-        "address": "13737 96 Avenue",
-        "city": "Surrey",
-        "province": "BC",
-        "postalCode": "V3V 0C6"
-      },
-      "lineItems": [
-        {
-          "sku": "2+1539-111-R",
-          "quantity": 1,
-          "pickType": "Regular"
-        }
-      ]
-    },
-    {
-      "orderType": "mixed",
-      "customer": {
-        "name": "Test Customer Windsor 2",
-        "email": "test-windsor-2@example.com",
-        "address": "1155 Lauzon Road",
-        "city": "Windsor",
-        "province": "ON",
-        "postalCode": "N8S 3N1"
-      },
-      "lineItems": [
-        {
-          "sku": "710-082-0-00-121-D",
-          "quantity": 2,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "3+3L42-301",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+3040-0-00-300",
-          "quantity": 5,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2136-112",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "46Q49-S-UU-S-R-1-100-D",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "3+3059-L-00-300-D",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "47K01-0-01-0-0-0-102-1",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "1+2L56-0-00-300-S-R",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+3+2420-201",
-          "quantity": 4,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "46K49-R-UU-S-P-1-100-R",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "3+3059-2-00-300",
-          "quantity": 9,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "3+2471-201",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "1+2073-2A1-D",
-          "quantity": 10,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+2037-111",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "3+2124-102-D",
-          "quantity": 3,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+2+2241-301",
-          "quantity": 3,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "1R56-0-00-300-S-R",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+2+2259-0-00-300-S-R",
-          "quantity": 8,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "46K49-S-UU-N-P-3-100-R",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+1326-102-R",
-          "quantity": 1,
-          "pickType": "Regular"
-        }
-      ]
-    },
-    {
-      "orderType": "mixed",
-      "customer": {
-        "name": "Test Customer Langley 2",
-        "email": "test-langley-2@example.com",
-        "address": "13737 96 Avenue",
-        "city": "Surrey",
-        "province": "BC",
-        "postalCode": "V3V 0C6"
-      },
-      "lineItems": [
-        {
-          "sku": "3+3018-L-00-501",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "10036-0-00-610",
-          "quantity": 10,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "4R73-0-0-710-R",
-          "quantity": 10,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "4089-2-00-300-S",
-          "quantity": 2,
-          "pickType": "Pick and Pack"
-        }
-      ]
-    },
-    {
-      "orderType": "pnp-only",
-      "customer": {
-        "name": "Test Customer Langley 1",
-        "email": "test-langley-1@example.com",
-        "address": "200 Granville Street",
-        "city": "Vancouver",
-        "province": "BC",
-        "postalCode": "V6C 1S4"
-      },
-      "lineItems": [
-        {
-          "sku": "3+3258-0-00-300-S",
-          "quantity": 7,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "30003-352-R",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "2+2R08-0-L-710-R",
-          "quantity": 3,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "30020-2-34-18x18K",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "12049-0-0-900",
-          "quantity": 2,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "33003-303-R",
-          "quantity": 2,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "4087-L-00-300-S",
-          "quantity": 2,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "ATM-0000-HW-30000000",
-          "quantity": 2,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "2+3+2087-L-00-300-D",
-          "quantity": 2,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "1076-0-0-800",
-          "quantity": 2,
-          "pickType": "Pick and Pack"
-        }
-      ]
-    },
-    {
-      "orderType": "mixed",
-      "customer": {
-        "name": "Test Customer Windsor 2",
-        "email": "test-windsor-2@example.com",
-        "address": "1155 Lauzon Road",
-        "city": "Windsor",
-        "province": "ON",
-        "postalCode": "N8S 3N1"
-      },
-      "lineItems": [
-        {
-          "sku": "34039-1-127-9x12F",
-          "quantity": 3,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "1+2069-R-00-300-S",
-          "quantity": 3,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "3+3119-201-R",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "20024-101",
-          "quantity": 2,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "3+2259-0-00-300",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "3+2R73-0-0-700",
-          "quantity": 10,
-          "pickType": "Pick and Pack"
-        }
-      ]
-    },
-    {
-      "orderType": "regular-only",
-      "customer": {
-        "name": "Test Customer Windsor 2",
-        "email": "test-windsor-2@example.com",
-        "address": "1155 Lauzon Road",
-        "city": "Windsor",
-        "province": "ON",
-        "postalCode": "N8S 3N1"
-      },
-      "lineItems": [
-        {
-          "sku": "2+1R40-301",
-          "quantity": 10,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+1326-101-D",
-          "quantity": 5,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+2+2276-0-0-800-D",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "3+3078-0-03-610-R",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "1+2028-101-R",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+2+2226-101-D",
-          "quantity": 8,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2L69-L-0-900-D",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+3+2326-102",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "4226-101-D",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "1231-101-R",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "30021-370K-D",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "4126-101",
-          "quantity": 5,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+1331-102-R",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "3+2331-102",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "3+2132-102-D",
-          "quantity": 8,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "1107-102-D",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "3+3132-101",
-          "quantity": 3,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "3L43-0-00-300-S",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "4232-102-R",
-          "quantity": 2,
-          "pickType": "Regular"
         }
       ]
     },
@@ -482,83 +134,531 @@
       },
       "lineItems": [
         {
-          "sku": "3+2069-L-00-501-D",
-          "quantity": 1,
+          "sku": "1101-201-R",
+          "quantity": 20,
           "pickType": "Regular"
+        }
+      ]
+    },
+    {
+      "orderType": "pnp-only",
+      "customer": {
+        "name": "Test Customer Langley 2",
+        "email": "test-langley-2@example.com",
+        "address": "13737 96 Avenue",
+        "city": "Surrey",
+        "province": "BC",
+        "postalCode": "V3V 0C6"
+      },
+      "lineItems": [
+        {
+          "sku": "4L08-2-0-711",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
         },
         {
-          "sku": "2+1R50-0-00-300-R",
+          "sku": "91372-6825-1",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "1+2087-0-00-300-D",
           "quantity": 5,
-          "pickType": "Regular"
+          "pickType": "Pick and Pack"
         },
         {
-          "sku": "3+3417-2A1-R",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "13076-200",
-          "quantity": 5,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+3+2271-201",
+          "sku": "2008-R-0-700",
           "quantity": 1,
-          "pickType": "Regular"
+          "pickType": "Pick and Pack"
         },
         {
-          "sku": "3076-0-00-5A1",
+          "sku": "SP-01-600-69-001",
           "quantity": 2,
-          "pickType": "Regular"
-        },
+          "pickType": "Pick and Pack"
+        }
+      ]
+    },
+    {
+      "orderType": "pnp-only",
+      "customer": {
+        "name": "Test Customer Windsor 2",
+        "email": "test-windsor-2@example.com",
+        "address": "1155 Lauzon Road",
+        "city": "Windsor",
+        "province": "ON",
+        "postalCode": "N8S 3N1"
+      },
+      "lineItems": [
         {
-          "sku": "2+1089-2-00-300-D",
+          "sku": "3+2219-R-0-710",
           "quantity": 1,
-          "pickType": "Regular"
+          "pickType": "Pick and Pack"
         },
         {
-          "sku": "20069-203-R",
-          "quantity": 1,
-          "pickType": "Regular"
+          "sku": "SP-01-400-01-008-R",
+          "quantity": 3,
+          "pickType": "Pick and Pack"
         },
         {
-          "sku": "1076-2A1",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+2069-2A1-D",
-          "quantity": 5,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+3+2220-202-R",
+          "sku": "14078-201-3-D",
           "quantity": 2,
-          "pickType": "Regular"
+          "pickType": "Pick and Pack"
         },
         {
-          "sku": "1+2042-R-00-300-S-R",
-          "quantity": 2,
-          "pickType": "Regular"
+          "sku": "90002-004-0",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
         },
         {
-          "sku": "2+2+2001-202-D",
+          "sku": "2059-2-00-300-R",
+          "quantity": 7,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "HRW-311-1",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "3R08-2-0-701",
           "quantity": 10,
-          "pickType": "Regular"
+          "pickType": "Pick and Pack"
         },
         {
-          "sku": "11073-202-D",
+          "sku": "30022-308",
           "quantity": 1,
-          "pickType": "Regular"
+          "pickType": "Pick and Pack"
         },
         {
-          "sku": "2+3+2L48-0-00-300-S-R",
+          "sku": "3+2219-R-0-711-R",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "3216-0-0-700-R",
+          "quantity": 5,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "20031-102",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "72051-0-00-302-S-D",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "20038-111",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "11050-E-00-300",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "3+2273-R-0-710-R",
+          "quantity": 6,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "4056-2-00-300-S-D",
+          "quantity": 5,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "2+2273-R-0-710-R",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "3+2L01-0-0-711-R",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        }
+      ]
+    },
+    {
+      "orderType": "pnp-only",
+      "customer": {
+        "name": "Test Customer Royalmount 1",
+        "email": "test-royalmount-1@example.com",
+        "address": "275 Rue Notre-Dame Est",
+        "city": "Montreal",
+        "province": "QC",
+        "postalCode": "H2Y 1C6"
+      },
+      "lineItems": [
+        {
+          "sku": "2R19-R-0-711-R",
+          "quantity": 3,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "46K74-R-U0-N-0-1-101-R",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "71070-0-00-300-S",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "3059-2-00-300-S",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "2043-0-00-300",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "25000-505",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "2273-R-0-710-R",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "4269-2-0-900",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "20077-503",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "1+2019-0-2-701-R",
+          "quantity": 4,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "1+2073-0-L-701",
+          "quantity": 4,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "2+2+2059-L-00-300-S-D",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "3+3L16-0-R-701",
+          "quantity": 5,
+          "pickType": "Pick and Pack"
+        }
+      ]
+    },
+    {
+      "orderType": "regular-only",
+      "customer": {
+        "name": "Test Customer Windsor 3",
+        "email": "test-windsor-3@example.com",
+        "address": "3000 Dougall Avenue",
+        "city": "Windsor",
+        "province": "ON",
+        "postalCode": "N9E 1S3"
+      },
+      "lineItems": [
+        {
+          "sku": "2052-1-85-420-0",
           "quantity": 2,
           "pickType": "Regular"
         },
         {
-          "sku": "2+3+2208-201-R",
+          "sku": "2+3048-L-00-300-S-R",
           "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "13078-0-00-601-S-D",
+          "quantity": 5,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "12035-0-00-601-S-D",
+          "quantity": 5,
+          "pickType": "Regular"
+        }
+      ]
+    },
+    {
+      "orderType": "pnp-only",
+      "customer": {
+        "name": "Test Customer Royalmount 3",
+        "email": "test-royalmount-3@example.com",
+        "address": "1055 Rue Saint-Laurent Ouest",
+        "city": "Longueuil",
+        "province": "QC",
+        "postalCode": "J4K 1C7"
+      },
+      "lineItems": [
+        {
+          "sku": "30027-1-30-18x18-R",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "74051-0-00-302",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "20024-103",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        }
+      ]
+    },
+    {
+      "orderType": "regular-only",
+      "customer": {
+        "name": "Test Customer Langley 1",
+        "email": "test-langley-1@example.com",
+        "address": "200 Granville Street",
+        "city": "Vancouver",
+        "province": "BC",
+        "postalCode": "V6C 1S4"
+      },
+      "lineItems": [
+        {
+          "sku": "2+2532-111-D",
+          "quantity": 5,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1231-112-D",
+          "quantity": 7,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+2+2001-0-00-501-D",
+          "quantity": 2,
+          "pickType": "Regular"
+        }
+      ]
+    },
+    {
+      "orderType": "pnp-only",
+      "customer": {
+        "name": "Test Customer Windsor 3",
+        "email": "test-windsor-3@example.com",
+        "address": "3000 Dougall Avenue",
+        "city": "Windsor",
+        "province": "ON",
+        "postalCode": "N9E 1S3"
+      },
+      "lineItems": [
+        {
+          "sku": "20008-201",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "4001-2-0-701",
+          "quantity": 9,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "2+2216-L-0-710",
+          "quantity": 5,
+          "pickType": "Pick and Pack"
+        }
+      ]
+    },
+    {
+      "orderType": "regular-only",
+      "customer": {
+        "name": "Test Customer Windsor 1",
+        "email": "test-windsor-1@example.com",
+        "address": "350 City Hall Square West",
+        "city": "Windsor",
+        "province": "ON",
+        "postalCode": "N9A 6S1"
+      },
+      "lineItems": [
+        {
+          "sku": "3+2041-R-00-300-R",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "72050-301-D",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+3+2059-0-00-300-R",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+3+2247-0-00-300-S",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+2077-L-00-501-D",
+          "quantity": 4,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "3+2069-0-0-900-R",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1232-111",
+          "quantity": 3,
+          "pickType": "Regular"
+        }
+      ]
+    },
+    {
+      "orderType": "mixed",
+      "customer": {
+        "name": "Test Customer Windsor 3",
+        "email": "test-windsor-3@example.com",
+        "address": "3000 Dougall Avenue",
+        "city": "Windsor",
+        "province": "ON",
+        "postalCode": "N9E 1S3"
+      },
+      "lineItems": [
+        {
+          "sku": "2+1071-201",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "4L50-0-00-300-S-R",
+          "quantity": 3,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "3+2276-201",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "45022-00-100-1-D",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "3019-0-0-701-R",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "91358-6821-1",
+          "quantity": 3,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "30006-355K",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "1R77-0-0-900",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        }
+      ]
+    },
+    {
+      "orderType": "pnp-only",
+      "customer": {
+        "name": "Test Customer Windsor 3",
+        "email": "test-windsor-3@example.com",
+        "address": "3000 Dougall Avenue",
+        "city": "Windsor",
+        "province": "ON",
+        "postalCode": "N9E 1S3"
+      },
+      "lineItems": [
+        {
+          "sku": "30004-301-R",
+          "quantity": 11,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "20039-112-1",
+          "quantity": 3,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "20037-115-1",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "4R19-0-0-710",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "14069-501-3",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "2+1201-0-0-710-R",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "4047-301",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "4R89-0-00-300-D",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        }
+      ]
+    },
+    {
+      "orderType": "regular-only",
+      "customer": {
+        "name": "Test Customer Windsor 1",
+        "email": "test-windsor-1@example.com",
+        "address": "350 City Hall Square West",
+        "city": "Windsor",
+        "province": "ON",
+        "postalCode": "N9A 6S1"
+      },
+      "lineItems": [
+        {
+          "sku": "1128-101-R",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "46F49-S-UU-S-P-1-100-D",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1+2427-101-R",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2217-201-D",
+          "quantity": 3,
           "pickType": "Regular"
         }
       ]
@@ -575,29 +675,107 @@
       },
       "lineItems": [
         {
-          "sku": "2+3+2R75-0-0-800",
-          "quantity": 3,
+          "sku": "1+2069-0-0-900",
+          "quantity": 14,
           "pickType": "Regular"
         },
         {
-          "sku": "2+1L59-0-00-300-S-R",
-          "quantity": 7,
+          "sku": "2+3289-0-00-300-S-D",
+          "quantity": 2,
           "pickType": "Regular"
         },
         {
-          "sku": "LEG-1200-201-1",
+          "sku": "1+2R56-0-00-300-S-R",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1L42-301",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+2219-0-0-711",
+          "quantity": 10,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "2+2019-0-R-701-R",
           "quantity": 1,
           "pickType": "Pick and Pack"
         },
         {
-          "sku": "SP-01-200-73-0A1-R",
+          "sku": "11056-0-00-300",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "RB-40-600-T3-003",
+          "quantity": 4,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "46Q75-0-0U-0-R-1-102",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        }
+      ]
+    },
+    {
+      "orderType": "mixed",
+      "customer": {
+        "name": "Test Customer Royalmount 2",
+        "email": "test-royalmount-2@example.com",
+        "address": "1250 Boulevard René-Lévesque Ouest",
+        "city": "Montreal",
+        "province": "QC",
+        "postalCode": "H3B 4W8"
+      },
+      "lineItems": [
+        {
+          "sku": "34042-1-122-8x10F",
+          "quantity": 5,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+2041-R-00-300",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "10076-0-00-610",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2052-1-80-420-2",
+          "quantity": 5,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "74044-301-2-R",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "1+2208-0-0-710-R",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "2+3+2250-0-00-300",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "4208-L-0-701",
           "quantity": 2,
           "pickType": "Pick and Pack"
         }
       ]
     },
     {
-      "orderType": "pnp-only",
+      "orderType": "mixed",
       "customer": {
         "name": "Test Customer Royalmount 3",
         "email": "test-royalmount-3@example.com",
@@ -608,270 +786,73 @@
       },
       "lineItems": [
         {
-          "sku": "3051-R-00-300",
+          "sku": "2+2052-1-83-420-2",
           "quantity": 1,
-          "pickType": "Pick and Pack"
+          "pickType": "Regular"
         },
         {
-          "sku": "2+3+2R01-0-0-700",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "74089-0-00-301",
+          "sku": "3+2051-1-83-420-1",
           "quantity": 2,
-          "pickType": "Pick and Pack"
+          "pickType": "Regular"
         },
         {
-          "sku": "12087-0-00-300-D",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "70058-0-00-301-D",
-          "quantity": 3,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "2+3257-0-00-300-S",
-          "quantity": 4,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "4048-L-00-300",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "3087-R-00-300-S-D",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "72089-0-00-302-D",
-          "quantity": 3,
-          "pickType": "Pick and Pack"
-        }
-      ]
-    },
-    {
-      "orderType": "mixed",
-      "customer": {
-        "name": "Test Customer Royalmount 1",
-        "email": "test-royalmount-1@example.com",
-        "address": "275 Rue Notre-Dame Est",
-        "city": "Montreal",
-        "province": "QC",
-        "postalCode": "H2Y 1C6"
-      },
-      "lineItems": [
-        {
-          "sku": "4R69-0-00-300",
+          "sku": "40012-112-111",
           "quantity": 1,
           "pickType": "Regular"
         },
         {
-          "sku": "2+3L44-0-00-300-R",
-          "quantity": 3,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "SP-01-600-35-006",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "3058-2-00-300-D",
-          "quantity": 10,
-          "pickType": "Pick and Pack"
-        }
-      ]
-    },
-    {
-      "orderType": "pnp-only",
-      "customer": {
-        "name": "Test Customer Royalmount 1",
-        "email": "test-royalmount-1@example.com",
-        "address": "275 Rue Notre-Dame Est",
-        "city": "Montreal",
-        "province": "QC",
-        "postalCode": "H2Y 1C6"
-      },
-      "lineItems": [
-        {
-          "sku": "30021-2-34-16x26K-R",
-          "quantity": 3,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "70042-0-00-300",
-          "quantity": 2,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "3+2L73-0-0-701-R",
-          "quantity": 4,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "CXL-7200-HW-50000000",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        }
-      ]
-    },
-    {
-      "orderType": "regular-only",
-      "customer": {
-        "name": "Test Customer Royalmount 1",
-        "email": "test-royalmount-1@example.com",
-        "address": "275 Rue Notre-Dame Est",
-        "city": "Montreal",
-        "province": "QC",
-        "postalCode": "H2Y 1C6"
-      },
-      "lineItems": [
-        {
-          "sku": "2436-112",
+          "sku": "2+3018-0-00-501-D",
           "quantity": 1,
           "pickType": "Regular"
         },
         {
-          "sku": "2+2+2L74-0-R-900-R",
-          "quantity": 3,
+          "sku": "3R76-0-0-900",
+          "quantity": 12,
           "pickType": "Regular"
         },
         {
-          "sku": "2+2236-111-D",
+          "sku": "4124-101-R",
           "quantity": 7,
           "pickType": "Regular"
         },
         {
-          "sku": "2258-0-00-300-S-R",
+          "sku": "2+1057-R-00-300-S-D",
           "quantity": 5,
           "pickType": "Regular"
         },
         {
-          "sku": "12049-0-00-302-S",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "46Q74-R-UU-S-P-1-100",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+1043-0-00-300-R",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "4019-2A1",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2533-111",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "7062-111",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "4031-111-D",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+3+2071-2-00-300-S",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "4245-301-R",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+3008-R-00-501",
-          "quantity": 10,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "4319-201-D",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+2R08-L-00-501-D",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "1219-202-D",
-          "quantity": 7,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "4101-201-D",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "3+2269-2A1-D",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+3419-202",
-          "quantity": 2,
-          "pickType": "Regular"
-        }
-      ]
-    },
-    {
-      "orderType": "pnp-only",
-      "customer": {
-        "name": "Test Customer Windsor 2",
-        "email": "test-windsor-2@example.com",
-        "address": "1155 Lauzon Road",
-        "city": "Windsor",
-        "province": "ON",
-        "postalCode": "N8S 3N1"
-      },
-      "lineItems": [
-        {
-          "sku": "71053-0-00-301-D",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "2+2219-0-0-701-R",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "3+2016-0-R-701",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "2008-R-0-700",
+          "sku": "20024-103-1",
           "quantity": 2,
           "pickType": "Pick and Pack"
         },
         {
-          "sku": "11073-E-0-7RL",
+          "sku": "GIA-7300-HW-40000000",
           "quantity": 1,
           "pickType": "Pick and Pack"
         },
         {
-          "sku": "4273-L-0-710-R",
+          "sku": "TMS-0000-HW-10000000",
           "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "46Q73-0-0U-0-R-1-102-D",
+          "quantity": 5,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "12053-0-00-302-R",
+          "quantity": 8,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "20078-207-R",
+          "quantity": 3,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "71047-0-00-300-S",
+          "quantity": 1,
           "pickType": "Pick and Pack"
         }
       ]
@@ -888,152 +869,136 @@
       },
       "lineItems": [
         {
-          "sku": "74043-301-1-D",
+          "sku": "3051-2-82-420-1",
           "quantity": 1,
           "pickType": "Regular"
         },
         {
-          "sku": "1317-202-D",
-          "quantity": 4,
+          "sku": "3+3071-2-00-300-S",
+          "quantity": 3,
           "pickType": "Regular"
         },
         {
-          "sku": "4536-112",
+          "sku": "11007-102-R",
           "quantity": 1,
           "pickType": "Regular"
         },
         {
-          "sku": "2+1078-0-R-800-D",
+          "sku": "3+2L78-0-R-900",
           "quantity": 1,
           "pickType": "Regular"
         },
         {
-          "sku": "3+3R58-0-00-300-R",
+          "sku": "1032-102-D",
           "quantity": 1,
           "pickType": "Regular"
         },
         {
-          "sku": "3+3258-0-00-300-S-R",
-          "quantity": 1,
+          "sku": "2+3+2L69-R-00-501-R",
+          "quantity": 2,
           "pickType": "Regular"
         },
         {
-          "sku": "3+3276-0-00-501-R",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "4L73-0-0-700",
-          "quantity": 1,
+          "sku": "3201-L-0-701",
+          "quantity": 2,
           "pickType": "Pick and Pack"
         },
         {
-          "sku": "3047-L-00-300-S",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "21000-105",
-          "quantity": 1,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "13050-0-00-300",
-          "quantity": 5,
+          "sku": "3043-R-00-300-R",
+          "quantity": 3,
           "pickType": "Pick and Pack"
         }
       ]
     },
     {
-      "orderType": "regular-only",
+      "orderType": "mixed",
       "customer": {
-        "name": "Test Customer Langley 2",
-        "email": "test-langley-2@example.com",
-        "address": "13737 96 Avenue",
-        "city": "Surrey",
-        "province": "BC",
-        "postalCode": "V3V 0C6"
+        "name": "Test Customer Royalmount 1",
+        "email": "test-royalmount-1@example.com",
+        "address": "275 Rue Notre-Dame Est",
+        "city": "Montreal",
+        "province": "QC",
+        "postalCode": "H2Y 1C6"
       },
       "lineItems": [
         {
-          "sku": "2+2R78-0-00-501",
+          "sku": "4538-112-D",
           "quantity": 5,
           "pickType": "Regular"
         },
         {
-          "sku": "1072-0-00-300-R",
-          "quantity": 4,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "3+2134-111-R",
+          "sku": "2R78-0-0-800-D",
           "quantity": 2,
           "pickType": "Regular"
         },
         {
-          "sku": "2+3031-111-D",
+          "sku": "43023-1-35-100",
+          "quantity": 1,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "3047-0-00-300-S-R",
+          "quantity": 18,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+3+2069-R-00-300-S-R",
+          "quantity": 2,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "2+3069-L-00-501-R",
           "quantity": 9,
           "pickType": "Regular"
         },
         {
-          "sku": "1+2063-112",
-          "quantity": 1,
-          "pickType": "Regular"
-        }
-      ]
-    },
-    {
-      "orderType": "regular-only",
-      "customer": {
-        "name": "Test Customer Royalmount 2",
-        "email": "test-royalmount-2@example.com",
-        "address": "1250 Boulevard René-Lévesque Ouest",
-        "city": "Montreal",
-        "province": "QC",
-        "postalCode": "H3B 4W8"
-      },
-      "lineItems": [
-        {
-          "sku": "2+2234-111-R",
-          "quantity": 1,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+3051-1-82-420-1",
-          "quantity": 4,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+3+2045-2-00-300",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "1031-112",
-          "quantity": 2,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "2+3+2053-0-00-300",
-          "quantity": 2,
-          "pickType": "Regular"
-        }
-      ]
-    },
-    {
-      "orderType": "pnp-only",
-      "customer": {
-        "name": "Test Customer Royalmount 1",
-        "email": "test-royalmount-1@example.com",
-        "address": "275 Rue Notre-Dame Est",
-        "city": "Montreal",
-        "province": "QC",
-        "postalCode": "H2Y 1C6"
-      },
-      "lineItems": [
-        {
-          "sku": "26000-509",
+          "sku": "3+3231-101",
           "quantity": 3,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "1+2072-2A1-D",
+          "quantity": 3,
+          "pickType": "Regular"
+        },
+        {
+          "sku": "70075-0-00-801-D",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "3L01-R-0-700-R",
+          "quantity": 3,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "2+3R19-0-L-700",
+          "quantity": 3,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "3042-R-00-300-S",
+          "quantity": 1,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "LEG-2202-111-2-R",
+          "quantity": 3,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "1+2R16-0-L-711-R",
+          "quantity": 11,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "3+2008-0-L-700",
+          "quantity": 2,
+          "pickType": "Pick and Pack"
+        },
+        {
+          "sku": "1+2R16-0-0-701",
+          "quantity": 2,
           "pickType": "Pick and Pack"
         }
       ]
@@ -1050,28 +1015,18 @@
       },
       "lineItems": [
         {
-          "sku": "1+2339-111",
-          "quantity": 1,
+          "sku": "11008-0-0-701-N-R",
+          "quantity": 16,
           "pickType": "Regular"
         },
         {
-          "sku": "1+2001-R-00-501-D",
-          "quantity": 19,
-          "pickType": "Regular"
-        },
-        {
-          "sku": "4R19-R-0-701",
-          "quantity": 2,
-          "pickType": "Pick and Pack"
-        },
-        {
-          "sku": "25000-508",
+          "sku": "44000-0-77-502",
           "quantity": 1,
           "pickType": "Pick and Pack"
         },
         {
-          "sku": "20077-501",
-          "quantity": 2,
+          "sku": "SP-01-400-01-004",
+          "quantity": 3,
           "pickType": "Pick and Pack"
         }
       ]

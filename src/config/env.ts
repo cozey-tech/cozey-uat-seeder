@@ -81,6 +81,63 @@ function transformAwsSecrets(
 ): Record<string, unknown> {
   const transformed: Record<string, unknown> = {};
 
+  // Check if we have individual database components that need to be assembled
+  const hasDbComponents =
+    (awsSecrets.username || awsSecrets.user) &&
+    (awsSecrets.password || awsSecrets.pass) &&
+    (awsSecrets.host || awsSecrets.hostname) &&
+    (awsSecrets.dbname || awsSecrets.database || awsSecrets.db);
+
+  // If we have individual components but no DATABASE_URL, assemble it
+  if (hasDbComponents && !awsSecrets.DATABASE_URL) {
+    const username = (awsSecrets.username || awsSecrets.user) as string;
+    const password = (awsSecrets.password || awsSecrets.pass) as string;
+    const host = (awsSecrets.host || awsSecrets.hostname) as string;
+    const port = (awsSecrets.port || "5432") as string;
+    const dbname = (awsSecrets.dbname || awsSecrets.database || awsSecrets.db) as string;
+    const engine = (awsSecrets.engine || "postgresql") as string;
+
+    // Construct DATABASE_URL from components
+    const protocol = engine === "postgres" || engine === "postgresql" ? "postgresql" : engine;
+    // Omit port if it's the default PostgreSQL port (5432) to match Neon's expected format
+    const portSegment = port === "5432" ? "" : `:${port}`;
+    let baseUrl = `${protocol}://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}${portSegment}/${dbname}`;
+
+    // Add SSL parameters if provided in AWS secrets, or default for Neon/hosted databases
+    const searchParams = new URLSearchParams();
+    if (awsSecrets.sslmode) {
+      searchParams.set("sslmode", awsSecrets.sslmode as string);
+    } else if (host.includes("neon.tech") || host.includes("aws.neon")) {
+      // Neon databases require SSL
+      searchParams.set("sslmode", "require");
+    }
+    if (awsSecrets.channel_binding) {
+      searchParams.set("channel_binding", awsSecrets.channel_binding as string);
+    } else if (host.includes("neon.tech") || host.includes("aws.neon")) {
+      // Neon databases often require channel_binding
+      searchParams.set("channel_binding", "require");
+    }
+    // Only add connect_timeout if explicitly provided in AWS secrets
+    // Don't add it by default as it may cause connection issues
+    if (awsSecrets.connect_timeout) {
+      searchParams.set("connect_timeout", awsSecrets.connect_timeout as string);
+    }
+
+    if (searchParams.toString()) {
+      baseUrl += `?${searchParams.toString()}`;
+    }
+
+    transformed.DATABASE_URL = baseUrl;
+
+    Logger.info("Assembled DATABASE_URL from individual AWS secret components", {
+      host,
+      port,
+      dbname,
+      username: username.substring(0, 3) + "***", // Log masked username
+      hasSslParams: searchParams.toString().length > 0,
+    });
+  }
+
   for (const [key, value] of Object.entries(awsSecrets)) {
     // If the key matches a secret name, it's a plain string secret that needs mapping
     if (key === databaseSecretName) {
@@ -91,8 +148,21 @@ function transformAwsSecrets(
       // Note: If the shopify secret is JSON, it will already have correct keys
       // and won't match this condition, so it will be copied as-is below
       transformed.SHOPIFY_ACCESS_TOKEN = value;
-    } else {
+    } else if (
+      key !== "username" &&
+      key !== "user" &&
+      key !== "password" &&
+      key !== "pass" &&
+      key !== "host" &&
+      key !== "hostname" &&
+      key !== "port" &&
+      key !== "dbname" &&
+      key !== "database" &&
+      key !== "db" &&
+      key !== "engine"
+    ) {
       // JSON secrets or other keys already have correct env var names, copy as-is
+      // Skip individual DB components if we already assembled DATABASE_URL
       transformed[key] = value;
     }
   }
@@ -161,7 +231,10 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
   const rawConfig = rawResult.data;
 
   // Apply connection pool limit to DATABASE_URL if specified
+  // NOTE: For Neon databases, we skip adding connection_limit to match their expected URL format
   let processedDatabaseUrl = rawConfig.DATABASE_URL;
+  const isNeonDatabase = processedDatabaseUrl.includes("neon.tech") || processedDatabaseUrl.includes("aws.neon");
+
   try {
     let connectionLimit: number | null = null;
 
@@ -183,10 +256,13 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
     }
 
     // Apply connection limit if URL doesn't already have one
-    const url = new URL(rawConfig.DATABASE_URL);
-    if (!url.searchParams.has("connection_limit")) {
-      url.searchParams.set("connection_limit", connectionLimit.toString());
-      processedDatabaseUrl = url.toString();
+    // Skip for Neon databases to match their expected URL format
+    if (!isNeonDatabase) {
+      const url = new URL(rawConfig.DATABASE_URL);
+      if (!url.searchParams.has("connection_limit")) {
+        url.searchParams.set("connection_limit", connectionLimit.toString());
+        processedDatabaseUrl = url.toString();
+      }
     }
   } catch (error) {
     Logger.warn("Failed to parse DATABASE_URL for connection limit configuration, using original URL", {
@@ -217,6 +293,10 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
 
   cachedConfig = result.data;
   isInitialized = true;
+
+  // CRITICAL: Update process.env with processed DATABASE_URL so PrismaClient can use it
+  // PrismaClient reads DATABASE_URL from process.env, not from our config object
+  process.env.DATABASE_URL = result.data.DATABASE_URL;
 
   const source = awsSecrets ? "AWS Secrets Manager (with .env fallback)" : ".env files";
   Logger.info("Environment configuration initialized", { source });
