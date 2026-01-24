@@ -18,7 +18,8 @@
 import { config } from "dotenv";
 import { resolve } from "path";
 import { PrismaClient } from "@prisma/client";
-import { ConfigDataRepository } from "../src/repositories/ConfigDataRepository";
+import { createAdminApiClient } from "@shopify/admin-api-client";
+import { initializeEnvConfig } from "../src/config/env";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import type { SeedConfig } from "../src/shared/validation/seedConfigSchema";
@@ -129,25 +130,185 @@ class SeededRNG {
 }
 
 /**
- * Query database for all available SKUs
+ * Fetch all SKUs from Shopify and get their pickType from database
  */
-async function queryDatabaseSKUs(region: string = "CA"): Promise<SKUCatalog> {
+async function fetchShopifySkusWithPickTypes(region: string = "CA"): Promise<SKUCatalog> {
+  await initializeEnvConfig();
+  const envConfig = await initializeEnvConfig();
+  const client = createAdminApiClient({
+    storeDomain: envConfig.SHOPIFY_STORE_DOMAIN,
+    apiVersion: envConfig.SHOPIFY_API_VERSION,
+    accessToken: envConfig.SHOPIFY_ACCESS_TOKEN,
+  });
+
+  const shopifySkus = new Set<string>();
+  let hasNextPage = true;
+  let cursor: string | null = null;
+  let pageCount = 0;
+
+  console.log(`\n🔍 Fetching all SKUs from Shopify staging...`);
+
+  // Fetch all SKUs from Shopify
+  while (hasNextPage) {
+    const query = `
+      query getProducts($first: Int!, $after: String) {
+        products(first: $first, after: $after) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          edges {
+            node {
+              variants(first: 250) {
+                edges {
+                  node {
+                    sku
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      const response = await client.request(query, {
+        variables: { first: 250, after: cursor },
+      });
+
+      const products = response.data?.products?.edges || [];
+      const pageInfo = response.data?.products?.pageInfo;
+
+      for (const productEdge of products) {
+        const variants = productEdge.node.variants.edges || [];
+        for (const variantEdge of variants) {
+          const sku = variantEdge.node.sku;
+          if (sku) {
+            shopifySkus.add(sku);
+          }
+        }
+      }
+
+      pageCount++;
+      hasNextPage = pageInfo?.hasNextPage ?? false;
+      cursor = pageInfo?.endCursor ?? null;
+
+      if (pageCount % 10 === 0 || !hasNextPage) {
+        console.log(`   Fetched page ${pageCount} - ${shopifySkus.size} unique SKUs found so far...`);
+      }
+    } catch (error) {
+      console.error(
+        `   ⚠️  Error fetching page ${pageCount + 1}:`,
+        error instanceof Error ? error.message : String(error),
+      );
+      hasNextPage = false; // Stop on error
+    }
+  }
+
+  console.log(`✅ Fetched ${shopifySkus.size} unique SKUs from Shopify\n`);
+
+  // Now query database to get pickType for each Shopify SKU
+  console.log(`🔍 Looking up pickType for ${shopifySkus.size} SKUs in database...\n`);
   const prisma = new PrismaClient();
-  const repository = new ConfigDataRepository(prisma);
 
   try {
-    console.log(`\n🔍 Querying database for available SKUs in region: ${region}\n`);
-    const variants = await repository.getAvailableVariants(region);
+    // Get all variants from database that match Shopify SKUs
+    const shopifySkuArray = Array.from(shopifySkus);
+    const BATCH_SIZE = 1000; // Process in batches to avoid huge IN clause
 
-    const regular = variants.filter((v) => v.pickType === "Regular");
-    const pickAndPack = variants.filter((v) => v.pickType === "Pick and Pack");
+    const allVariants: Variant[] = [];
 
-    console.log(`✅ Found ${variants.length} total variants:`);
+    for (let i = 0; i < shopifySkuArray.length; i += BATCH_SIZE) {
+      const batch = shopifySkuArray.slice(i, i + BATCH_SIZE);
+      const variants = await prisma.variant.findMany({
+        where: {
+          region,
+          disabled: false,
+          sku: { in: batch },
+        },
+        select: {
+          id: true,
+          sku: true,
+          modelName: true,
+          colorId: true,
+          shopifyIds: true,
+          region: true,
+          description: true,
+        },
+      });
+
+      // Get variant parts to determine pickType
+      const variantIds = variants.map((v) => v.id);
+      const variantParts = await prisma.variantPart.findMany({
+        where: {
+          variantId: { in: variantIds },
+        },
+        include: {
+          part: {
+            select: {
+              pickType: true,
+            },
+          },
+        },
+      });
+
+      // Group variantParts by variantId
+      const variantPartsByVariantId = new Map<string, typeof variantParts>();
+      for (const vp of variantParts) {
+        const existing = variantPartsByVariantId.get(vp.variantId) || [];
+        existing.push(vp);
+        variantPartsByVariantId.set(vp.variantId, existing);
+      }
+
+      // Determine pickType for each variant
+      for (const variant of variants) {
+        const vps = variantPartsByVariantId.get(variant.id) || [];
+        let pickType: "Regular" | "Pick and Pack" = "Regular";
+        if (vps.length > 0) {
+          const pickTypeCounts = new Map<string, number>();
+          for (const vp of vps) {
+            const pt = vp.part.pickType;
+            pickTypeCounts.set(pt, (pickTypeCounts.get(pt) || 0) + 1);
+          }
+          let maxCount = 0;
+          for (const [pt, count] of pickTypeCounts.entries()) {
+            if (count > maxCount) {
+              maxCount = count;
+              pickType = pt as "Regular" | "Pick and Pack";
+            }
+          }
+        }
+
+        allVariants.push({
+          id: variant.id,
+          sku: variant.sku,
+          modelName: variant.modelName,
+          colorId: variant.colorId,
+          shopifyIds: variant.shopifyIds,
+          region: variant.region,
+          description: variant.description,
+          pickType,
+        });
+      }
+    }
+
+    const regular = allVariants.filter((v) => v.pickType === "Regular");
+    const pickAndPack = allVariants.filter((v) => v.pickType === "Pick and Pack");
+
+    console.log(`✅ Found pickType for ${allVariants.length}/${shopifySkus.size} SKUs in database:`);
     console.log(`   - ${regular.length} Regular SKUs`);
-    console.log(`   - ${pickAndPack.length} Pick and Pack SKUs\n`);
+    console.log(`   - ${pickAndPack.length} Pick and Pack SKUs`);
+
+    if (allVariants.length < shopifySkus.size) {
+      const missing = shopifySkus.size - allVariants.length;
+      console.log(`   - ${missing} SKUs from Shopify not found in database (will be skipped)\n`);
+    } else {
+      console.log();
+    }
 
     if (regular.length === 0 && pickAndPack.length === 0) {
-      throw new Error("No SKUs found in database. Cannot generate configs.");
+      throw new Error("No SKUs found in database that match Shopify SKUs. Cannot generate configs.");
     }
 
     if (regular.length === 0) {
@@ -161,7 +322,7 @@ async function queryDatabaseSKUs(region: string = "CA"): Promise<SKUCatalog> {
     return {
       regular,
       pickAndPack,
-      all: variants,
+      all: allVariants,
     };
   } finally {
     await prisma.$disconnect();
@@ -614,7 +775,8 @@ async function main(): Promise<void> {
   console.log("PHASE 1: Data Discovery");
   console.log("=".repeat(60));
 
-  const catalog = await queryDatabaseSKUs("CA");
+  // Fetch SKUs directly from Shopify, then get pickType from database
+  const catalog = await fetchShopifySkusWithPickTypes("CA");
   const customers = loadCustomers();
 
   // Phase 2: Generate Configs
