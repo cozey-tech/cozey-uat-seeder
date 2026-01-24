@@ -1,7 +1,7 @@
 import { createAdminApiClient } from "@shopify/admin-api-client";
 import { v4 as uuidv4 } from "uuid";
 import pLimit from "p-limit";
-import { getEnvConfig } from "../config/env";
+import { getShopifyConfig } from "../config/env";
 import { Logger } from "../utils/logger";
 import type { GraphQLCostInfo } from "../shared/types/PerformanceMetrics";
 
@@ -75,7 +75,7 @@ export class ShopifyServiceError extends Error {
  * - Variant lookup by SKU
  */
 export class ShopifyService {
-  private readonly client: ReturnType<typeof createAdminApiClient>;
+  private readonly clients: Map<"CA" | "US", ReturnType<typeof createAdminApiClient>> = new Map();
   private readonly dryRun: boolean;
   private orderNumberCounter: number;
 
@@ -86,12 +86,31 @@ export class ShopifyService {
     this.dryRun = dryRun;
     // Start from #1000 to avoid conflicts with real order numbers (typically < 1000 in staging)
     this.orderNumberCounter = 1000;
-    const config = getEnvConfig();
-    this.client = createAdminApiClient({
-      storeDomain: config.SHOPIFY_STORE_DOMAIN,
-      apiVersion: config.SHOPIFY_API_VERSION,
-      accessToken: config.SHOPIFY_ACCESS_TOKEN,
-    });
+  }
+
+  /**
+   * Get or create Shopify client for the specified region
+   * @param region - Region code ("CA" or "US")
+   * @returns Shopify Admin API client for the region
+   */
+  private getClient(region: "CA" | "US" = "CA"): ReturnType<typeof createAdminApiClient> {
+    if (!this.clients.has(region)) {
+      const config = getShopifyConfig(region);
+      const client = createAdminApiClient({
+        storeDomain: config.storeDomain,
+        apiVersion: config.apiVersion,
+        accessToken: config.accessToken,
+      });
+      this.clients.set(region, client);
+      Logger.debug(`Initialized Shopify client for region ${region}`, {
+        storeDomain: config.storeDomain,
+      });
+    }
+    const client = this.clients.get(region);
+    if (!client) {
+      throw new Error(`Shopify client for region ${region} not found`);
+    }
+    return client;
   }
 
   /**
@@ -251,7 +270,11 @@ export class ShopifyService {
       let resolvedVariantMap = variantMap;
       if (!resolvedVariantMap) {
         // Fallback: lookup variants if not provided (backward compatibility)
-        resolvedVariantMap = await this.findVariantIdsBySkus(input.lineItems.map((item) => item.sku));
+        const regionCode = (region === "US" ? "US" : "CA") as "CA" | "US";
+        resolvedVariantMap = await this.findVariantIdsBySkus(
+          input.lineItems.map((item) => item.sku),
+          regionCode,
+        );
       }
 
       // Build line items with variant IDs
@@ -333,7 +356,9 @@ export class ShopifyService {
         });
       }
 
-      const response = await this.client.request(mutation, { variables });
+      const regionCode = (region === "US" ? "US" : "CA") as "CA" | "US";
+      const client = this.getClient(regionCode);
+      const response = await client.request(mutation, { variables });
       const graphQLCost = this.extractGraphQLCost(response);
 
       if (response.data?.draftOrderCreate?.userErrors?.length > 0) {
@@ -363,7 +388,7 @@ export class ShopifyService {
     }
   }
 
-  async completeDraftOrder(draftOrderId: string): Promise<OrderResult> {
+  async completeDraftOrder(draftOrderId: string, region: "CA" | "US" = "CA"): Promise<OrderResult> {
     if (this.dryRun) {
       const orderNumber = `#${this.orderNumberCounter++}`;
       const orderId = `gid://shopify/Order/${uuidv4()}`;
@@ -408,7 +433,8 @@ export class ShopifyService {
     };
 
     try {
-      const response = await this.client.request(mutation, { variables });
+      const client = this.getClient(region);
+      const response = await client.request(mutation, { variables });
       const graphQLCost = this.extractGraphQLCost(response);
 
       if (response.data?.draftOrderComplete?.userErrors?.length > 0) {
@@ -449,7 +475,7 @@ export class ShopifyService {
     }
   }
 
-  async fulfillOrder(orderId: string): Promise<FulfillmentResult> {
+  async fulfillOrder(orderId: string, region: "CA" | "US" = "CA"): Promise<FulfillmentResult> {
     if (this.dryRun) {
       const fulfillmentId = `gid://shopify/Fulfillment/${uuidv4()}`;
       Logger.info("DRY RUN: Would fulfill order", {
@@ -484,7 +510,8 @@ export class ShopifyService {
 
     try {
       // Get order line items and fulfillments
-      const orderResponse = await this.client.request(queryOrder, { variables: { id: orderId } });
+      const client = this.getClient(region);
+      const orderResponse = await client.request(queryOrder, { variables: { id: orderId } });
 
       const graphQLErrors =
         orderResponse.errors?.graphQLErrors || (Array.isArray(orderResponse.errors) ? orderResponse.errors : []);
@@ -558,7 +585,7 @@ export class ShopifyService {
         },
       };
 
-      const response = await this.client.request(mutation, { variables });
+      const response = await client.request(mutation, { variables });
 
       const fulfillmentGraphQLErrors =
         response.errors?.graphQLErrors || (Array.isArray(response.errors) ? response.errors : []);
@@ -614,7 +641,7 @@ export class ShopifyService {
    * Query a single order by ID to get line items
    * More efficient than querying all orders by tag when we only need one order
    */
-  async queryOrderById(orderId: string): Promise<OrderQueryResult | null> {
+  async queryOrderById(orderId: string, region: "CA" | "US" = "CA"): Promise<OrderQueryResult | null> {
     if (this.dryRun) {
       Logger.info("DRY RUN: Would query order by ID", { orderId });
       return null;
@@ -643,7 +670,8 @@ export class ShopifyService {
     };
 
     try {
-      const response = await this.client.request(query, { variables });
+      const client = this.getClient(region);
+      const response = await client.request(query, { variables });
       this.logGraphQLCostIfPresent("queryOrderById", response, { orderId });
 
       if (!response.data?.order) {
@@ -667,7 +695,7 @@ export class ShopifyService {
     }
   }
 
-  async queryOrdersByTag(tag: string): Promise<OrderQueryResult[]> {
+  async queryOrdersByTag(tag: string, region: "CA" | "US" = "CA"): Promise<OrderQueryResult[]> {
     // Note: This is a read-only query operation, so it's safe to execute even in dry-run mode.
     // Dry-run protection only applies to write operations (create, delete, cancel, archive).
     // For cleanup dry-run, we need to query actual orders to preview what would be deleted.
@@ -699,7 +727,8 @@ export class ShopifyService {
     };
 
     try {
-      const response = await this.client.request(query, { variables });
+      const client = this.getClient(region);
+      const response = await client.request(query, { variables });
       // Note: Cost tracking for query operations - can be logged but not returned in this method
       // since it returns OrderQueryResult[] which doesn't include cost info
       this.logGraphQLCostIfPresent("queryOrdersByTag", response, { tag });
@@ -730,7 +759,7 @@ export class ShopifyService {
   }
 
   // Helper method to find variant IDs by SKU
-  async findVariantIdsBySkus(skus: string[]): Promise<Map<string, string>> {
+  async findVariantIdsBySkus(skus: string[], region: "CA" | "US" = "CA"): Promise<Map<string, string>> {
     if (this.dryRun) {
       // Return mock variant IDs for each SKU
       const variantMap = new Map<string, string>();
@@ -769,7 +798,8 @@ export class ShopifyService {
     };
 
     try {
-      const response = await this.client.request(query, { variables });
+      const client = this.getClient(region);
+      const response = await client.request(query, { variables });
       // Note: Cost tracking for variant lookup - can be logged but not returned
       // since it returns Map<string, string> which doesn't include cost info
       this.logGraphQLCostIfPresent("findVariantIdsBySkus", response, { skuCount: skus.length });
@@ -795,7 +825,7 @@ export class ShopifyService {
     }
   }
 
-  async cancelOrder(orderId: string): Promise<void> {
+  async cancelOrder(orderId: string, region: "CA" | "US" = "CA"): Promise<void> {
     if (this.dryRun) {
       Logger.info("DRY RUN: Would cancel order", { orderId });
       return;
@@ -813,7 +843,8 @@ export class ShopifyService {
     const variables = { orderId };
 
     try {
-      const response = await this.client.request(mutation, { variables });
+      const client = this.getClient(region);
+      const response = await client.request(mutation, { variables });
 
       if (response.data?.orderCancel?.userErrors?.length > 0) {
         const errors = response.data.orderCancel.userErrors;
@@ -834,7 +865,7 @@ export class ShopifyService {
     }
   }
 
-  async archiveOrder(orderId: string): Promise<void> {
+  async archiveOrder(orderId: string, region: "CA" | "US" = "CA"): Promise<void> {
     if (this.dryRun) {
       Logger.info("DRY RUN: Would archive order", { orderId });
       return;
@@ -857,7 +888,8 @@ export class ShopifyService {
     };
 
     try {
-      const response = await this.client.request(mutation, { variables });
+      const client = this.getClient(region);
+      const response = await client.request(mutation, { variables });
 
       if (response.data?.orderUpdate?.userErrors?.length > 0) {
         const errors = response.data.orderUpdate.userErrors;
@@ -878,7 +910,7 @@ export class ShopifyService {
     }
   }
 
-  async deleteOrder(orderId: string): Promise<void> {
+  async deleteOrder(orderId: string, region: "CA" | "US" = "CA"): Promise<void> {
     if (this.dryRun) {
       Logger.info("DRY RUN: Would delete order", { orderId });
       return;
@@ -896,7 +928,8 @@ export class ShopifyService {
     const variables = { input: { id: orderId } };
 
     try {
-      const response = await this.client.request(mutation, { variables });
+      const client = this.getClient(region);
+      const response = await client.request(mutation, { variables });
 
       if (response.data?.orderDelete?.userErrors?.length > 0) {
         const errors = response.data.orderDelete.userErrors;
@@ -931,14 +964,17 @@ export class ShopifyService {
     }
   }
 
-  async cleanupOrder(orderId: string): Promise<{
+  async cleanupOrder(
+    orderId: string,
+    region: "CA" | "US" = "CA",
+  ): Promise<{
     orderId: string;
     method: "deleted" | "archived";
     success: boolean;
     error?: string;
   }> {
     try {
-      await this.deleteOrder(orderId);
+      await this.deleteOrder(orderId, region);
       return { orderId, method: "deleted", success: true };
     } catch (deleteError) {
       const errorMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
@@ -956,8 +992,8 @@ export class ShopifyService {
         });
 
         try {
-          await this.cancelOrder(orderId);
-          await this.archiveOrder(orderId);
+          await this.cancelOrder(orderId, region);
+          await this.archiveOrder(orderId, region);
 
           Logger.info("Order cancelled and archived successfully", { orderId });
           return { orderId, method: "archived", success: true };
@@ -986,6 +1022,7 @@ export class ShopifyService {
   private async cleanupOrderWithRetry(
     orderId: string,
     maxRetries: number,
+    region: "CA" | "US" = "CA",
   ): Promise<{
     orderId: string;
     method: "deleted" | "archived";
@@ -994,7 +1031,7 @@ export class ShopifyService {
   }> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        const result = await this.cleanupOrder(orderId);
+        const result = await this.cleanupOrder(orderId, region);
         return result;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1024,7 +1061,10 @@ export class ShopifyService {
     throw new Error("Unreachable");
   }
 
-  async cleanupOrders(orderIds: string[]): Promise<
+  async cleanupOrders(
+    orderIds: string[],
+    region: "CA" | "US" = "CA",
+  ): Promise<
     Array<{
       orderId: string;
       method: "deleted" | "archived";
@@ -1038,7 +1078,7 @@ export class ShopifyService {
     for (const orderId of orderIds) {
       results.push(
         limit(async () => {
-          return this.cleanupOrderWithRetry(orderId, 3);
+          return this.cleanupOrderWithRetry(orderId, 3, region);
         }),
       );
     }

@@ -68,7 +68,7 @@ export class SeedShopifyOrdersUseCase {
 
     const { result: variantMap, metrics: variantLookupMetrics } = await this.measureOperation(
       "findVariantIdsBySkus",
-      () => this.shopifyService.findVariantIdsBySkus(uniqueSkus),
+      () => this.shopifyService.findVariantIdsBySkus(uniqueSkus, request.region || "CA"),
     );
 
     // Validate that all SKUs were found before processing orders
@@ -133,7 +133,7 @@ export class SeedShopifyOrdersUseCase {
           // Complete draft order
           const { result: orderResult, metrics: completeMetrics } = await this.measureOperation(
             "completeDraftOrder",
-            () => this.shopifyService.completeDraftOrder(draftOrderResult.draftOrderId),
+            () => this.shopifyService.completeDraftOrder(draftOrderResult.draftOrderId, request.region || "CA"),
           );
 
           completeMetrics.graphQLCost = orderResult.graphQLCost;
@@ -169,7 +169,7 @@ export class SeedShopifyOrdersUseCase {
             // Avoids unnecessary cost when we only need one order's line items
             const { result: createdOrder, metrics: queryMetricsResult } = await this.measureOperation(
               "queryOrderById",
-              () => this.shopifyService.queryOrderById(orderResult.orderId),
+              () => this.shopifyService.queryOrderById(orderResult.orderId, request.region || "CA"),
             );
             queryMetrics = queryMetricsResult;
 

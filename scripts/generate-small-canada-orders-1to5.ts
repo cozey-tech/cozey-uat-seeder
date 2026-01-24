@@ -1,25 +1,26 @@
 #!/usr/bin/env tsx
 
 /**
- * Generate 20 seed config files for Canadian orders
- * Each config contains 20 orders with diverse types, sizes, and complexities
+ * Generate small Canada order configs with 1-5 boxes (items) per order
+ * Focuses on reasonable orders perfect for testing
  *
  * Usage:
- *   npx tsx scripts/generate-canada-order-configs.ts [--seed <number>]
+ *   npx tsx scripts/generate-small-canada-orders-1to5.ts [--seed <number>] [--batches <number>]
  *
  * Options:
- *   --seed <number>  Optional seed for deterministic output (default: random)
+ *   --seed <number>    Optional seed for deterministic output (default: random)
+ *   --batches <number> Number of config batches to generate (default: 10)
  *
  * Examples:
- *   npx tsx scripts/generate-canada-order-configs.ts
- *   npx tsx scripts/generate-canada-order-configs.ts --seed 12345
+ *   npx tsx scripts/generate-small-canada-orders-1to5.ts
+ *   npx tsx scripts/generate-small-canada-orders-1to5.ts --seed 12345 --batches 15
  */
 
 import { config } from "dotenv";
 import { resolve } from "path";
 import { PrismaClient } from "@prisma/client";
 import { createAdminApiClient } from "@shopify/admin-api-client";
-import { initializeEnvConfig } from "../src/config/env";
+import { initializeEnvConfig, getShopifyConfig } from "../src/config/env";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import type { SeedConfig } from "../src/shared/validation/seedConfigSchema";
@@ -38,8 +39,7 @@ interface Customer {
   city: string;
   province: string;
   postalCode: string;
-  region: string;
-  locationId: string;
+  region: "CA" | "US";
 }
 
 interface SKUCatalog {
@@ -47,59 +47,6 @@ interface SKUCatalog {
   pickAndPack: Variant[];
   all: Variant[];
 }
-
-interface OrderSize {
-  type: "small" | "medium" | "large" | "extra-large";
-  minItems: number;
-  maxItems: number;
-}
-
-interface DistributionConfig {
-  orderType: {
-    "regular-only": number;
-    "pnp-only": number;
-    mixed: number;
-  };
-  orderSize: {
-    small: number;
-    medium: number;
-    large: number;
-    "extra-large": number;
-  };
-  quantity: {
-    low: number; // 1-2
-    medium: number; // 3-5
-    high: number; // 6-10
-    bulk: number; // 10+
-  };
-}
-
-const ORDER_SIZES: OrderSize[] = [
-  { type: "small", minItems: 1, maxItems: 2 },
-  { type: "medium", minItems: 3, maxItems: 5 },
-  { type: "large", minItems: 6, maxItems: 10 },
-  { type: "extra-large", minItems: 11, maxItems: 20 },
-];
-
-const DEFAULT_DISTRIBUTION: DistributionConfig = {
-  orderType: {
-    "regular-only": 7,
-    "pnp-only": 7,
-    mixed: 6,
-  },
-  orderSize: {
-    small: 2,
-    medium: 10,
-    large: 6,
-    "extra-large": 2,
-  },
-  quantity: {
-    low: 0.7, // 70%: 1-2
-    medium: 0.2, // 20%: 3-5
-    high: 0.08, // 8%: 6-10
-    bulk: 0.02, // 2%: 10-20
-  },
-};
 
 /**
  * Seeded pseudo-random number generator (Linear Congruential Generator)
@@ -134,11 +81,11 @@ class SeededRNG {
  */
 async function fetchShopifySkusWithPickTypes(region: string = "CA"): Promise<SKUCatalog> {
   await initializeEnvConfig();
-  const envConfig = await initializeEnvConfig();
+  const shopifyConfig = getShopifyConfig(region as "CA" | "US");
   const client = createAdminApiClient({
-    storeDomain: envConfig.SHOPIFY_STORE_DOMAIN,
-    apiVersion: envConfig.SHOPIFY_API_VERSION,
-    accessToken: envConfig.SHOPIFY_ACCESS_TOKEN,
+    storeDomain: shopifyConfig.storeDomain,
+    apiVersion: shopifyConfig.apiVersion,
+    accessToken: shopifyConfig.accessToken,
   });
 
   const shopifySkus = new Set<string>();
@@ -348,7 +295,7 @@ function loadCustomers(): Customer[] {
 }
 
 /**
- * Get random element from array (with error handling)
+ * Get random element from array
  */
 function randomElement<T>(array: T[], rng: SeededRNG): T {
   if (array.length === 0) {
@@ -358,177 +305,35 @@ function randomElement<T>(array: T[], rng: SeededRNG): T {
 }
 
 /**
- * Get random elements from array using Fisher-Yates shuffle (without replacement)
- * Efficient for large arrays when count << array.length
+ * Get random elements from array (without replacement)
  */
 function randomElements<T>(array: T[], count: number, rng: SeededRNG): T[] {
-  if (array.length === 0) {
-    throw new Error("Cannot select random elements from empty array");
+  if (count > array.length) {
+    throw new Error(`Cannot select ${count} elements from array of length ${array.length}`);
   }
-
-  const actualCount = Math.min(count, array.length);
-  if (actualCount === 0) {
-    return [];
-  }
-
-  // Use reservoir sampling for large arrays (more efficient)
-  if (actualCount < array.length / 10) {
-    const selected = new Set<number>();
-    while (selected.size < actualCount) {
-      selected.add(rng.randomInt(0, array.length));
-    }
-    return Array.from(selected).map((i) => array[i]);
-  }
-
-  // Use Fisher-Yates shuffle for smaller selections
   const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > shuffled.length - actualCount - 1; i--) {
+  for (let i = shuffled.length - 1; i > 0; i--) {
     const j = rng.randomInt(0, i + 1);
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  return shuffled.slice(-actualCount);
+  return shuffled.slice(0, count);
 }
 
 /**
- * Generate quantity based on distribution
+ * Generate a small order (1-5 items, quantity 1-2)
  */
-function generateQuantity(rng: SeededRNG, distribution: DistributionConfig["quantity"]): number {
-  const rand = rng.random();
-  if (rand < distribution.low) {
-    return rng.randomInt(1, 3); // 1-2
-  } else if (rand < distribution.low + distribution.medium) {
-    return rng.randomInt(3, 6); // 3-5
-  } else if (rand < distribution.low + distribution.medium + distribution.high) {
-    return rng.randomInt(6, 11); // 6-10
-  } else {
-    return rng.randomInt(10, 21); // 10-20
-  }
-}
-
-/**
- * Generate a "weird" order
- */
-function generateWeirdOrder(
+function generateSmallOrder(
   catalog: SKUCatalog,
   customers: Customer[],
   orderType: "regular-only" | "pnp-only" | "mixed",
+  itemCount: 1 | 2 | 3 | 4 | 5,
   rng: SeededRNG,
-  distribution: DistributionConfig["quantity"],
 ): SeedConfig["orders"][0] {
   const customer = randomElement(customers, rng);
-  const weirdType = rng.random();
-
-  if (weirdType < 0.4) {
-    // Bulk quantity order (single item, high quantity)
-    const skuPool =
-      orderType === "regular-only"
-        ? catalog.regular
-        : orderType === "pnp-only"
-          ? catalog.pickAndPack
-          : [...catalog.regular, ...catalog.pickAndPack];
-
-    if (skuPool.length === 0) {
-      throw new Error(`No SKUs available for ${orderType} order type`);
-    }
-
-    const sku = randomElement(skuPool, rng);
-    return {
-      orderType,
-      customer: {
-        name: customer.name,
-        email: customer.email,
-        address: customer.address,
-        city: customer.city,
-        province: customer.province,
-        postalCode: customer.postalCode,
-      },
-      lineItems: [
-        {
-          sku: sku.sku,
-          quantity: rng.randomInt(10, 26), // 10-25
-          pickType: sku.pickType,
-        },
-      ],
-    };
-  } else if (weirdType < 0.7) {
-    // Many different SKUs (15+ unique items)
-    const skuPool =
-      orderType === "regular-only"
-        ? catalog.regular
-        : orderType === "pnp-only"
-          ? catalog.pickAndPack
-          : [...catalog.regular, ...catalog.pickAndPack];
-
-    if (skuPool.length === 0) {
-      throw new Error(`No SKUs available for ${orderType} order type`);
-    }
-
-    const uniqueSkus = randomElements(skuPool, Math.min(20, skuPool.length), rng);
-    return {
-      orderType,
-      customer: {
-        name: customer.name,
-        email: customer.email,
-        address: customer.address,
-        city: customer.city,
-        province: customer.province,
-        postalCode: customer.postalCode,
-      },
-      lineItems: uniqueSkus.map((sku) => ({
-        sku: sku.sku,
-        quantity: generateQuantity(rng, distribution),
-        pickType: sku.pickType,
-      })),
-    };
-  } else {
-    // Unusual combination (mix of kits, accessories, regular items)
-    if (catalog.regular.length === 0 || catalog.pickAndPack.length === 0) {
-      throw new Error("Cannot create mixed order: missing Regular or Pick and Pack SKUs");
-    }
-
-    const regularSkus = randomElements(catalog.regular, rng.randomInt(3, 8), rng);
-    const pnpSkus = randomElements(catalog.pickAndPack, rng.randomInt(2, 7), rng);
-    return {
-      orderType: "mixed",
-      customer: {
-        name: customer.name,
-        email: customer.email,
-        address: customer.address,
-        city: customer.city,
-        province: customer.province,
-        postalCode: customer.postalCode,
-      },
-      lineItems: [
-        ...regularSkus.map((sku) => ({
-          sku: sku.sku,
-          quantity: generateQuantity(rng, distribution),
-          pickType: sku.pickType as "Regular",
-        })),
-        ...pnpSkus.map((sku) => ({
-          sku: sku.sku,
-          quantity: generateQuantity(rng, distribution),
-          pickType: sku.pickType as "Pick and Pack",
-        })),
-      ],
-    };
-  }
-}
-
-/**
- * Generate a normal order
- */
-function generateOrder(
-  catalog: SKUCatalog,
-  customers: Customer[],
-  orderType: "regular-only" | "pnp-only" | "mixed",
-  size: OrderSize,
-  rng: SeededRNG,
-  distribution: DistributionConfig["quantity"],
-): SeedConfig["orders"][0] {
-  const customer = randomElement(customers, rng);
-  const itemCount = rng.randomInt(size.minItems, size.maxItems + 1);
-
   let lineItems: Array<{ sku: string; quantity: number; pickType: "Regular" | "Pick and Pack" }> = [];
+
+  // Quantity is almost always 1, occasionally 2
+  const quantity = rng.random() < 0.9 ? 1 : 2;
 
   if (orderType === "regular-only") {
     if (catalog.regular.length === 0) {
@@ -537,7 +342,7 @@ function generateOrder(
     const skus = randomElements(catalog.regular, itemCount, rng);
     lineItems = skus.map((sku) => ({
       sku: sku.sku,
-      quantity: generateQuantity(rng, distribution),
+      quantity,
       pickType: "Regular" as const,
     }));
   } else if (orderType === "pnp-only") {
@@ -547,32 +352,62 @@ function generateOrder(
     const skus = randomElements(catalog.pickAndPack, itemCount, rng);
     lineItems = skus.map((sku) => ({
       sku: sku.sku,
-      quantity: generateQuantity(rng, distribution),
+      quantity,
       pickType: "Pick and Pack" as const,
     }));
   } else {
-    // Mixed order
+    // Mixed order - split items between regular and pnp
     if (catalog.regular.length === 0 || catalog.pickAndPack.length === 0) {
       throw new Error("Cannot create mixed order: missing Regular or Pick and Pack SKUs");
     }
 
-    const regularCount = Math.floor(itemCount / 2);
-    const pnpCount = itemCount - regularCount;
-    const regularSkus = randomElements(catalog.regular, regularCount, rng);
-    const pnpSkus = randomElements(catalog.pickAndPack, pnpCount, rng);
-
-    lineItems = [
-      ...regularSkus.map((sku) => ({
-        sku: sku.sku,
-        quantity: generateQuantity(rng, distribution),
-        pickType: "Regular" as const,
-      })),
-      ...pnpSkus.map((sku) => ({
-        sku: sku.sku,
-        quantity: generateQuantity(rng, distribution),
-        pickType: "Pick and Pack" as const,
-      })),
-    ];
+    if (itemCount === 1) {
+      // Single item - randomly pick regular or pnp
+      const pool = rng.random() < 0.5 ? catalog.regular : catalog.pickAndPack;
+      const sku = randomElement(pool, rng);
+      lineItems = [
+        {
+          sku: sku.sku,
+          quantity,
+          pickType: sku.pickType,
+        },
+      ];
+    } else if (itemCount === 2) {
+      // Two items - one regular, one pnp
+      const regularSku = randomElement(catalog.regular, rng);
+      const pnpSku = randomElement(catalog.pickAndPack, rng);
+      lineItems = [
+        {
+          sku: regularSku.sku,
+          quantity,
+          pickType: "Regular" as const,
+        },
+        {
+          sku: pnpSku.sku,
+          quantity,
+          pickType: "Pick and Pack" as const,
+        },
+      ];
+    } else {
+      // 3-5 items - distribute between regular and pnp
+      // Prefer more regular items (60/40 split)
+      const regularCount = Math.floor(itemCount * 0.6) || 1;
+      const pnpCount = itemCount - regularCount;
+      const regularSkus = randomElements(catalog.regular, regularCount, rng);
+      const pnpSkus = randomElements(catalog.pickAndPack, pnpCount, rng);
+      lineItems = [
+        ...regularSkus.map((sku) => ({
+          sku: sku.sku,
+          quantity,
+          pickType: "Regular" as const,
+        })),
+        ...pnpSkus.map((sku) => ({
+          sku: sku.sku,
+          quantity,
+          pickType: "Pick and Pack" as const,
+        })),
+      ];
+    }
   }
 
   return {
@@ -590,60 +425,63 @@ function generateOrder(
 }
 
 /**
- * Generate a single config file
+ * Generate a single config file with small orders (1-5 items)
  */
-function generateConfig(
-  catalog: SKUCatalog,
-  customers: Customer[],
-  batchNumber: number,
-  rng: SeededRNG,
-  distribution: DistributionConfig,
-): SeedConfig {
+function generateConfig(catalog: SKUCatalog, customers: Customer[], batchNumber: number, rng: SeededRNG): SeedConfig {
   const orders: SeedConfig["orders"] = [];
-  const weirdOrderCount = rng.randomInt(2, 4); // 2-3 weird orders
 
-  // Build order plan
-  const orderPlan: Array<{ type: "regular-only" | "pnp-only" | "mixed"; size: OrderSize; isWeird: boolean }> = [];
+  // Distribution for small orders (1-5 items):
+  // - 30% single-item orders (6 orders)
+  // - 30% two-item orders (6 orders)
+  // - 20% three-item orders (4 orders)
+  // - 15% four-item orders (3 orders)
+  // - 5% five-item orders (1 order)
+  // - Order types: 40% regular-only, 40% pnp-only, 20% mixed
 
-  // Add normal orders
-  for (const [type, count] of Object.entries(distribution.orderType)) {
-    const orderType = type as "regular-only" | "pnp-only" | "mixed";
+  const singleItemCount = 6;
+  const twoItemCount = 6;
+  const threeItemCount = 4;
+  const fourItemCount = 3;
+  const fiveItemCount = 1;
 
-    // Distribute sizes for this order type
-    for (let i = 0; i < count; i++) {
-      // Pick a size based on distribution
-      const sizeRand = rng.random();
-      let size: OrderSize;
-      if (sizeRand < 0.1)
-        size = ORDER_SIZES[0]; // 10% small
-      else if (sizeRand < 0.6)
-        size = ORDER_SIZES[1]; // 50% medium
-      else if (sizeRand < 0.9)
-        size = ORDER_SIZES[2]; // 30% large
-      else size = ORDER_SIZES[3]; // 10% extra-large
-
-      orderPlan.push({ type: orderType, size, isWeird: false });
-    }
+  // Generate single-item orders
+  for (let i = 0; i < singleItemCount; i++) {
+    const typeRand = rng.random();
+    const orderType: "regular-only" | "pnp-only" | "mixed" =
+      typeRand < 0.4 ? "regular-only" : typeRand < 0.8 ? "pnp-only" : "mixed";
+    orders.push(generateSmallOrder(catalog, customers, orderType, 1, rng));
   }
 
-  if (orderPlan.length === 0) {
-    throw new Error("Order plan is empty. Check distribution configuration.");
+  // Generate two-item orders
+  for (let i = 0; i < twoItemCount; i++) {
+    const typeRand = rng.random();
+    const orderType: "regular-only" | "pnp-only" | "mixed" =
+      typeRand < 0.4 ? "regular-only" : typeRand < 0.8 ? "pnp-only" : "mixed";
+    orders.push(generateSmallOrder(catalog, customers, orderType, 2, rng));
   }
 
-  // Replace some orders with weird ones
-  for (let i = 0; i < weirdOrderCount; i++) {
-    const index = rng.randomInt(0, orderPlan.length);
-    const order = orderPlan[index];
-    orderPlan[index] = { ...order, isWeird: true };
+  // Generate three-item orders
+  for (let i = 0; i < threeItemCount; i++) {
+    const typeRand = rng.random();
+    const orderType: "regular-only" | "pnp-only" | "mixed" =
+      typeRand < 0.4 ? "regular-only" : typeRand < 0.8 ? "pnp-only" : "mixed";
+    orders.push(generateSmallOrder(catalog, customers, orderType, 3, rng));
   }
 
-  // Generate orders
-  for (const plan of orderPlan) {
-    if (plan.isWeird) {
-      orders.push(generateWeirdOrder(catalog, customers, plan.type, rng, distribution.quantity));
-    } else {
-      orders.push(generateOrder(catalog, customers, plan.type, plan.size, rng, distribution.quantity));
-    }
+  // Generate four-item orders
+  for (let i = 0; i < fourItemCount; i++) {
+    const typeRand = rng.random();
+    const orderType: "regular-only" | "pnp-only" | "mixed" =
+      typeRand < 0.4 ? "regular-only" : typeRand < 0.8 ? "pnp-only" : "mixed";
+    orders.push(generateSmallOrder(catalog, customers, orderType, 4, rng));
+  }
+
+  // Generate five-item orders
+  for (let i = 0; i < fiveItemCount; i++) {
+    const typeRand = rng.random();
+    const orderType: "regular-only" | "pnp-only" | "mixed" =
+      typeRand < 0.4 ? "regular-only" : typeRand < 0.8 ? "pnp-only" : "mixed";
+    orders.push(generateSmallOrder(catalog, customers, orderType, 5, rng));
   }
 
   // Shuffle orders for variety using Fisher-Yates
@@ -678,24 +516,28 @@ function validateConfig(
     return { valid: false, errors, warnings }; // Stop here if schema invalid
   }
 
-  // 2. Custom validation checks (supplementary)
+  // 2. Custom validation checks
   if (config.orders.length !== 20) {
     errors.push(`Expected 20 orders, got ${config.orders.length}`);
   }
 
-  const typeCounts = { "regular-only": 0, "pnp-only": 0, mixed: 0 };
-  const sizeCounts = { small: 0, medium: 0, large: 0, "extra-large": 0 };
-
+  // Check that orders are small (1-5 items)
+  const itemCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, other: 0 };
   for (const order of config.orders) {
-    if (order.orderType) {
-      typeCounts[order.orderType]++;
-    }
-
     const itemCount = order.lineItems.length;
-    if (itemCount <= 2) sizeCounts.small++;
-    else if (itemCount <= 5) sizeCounts.medium++;
-    else if (itemCount <= 10) sizeCounts.large++;
-    else sizeCounts["extra-large"]++;
+    if (itemCount === 1) itemCounts[1]++;
+    else if (itemCount === 2) itemCounts[2]++;
+    else if (itemCount === 3) itemCounts[3]++;
+    else if (itemCount === 4) itemCounts[4]++;
+    else if (itemCount === 5) itemCounts[5]++;
+    else itemCounts.other++;
+
+    // Validate quantities are 1-2
+    for (const item of order.lineItems) {
+      if (item.quantity < 1 || item.quantity > 2) {
+        warnings.push(`Order has quantity ${item.quantity} (expected 1-2 for small orders)`);
+      }
+    }
 
     // Validate SKUs
     for (const item of order.lineItems) {
@@ -714,19 +556,9 @@ function validateConfig(
     }
   }
 
-  // Check distributions (warnings, not errors - allow some variance)
-  if (Math.abs(typeCounts["regular-only"] - DEFAULT_DISTRIBUTION.orderType["regular-only"]) > 1) {
-    warnings.push(
-      `Regular-only count ${typeCounts["regular-only"]} is too far from target ${DEFAULT_DISTRIBUTION.orderType["regular-only"]}`,
-    );
-  }
-  if (Math.abs(typeCounts["pnp-only"] - DEFAULT_DISTRIBUTION.orderType["pnp-only"]) > 1) {
-    warnings.push(
-      `Pnp-only count ${typeCounts["pnp-only"]} is too far from target ${DEFAULT_DISTRIBUTION.orderType["pnp-only"]}`,
-    );
-  }
-  if (Math.abs(typeCounts.mixed - DEFAULT_DISTRIBUTION.orderType.mixed) > 1) {
-    warnings.push(`Mixed count ${typeCounts.mixed} is too far from target ${DEFAULT_DISTRIBUTION.orderType.mixed}`);
+  // Check distribution (warnings, not errors - allow some variance)
+  if (itemCounts.other > 0) {
+    warnings.push(`Found ${itemCounts.other} orders with more than 5 items (expected only 1-5 item orders)`);
   }
 
   return {
@@ -739,9 +571,9 @@ function validateConfig(
 /**
  * Parse command line arguments
  */
-function parseArgs(): { seed?: number } {
+function parseArgs(): { seed?: number; batches?: number } {
   const args = process.argv.slice(2);
-  const result: { seed?: number } = {};
+  const result: { seed?: number; batches?: number } = {};
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--seed" && i + 1 < args.length) {
@@ -751,6 +583,14 @@ function parseArgs(): { seed?: number } {
         process.exit(1);
       }
       result.seed = seed;
+      i++; // Skip next argument
+    } else if (args[i] === "--batches" && i + 1 < args.length) {
+      const batches = parseInt(args[i + 1], 10);
+      if (isNaN(batches) || batches < 1) {
+        console.error("Error: --batches must be a positive number");
+        process.exit(1);
+      }
+      result.batches = batches;
       i++; // Skip next argument
     }
   }
@@ -764,13 +604,16 @@ function parseArgs(): { seed?: number } {
 async function main(): Promise<void> {
   const args = parseArgs();
   const seed = args.seed ?? Math.floor(Math.random() * 2 ** 31);
+  const batches = args.batches ?? 10;
 
-  console.log("🚀 Starting Canada order config generation...");
+  console.log("🚀 Starting small Canada order config generation (1-5 boxes)...");
+  console.log(`   Focus: Small orders (1-5 items, quantity 1-2)`);
   if (args.seed !== undefined) {
     console.log(`   Using seed: ${seed} (deterministic mode)\n`);
   } else {
     console.log(`   Using random seed: ${seed}\n`);
   }
+  console.log(`   Generating ${batches} config batches\n`);
 
   // Phase 1: Data Discovery
   console.log("=".repeat(60));
@@ -792,11 +635,11 @@ async function main(): Promise<void> {
     validation: { valid: boolean; errors: string[]; warnings: string[] };
   }> = [];
 
-  for (let i = 1; i <= 20; i++) {
+  for (let i = 1; i <= batches; i++) {
     console.log(`\n📝 Generating config batch ${i.toString().padStart(2, "0")}...`);
     // Use different seed for each batch to ensure variety
     const batchRng = new SeededRNG(seed + i);
-    const config = generateConfig(catalog, customers, i, batchRng, DEFAULT_DISTRIBUTION);
+    const config = generateConfig(catalog, customers, i, batchRng);
     const validation = validateConfig(config, catalog, customers);
 
     if (!validation.valid) {
@@ -820,7 +663,7 @@ async function main(): Promise<void> {
   const configDir = join(process.cwd(), "config");
 
   for (const { batchNumber, config } of configs) {
-    const filename = `canada-orders-batch-${batchNumber.toString().padStart(2, "0")}.json`;
+    const filename = `canada-orders-1to5-boxes-batch-${batchNumber.toString().padStart(2, "0")}.json`;
     const filepath = join(configDir, filename);
     writeFileSync(filepath, JSON.stringify(config, null, 2) + "\n", "utf-8");
     console.log(`✅ Saved ${filename}`);
@@ -830,9 +673,10 @@ async function main(): Promise<void> {
   console.log("\n" + "=".repeat(60));
   console.log("SUMMARY");
   console.log("=".repeat(60));
-  console.log(`✅ Generated 20 config files`);
+  console.log(`✅ Generated ${batches} config files`);
   console.log(`✅ Total orders: ${configs.reduce((sum, c) => sum + c.config.orders.length, 0)}`);
   console.log(`✅ Configs saved to: ${configDir}`);
+  console.log(`✅ All orders are small (1-5 items, quantity 1-2)`);
   if (args.seed !== undefined) {
     console.log(`✅ Seed used: ${seed} (re-run with --seed ${seed} to reproduce)\n`);
   } else {

@@ -5,8 +5,12 @@ import { Logger } from "../utils/logger";
 // Schema for raw env vars (before processing)
 const rawEnvSchema = z.object({
   DATABASE_URL: z.string().url(),
+  // CA Shopify (required for backward compatibility)
   SHOPIFY_STORE_DOMAIN: z.string().min(1),
   SHOPIFY_ACCESS_TOKEN: z.string().min(1),
+  // US Shopify (optional - only needed for US region)
+  SHOPIFY_STORE_DOMAIN_US: z.string().min(1).optional(),
+  SHOPIFY_ACCESS_TOKEN_US: z.string().min(1).optional(),
   SHOPIFY_API_VERSION: z.string().optional().default("2024-01"),
   DATABASE_CONNECTION_LIMIT: z.string().optional(), // Optional connection pool limit (parsed as string from env)
 });
@@ -16,6 +20,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   SHOPIFY_STORE_DOMAIN: z.string().min(1),
   SHOPIFY_ACCESS_TOKEN: z.string().min(1),
+  SHOPIFY_STORE_DOMAIN_US: z.string().min(1).optional(),
+  SHOPIFY_ACCESS_TOKEN_US: z.string().min(1).optional(),
   SHOPIFY_API_VERSION: z.string().optional().default("2024-01"),
 });
 
@@ -58,6 +64,8 @@ function loadEnvVars(): Partial<z.infer<typeof rawEnvSchema>> {
     DATABASE_URL: process.env.DATABASE_URL,
     SHOPIFY_STORE_DOMAIN: process.env.SHOPIFY_STORE_DOMAIN,
     SHOPIFY_ACCESS_TOKEN: process.env.SHOPIFY_ACCESS_TOKEN,
+    SHOPIFY_STORE_DOMAIN_US: process.env.SHOPIFY_STORE_DOMAIN_US,
+    SHOPIFY_ACCESS_TOKEN_US: process.env.SHOPIFY_ACCESS_TOKEN_US,
     SHOPIFY_API_VERSION: process.env.SHOPIFY_API_VERSION,
     DATABASE_CONNECTION_LIMIT: process.env.DATABASE_CONNECTION_LIMIT,
   };
@@ -277,6 +285,8 @@ export async function initializeEnvConfig(): Promise<EnvConfig> {
     DATABASE_URL: processedDatabaseUrl,
     SHOPIFY_STORE_DOMAIN: rawConfig.SHOPIFY_STORE_DOMAIN,
     SHOPIFY_ACCESS_TOKEN: rawConfig.SHOPIFY_ACCESS_TOKEN,
+    SHOPIFY_STORE_DOMAIN_US: rawConfig.SHOPIFY_STORE_DOMAIN_US,
+    SHOPIFY_ACCESS_TOKEN_US: rawConfig.SHOPIFY_ACCESS_TOKEN_US,
     SHOPIFY_API_VERSION: rawConfig.SHOPIFY_API_VERSION,
   };
 
@@ -328,4 +338,39 @@ export function getEnvConfig(): EnvConfig {
  */
 export function areSecretsFromAws(): boolean {
   return secretsFromAws;
+}
+
+/**
+ * Get Shopify configuration for a specific region
+ * @param region - Region code ("CA" or "US")
+ * @returns Shopify configuration for the specified region
+ * @throws Error if configuration is missing for the requested region
+ */
+export function getShopifyConfig(region: "CA" | "US"): {
+  storeDomain: string;
+  accessToken: string;
+  apiVersion: string;
+} {
+  const config = getEnvConfig();
+
+  if (region === "US") {
+    if (!config.SHOPIFY_STORE_DOMAIN_US || !config.SHOPIFY_ACCESS_TOKEN_US) {
+      throw new Error(
+        "US Shopify configuration is missing. " +
+          "Please set SHOPIFY_STORE_DOMAIN_US and SHOPIFY_ACCESS_TOKEN_US environment variables.",
+      );
+    }
+    return {
+      storeDomain: config.SHOPIFY_STORE_DOMAIN_US,
+      accessToken: config.SHOPIFY_ACCESS_TOKEN_US,
+      apiVersion: config.SHOPIFY_API_VERSION || "2024-01",
+    };
+  }
+
+  // Default to CA
+  return {
+    storeDomain: config.SHOPIFY_STORE_DOMAIN,
+    accessToken: config.SHOPIFY_ACCESS_TOKEN,
+    apiVersion: config.SHOPIFY_API_VERSION || "2024-01",
+  };
 }
